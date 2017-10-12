@@ -10,14 +10,6 @@ cmake_minimum_required(VERSION 3.5)
 # You can define multiple libraries, and CMake builds them for you.
 # Gradle automatically packages shared libraries with your APK.
 
-set( blaze_src_DIR ../../lib_source/blaze )
-set( lib_build_DIR ../../lib_source/out )
-file(MAKE_DIRECTORY ${lib_build_DIR})
-
-add_subdirectory( ${blaze_src_DIR}
-
-                  ${lib_build_DIR} )
-
 add_library( # Sets the name of the library.
              native-lib
 
@@ -40,7 +32,24 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
+set( blaze_src_DIR ../../../lib_source/blaze )
+set( blaze_build_DIR ../../../lib_source/blaze/outputs )
+file(MAKE_DIRECTORY ${blaze_build_DIR})
 
+add_subdirectory( # Specifies the directory of the CMakeLists.txt file.
+                  ${blaze_src_DIR}
+
+                  # Specifies the directory for the build outputs.
+                  ${blaze_build_DIR} )
+
+find_package( blaze )
+if( blaze_FOUND )
+   add_library( blaze_target INTERFACE )
+   target_link_libraries( blaze_target INTERFACE blaze::blaze )
+   message(STATUS "Added blaze library")
+else()
+   message(STATUS "Still Could not add blaze library")
+endif()
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
@@ -52,5 +61,3 @@ target_link_libraries( # Specifies the target library.
                        # Links the target library to the log library
                        # included in the NDK.
                        ${log-lib} )
-
-target_link_libraries( native-lib ... blaze )
