@@ -32,6 +32,10 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
+set(BLAS ../../../lib_source/ATLAS)
+find_package(BLAS REQUIRED)
+#find_package(LAPACK REQUIRED)
+
 set( blaze_src_DIR ../../../lib_source/blaze )
 set( blaze_build_DIR ../../../lib_source/blaze/outputs )
 file(MAKE_DIRECTORY ${blaze_build_DIR})
