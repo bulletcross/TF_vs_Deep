@@ -32,39 +32,25 @@ find_library( # Sets the name of the path variable.
               # you want CMake to locate.
               log )
 
-#set(BLAS_DIR ../../../lib_source/ATLAS)
-set(BLAS_DIR ../../../lib_source/OpenBLAS)
+if(NOT log-lib)
+   message(STATUS "log library cannot be found")
+else()
+   message(STATUS "found log library")
+endif()
 
-#set(BLAS_build_DIR ../../../lib_source/ATLAS/outputs)
-set(BLAS_build_DIR ../../../lib_source/OpenBLAS/outputs)
-
-file(MAKE_DIRECTORY ${BLAS_build_DIR})
-add_subdirectory( # Specifies the directory of the CMakeLists.txt file.
-                  ${BLAS_DIR}
-
-                  # Specifies the directory for the build outputs.
-                  ${BLAS_build_DIR} )
-
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
-
-set( blaze_src_DIR ../../../lib_source/blaze )
+set( blaze_src_DIR ../../../blaze-3.2 )
 set( blaze_build_DIR ../../../lib_source/blaze/outputs )
 file(MAKE_DIRECTORY ${blaze_build_DIR})
-
-add_subdirectory( # Specifies the directory of the CMakeLists.txt file.
-                  ${blaze_src_DIR}
-
-                  # Specifies the directory for the build outputs.
-                  ${blaze_build_DIR} )
+add_subdirectory(${blaze_src_DIR} ${blaze_build_DIR} )
 
 find_package( blaze )
+
 if( blaze_FOUND )
    add_library( blaze_target INTERFACE )
-   target_link_libraries( blaze_target INTERFACE blaze::blaze )
-   message(STATUS "Added blaze library")
+  target_link_libraries( blaze_target INTERFACE blaze::blaze )
+  message(STATUS "Added blaze library")
 else()
-   message(STATUS "Still Could not add blaze library")
+  message(STATUS "Still Could not add blaze library")
 endif()
 
 # Specifies libraries CMake should link to your target library. You

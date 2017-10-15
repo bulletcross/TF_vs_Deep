@@ -16,7 +16,6 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                arguments '-DBUILD_TESTING=OFF','-DANDROID_TOOLCHAIN=gcc'
                 cppFlags "-std=c++14 -fexceptions -frtti"
             }
         }

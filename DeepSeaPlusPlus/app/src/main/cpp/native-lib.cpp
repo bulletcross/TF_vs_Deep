@@ -1,6 +1,6 @@
 #include <jni.h>
 #include <string>
-#include <blaze/Math.h>
+
 extern "C"
 JNIEXPORT jstring
 
