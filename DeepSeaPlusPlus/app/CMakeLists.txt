@@ -38,20 +38,28 @@ else()
    message(STATUS "found log library")
 endif()
 
-set( blaze_src_DIR ../../../blaze-3.2 )
-set( blaze_build_DIR ../../../lib_source/blaze/outputs )
-file(MAKE_DIRECTORY ${blaze_build_DIR})
-add_subdirectory(${blaze_src_DIR} ${blaze_build_DIR} )
+find_package( BLAS REQUIRED)
 
-find_package( blaze )
-
-if( blaze_FOUND )
-   add_library( blaze_target INTERFACE )
-  target_link_libraries( blaze_target INTERFACE blaze::blaze )
-  message(STATUS "Added blaze library")
+if(BLAS_FOUND)
+  message(STATUS "BLAS found")
 else()
-  message(STATUS "Still Could not add blaze library")
+  message(STATUS "BLAS not found")
 endif()
+
+#set( blaze_src_DIR ../../../blaze-3.2 )
+#set( blaze_build_DIR ../../../lib_source/blaze/outputs )
+#file(MAKE_DIRECTORY ${blaze_build_DIR})
+#add_subdirectory(${blaze_src_DIR} ${blaze_build_DIR} )
+
+#find_package( blaze )
+
+#if( blaze_FOUND )
+#   add_library( blaze_target INTERFACE )
+#  target_link_libraries( blaze_target INTERFACE blaze::blaze )
+#  message(STATUS "Added blaze library")
+#else()
+#  message(STATUS "Still Could not add blaze library")
+#endif()
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
