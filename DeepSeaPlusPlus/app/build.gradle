@@ -16,13 +16,9 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                arguments "-DBLA_VENDOR=OpenBLAS",
-                        "-DCMAKE_PREFIX_PATH=/usr/lib/openblas-base",
-                        "-DBLAS_openblas_LIBRARY=/usr/lib/openblas-base/libblas.so"
-
                 cppFlags "-std=c++14 -fexceptions -frtti"
 
-                abiFilters 'armeabi-v7a'
+                abiFilters 'armeabi'
             }
         }
     }
