@@ -3,7 +3,7 @@
 //  \file blaze/math/proxy/ComplexProxy.h
 //  \brief Header file for the ComplexProxy class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,10 +40,10 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Exception.h>
 #include <blaze/math/shims/Clear.h>
 #include <blaze/math/shims/Reset.h>
 #include <blaze/system/Inline.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/constraints/Complex.h>
 
 
@@ -69,8 +69,8 @@ class ComplexProxy
 {
  public:
    //**Type definitions****************************************************************************
-   typedef typename CT::value_type  value_type;  //!< Value type of the represented complex element.
-   typedef value_type               ValueType;   //!< Value type of the represented complex element.
+   using value_type = typename CT::value_type;  //!< Value type of the represented complex element.
+   using ValueType  = value_type;               //!< Value type of the represented complex element.
    //**********************************************************************************************
 
    //**Data access functions***********************************************************************

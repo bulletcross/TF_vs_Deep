@@ -3,7 +3,7 @@
 //  \file blaze/math/HybridMatrix.h
 //  \brief Header file for the complete HybridMatrix implementation
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -42,15 +42,15 @@
 
 #include <blaze/math/dense/HybridMatrix.h>
 #include <blaze/math/DenseMatrix.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/HybridVector.h>
+#include <blaze/math/IdentityMatrix.h>
 #include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/Real.h>
 #include <blaze/math/StaticMatrix.h>
 #include <blaze/math/typetraits/UnderlyingBuiltin.h>
-#include <blaze/system/Precision.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/constraints/Numeric.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/Random.h>
 
 
@@ -306,7 +306,7 @@ void makeHermitian( HybridMatrix<Type,M,N,SO>& matrix )
 
    BLAZE_CONSTRAINT_MUST_BE_NUMERIC_TYPE( Type );
 
-   typedef typename UnderlyingBuiltin<Type>::Type  BT;
+   using BT = UnderlyingBuiltin_<Type>;
 
    if( !isSquare( ~matrix ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid non-square matrix provided" );
@@ -349,7 +349,7 @@ void makeHermitian( HybridMatrix<Type,M,N,SO>& matrix, const Arg& min, const Arg
 
    BLAZE_CONSTRAINT_MUST_BE_NUMERIC_TYPE( Type );
 
-   typedef typename UnderlyingBuiltin<Type>::Type  BT;
+   using BT = UnderlyingBuiltin_<Type>;
 
    if( !isSquare( ~matrix ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid non-square matrix provided" );

@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/VecScalarMultExpr.h
 //  \brief Header file for the VecScalarMultExpr base class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -58,12 +58,14 @@ namespace blaze {
 // The VecScalarMultExpr class serves as a tag for all expression templates that implement a
 // vector/scalar multiplication. All classes, that represent a vector/scalar multiplication
 // and that are used within the expression template environment of the Blaze library have
-// to derive from this class in order to qualify as vector/scalar multiplication expression
-// template. Only in case a class is derived from the VecScalarMultExpr base class, the
-// IsVecScalarMultExpr type trait recognizes the class as valid vector/scalar multiplication
-// expression template.
+// to derive publicly from this class in order to qualify as vector/scalar multiplication
+// expression template. Only in case a class is derived publicly from the VecScalarMultExpr
+// base class, the IsVecScalarMultExpr type trait recognizes the class as valid vector/scalar
+// multiplication expression template.
 */
-struct VecScalarMultExpr : private MultExpr
+template< typename VT >  // Vector base type of the expression
+struct VecScalarMultExpr
+   : public MultExpr<VT>
 {};
 //*************************************************************************************************
 

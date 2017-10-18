@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/symmetricmatrix/SymmetricElement.h
 //  \brief Header file for the SymmetricElement class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,6 +40,7 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/adaptors/symmetricmatrix/SymmetricValue.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
@@ -77,7 +78,7 @@ namespace blaze {
 // by means of a \f$ 3 \times 3 \f$ dense Hermitian matrix:
 
    \code
-   typedef blaze::SymmetricMatrix< blaze::CompressedMatrix<int> >  Symmetric;
+   using Symmetric = blaze::SymmetricMatrix< blaze::CompressedMatrix<int> >;
 
    // Creating a 3x3 symmetric sparse matrix
    //
@@ -101,21 +102,22 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class SymmetricElement : private SparseElement
+class SymmetricElement
+   : private SparseElement
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT::ElementType  ElementType;   //!< Type of the represented matrix element.
-   typedef typename MT::Iterator     IteratorType;  //!< Type of the underlying sparse matrix iterators.
+   using ElementType  = ElementType_<MT>;  //!< Type of the represented matrix element.
+   using IteratorType = Iterator_<MT>;     //!< Type of the underlying sparse matrix iterators.
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef SymmetricValue<MT>        ValueType;       //!< The value type of the value-index-pair.
-   typedef size_t                    IndexType;       //!< The index type of the value-index-pair.
-   typedef SymmetricValue<MT>        Reference;       //!< Reference return type.
-   typedef const SymmetricValue<MT>  ConstReference;  //!< Reference-to-const return type.
-   typedef SymmetricElement*         Pointer;         //!< Pointer return type.
+   using ValueType      = SymmetricValue<MT>;        //!< The value type of the value-index-pair.
+   using IndexType      = size_t;                    //!< The index type of the value-index-pair.
+   using Reference      = SymmetricValue<MT>;        //!< Reference return type.
+   using ConstReference = const SymmetricValue<MT>;  //!< Reference-to-const return type.
+   using Pointer        = SymmetricElement*;         //!< Pointer return type.
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -139,7 +141,7 @@ class SymmetricElement : private SparseElement
    //**Access operators****************************************************************************
    /*!\name Access operators */
    //@{
-   inline Pointer operator->();
+   inline Pointer operator->() noexcept;
    //@}
    //**********************************************************************************************
 
@@ -318,7 +320,7 @@ inline SymmetricElement<MT>& SymmetricElement<MT>::operator/=( const T& v )
 // \return Reference to the value of the Hermitian element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline typename SymmetricElement<MT>::Pointer SymmetricElement<MT>::operator->()
+inline typename SymmetricElement<MT>::Pointer SymmetricElement<MT>::operator->() noexcept
 {
    return this;
 }

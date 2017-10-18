@@ -3,7 +3,7 @@
 //  \file blaze/math/AlignmentFlag.h
 //  \brief Header file for the alignment flag values
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -55,13 +55,13 @@ namespace blaze {
    using blaze::columnVector;
    using blaze::unaligned;
 
-   typedef blaze::DynamicVector<int,columnVector>  VectorType;
+   using VectorType = blaze::DynamicVector<int,columnVector>;
 
    VectorType v( 100UL );
-   DenseSubvector<VectorType,unaligned> sv = subvector<unaligned>( v, 10UL, 20UL );
+   Subvector<VectorType,unaligned> sv = subvector<unaligned>( v, 10UL, 20UL );
    \endcode
 */
-const bool unaligned = false;
+constexpr bool unaligned = false;
 //*************************************************************************************************
 
 
@@ -76,13 +76,13 @@ const bool unaligned = false;
    using blaze::columnVector;
    using blaze::aligned;
 
-   typedef blaze::DynamicVector<int,columnVector>  VectorType;
+   using VectorType = blaze::DynamicVector<int,columnVector>;
 
    VectorType v( 100UL );
-   DenseSubvector<VectorType,aligned> sv = subvector<aligned>( v, 8UL, 32UL );
+   Subvector<VectorType,aligned> sv = subvector<aligned>( v, 8UL, 32UL );
    \endcode
 */
-const bool aligned = true;
+constexpr bool aligned = true;
 //*************************************************************************************************
 
 } // namespace blaze

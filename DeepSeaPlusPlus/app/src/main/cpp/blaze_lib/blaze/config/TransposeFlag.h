@@ -3,7 +3,7 @@
 //  \file blaze/config/TransposeFlag.h
 //  \brief Configuration of the default transpose flag for all vectors of the Blaze library
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -33,8 +33,6 @@
 //=================================================================================================
 
 
-namespace blaze {
-
 //*************************************************************************************************
 /*!\brief The default transpose flag for all vectors of the Blaze library.
 // \ingroup config
@@ -45,15 +43,23 @@ namespace blaze {
 
    \code
    // Explicit specification of the transpose flag => column vector
-   StaticVector<double,3UL,columnMajor> a;
+   StaticVector<double,3UL,columnVector> a;
 
-   // No explicit specification of the transpose flag => use of the defaultTransposeFlag
+   // No explicit specification of the transpose flag => use of the default transpose flag
    StaticVector<double,3UL> b;
    \endcode
 
 // Valid settings for the defaultTransposeFlag are blaze::rowVector and blaze::columnVector.
-*/
-const bool defaultTransposeFlag = columnVector;
-//*************************************************************************************************
+//
+// \note It is possible to specify the default transpose flag via command line or by defining
+// this symbol manually before including any Blaze header file:
 
-} // namespace blaze
+   \code
+   #define BLAZE_DEFAULT_TRANSPOSE_FLAG blaze::columnVector
+   #include <blaze/Blaze.h>
+   \endcode
+*/
+#ifndef BLAZE_DEFAULT_TRANSPOSE_FLAG
+#define BLAZE_DEFAULT_TRANSPOSE_FLAG columnVector
+#endif
+//*************************************************************************************************

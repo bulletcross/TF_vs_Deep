@@ -3,7 +3,7 @@
 //  \file blaze/util/valuetraits/IsOdd.h
 //  \brief Header file for the IsEven value trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,9 +40,7 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
-#include <blaze/util/TrueType.h>
+#include <blaze/util/IntegralConstant.h>
 
 
 namespace blaze {
@@ -72,16 +70,9 @@ namespace blaze {
    \endcode
 */
 template< size_t N >
-struct IsOdd : public SelectType<N%2,TrueType,FalseType>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = ( N%2 )?( 1 ):( 0 ) };
-   typedef typename SelectType<N%2,TrueType,FalseType>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsOdd
+   : public BoolConstant< N % 2UL != 0UL >
+{};
 //*************************************************************************************************
 
 } // namespace blaze

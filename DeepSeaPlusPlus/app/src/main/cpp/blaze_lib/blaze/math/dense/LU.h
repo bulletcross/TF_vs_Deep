@@ -3,7 +3,7 @@
 //  \file blaze/math/dense/LU.h
 //  \brief Header file for the dense matrix in-place LU decomposition
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,21 +40,23 @@
 // Includes
 //*************************************************************************************************
 
-#include <algorithm>
+#include <memory>
+#include <utility>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Adaptor.h>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
 #include <blaze/math/constraints/StrictlyTriangular.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/UniTriangular.h>
 #include <blaze/math/constraints/Upper.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/DenseMatrix.h>
-#include <blaze/math/Functions.h>
 #include <blaze/math/lapack/getrf.h>
-#include <blaze/math/traits/DerestrictTrait.h>
 #include <blaze/math/typetraits/IsResizable.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/algorithms/Min.h>
+#include <blaze/util/NumericCast.h>
 
 
 namespace blaze {
@@ -95,23 +97,23 @@ template< typename MT1  // Type of matrix A
 void lu( DenseMatrix<MT1,SO1>& A, Matrix<MT2,SO2>& P )
 {
    BLAZE_CONSTRAINT_MUST_NOT_BE_ADAPTOR_TYPE( MT1 );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
    BLAZE_CONSTRAINT_MUST_NOT_BE_ADAPTOR_TYPE( MT2 );
 
-   typedef typename MT2::ElementType  ET;
+   using ET = ElementType_<MT2>;
 
-   const size_t m( (~A).rows()    );
-   const size_t n( (~A).columns() );
-   const size_t mindim( min( m, n ) );
-   const size_t size( SO1 ? m : n );
+   const int m( numeric_cast<int>( (~A).rows()    ) );
+   const int n( numeric_cast<int>( (~A).columns() ) );
+   const int mindim( min( m, n ) );
+   const int size( SO1 ? m : n );
 
-   UniqueArray<int> helper( new int[mindim + size] );
+   const std::unique_ptr<int[]> helper( new int[mindim + size] );
    int* ipiv  ( helper.get() );
    int* permut( ipiv + mindim );
 
    getrf( ~A, ipiv );
 
-   for( size_t i=0UL; i<size; ++i ) {
+   for( int i=0; i<size; ++i ) {
       permut[i] = i;
    }
 
@@ -122,9 +124,9 @@ void lu( DenseMatrix<MT1,SO1>& A, Matrix<MT2,SO2>& P )
       }
    }
 
-   resize( ~P, size, size );
+   resize( ~P, size, size, false );
    reset( ~P );
-   for( size_t i=0UL; i<size; ++i ) {
+   for( int i=0; i<size; ++i ) {
       (~P)( ( SO1 ? permut[i] : i ), ( SO1 ? i : permut[i] ) ) = ET(1);
    }
 }
@@ -201,7 +203,7 @@ void lu( DenseMatrix<MT1,SO1>& A, Matrix<MT2,SO2>& P )
 // \c complex<double> element type. The attempt to call the function with matrices of any other
 // element type results in a compile time error!
 //
-// \note This function can only be used if the fitting LAPACK library is available and linked to
+// \note This function can only be used if a fitting LAPACK library is available and linked to
 // the executable. Otherwise a call to this function will result in a linker error.
 //
 // \note The LU decomposition will never fail, even for singular matrices. However, in case of a
@@ -218,7 +220,7 @@ void lu( const DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO1>& L,
          DenseMatrix<MT3,SO1>& U, Matrix<MT4,SO2>& P )
 {
    BLAZE_CONSTRAINT_MUST_NOT_BE_STRICTLY_TRIANGULAR_MATRIX_TYPE( MT1 );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
 
    BLAZE_CONSTRAINT_MUST_NOT_BE_SYMMETRIC_MATRIX_TYPE( MT2 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_HERMITIAN_MATRIX_TYPE( MT2 );
@@ -230,8 +232,8 @@ void lu( const DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO1>& L,
    BLAZE_CONSTRAINT_MUST_NOT_BE_UNITRIANGULAR_MATRIX_TYPE( MT3 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_LOWER_MATRIX_TYPE( MT3 );
 
-   typedef typename MT2::ElementType  ET2;
-   typedef typename MT3::ElementType  ET3;
+   using ET2 = ElementType_<MT2>;
+   using ET3 = ElementType_<MT3>;
 
    const size_t m( (~A).rows()    );
    const size_t n( (~A).columns() );
@@ -248,15 +250,15 @@ void lu( const DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO1>& L,
       BLAZE_THROW_INVALID_ARGUMENT( "Square matrix cannot be resized to m-by-n" );
    }
 
-   typename DerestrictTrait<MT2>::Type l( derestrict( ~L ) );
-   typename DerestrictTrait<MT3>::Type u( derestrict( ~U ) );
+   decltype(auto) l( derestrict( ~L ) );
+   decltype(auto) u( derestrict( ~U ) );
 
    if( m < n )
    {
       u = (~A);
       lu( u, ~P );
 
-      resize( ~L, m, m );
+      resize( ~L, m, m, false );
       reset( l );
 
       if( SO1 == rowMajor )
@@ -290,7 +292,7 @@ void lu( const DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO1>& L,
       l = (~A);
       lu( l, ~P );
 
-      resize( ~U, n, n );
+      resize( ~U, n, n, false );
       reset( u );
 
       if( SO1 == rowMajor )

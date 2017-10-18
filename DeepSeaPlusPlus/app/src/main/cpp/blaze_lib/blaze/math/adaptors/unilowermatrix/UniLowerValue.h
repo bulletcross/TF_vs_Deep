@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/unilowermatrix/UniLowerValue.h
 //  \brief Header file for the UniLowerValue class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,15 +40,16 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
 #include <blaze/math/constraints/SparseMatrix.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/Upper.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/proxy/Proxy.h>
 #include <blaze/math/shims/Clear.h>
-#include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/Invert.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/IsNaN.h>
@@ -56,14 +57,11 @@
 #include <blaze/math/shims/IsReal.h>
 #include <blaze/math/shims/IsZero.h>
 #include <blaze/math/shims/Reset.h>
-#include <blaze/math/traits/ConjExprTrait.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/util/constraints/Const.h>
 #include <blaze/util/constraints/Numeric.h>
 #include <blaze/util/constraints/Pointer.h>
 #include <blaze/util/constraints/Reference.h>
 #include <blaze/util/constraints/Volatile.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/InvalidType.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/Types.h>
@@ -88,7 +86,7 @@ namespace blaze {
 // illustrates this by means of a \f$ 3 \times 3 \f$ sparse lower unitriangular matrix:
 
    \code
-   typedef blaze::UniLowerMatrix< blaze::CompressedMatrix<int> >  UniLower;
+   using UniLower = blaze::UniLowerMatrix< blaze::CompressedMatrix<int> >;
 
    // Creating a 3x3 lower unitriangular sparse matrix
    UniLower A( 3UL );
@@ -104,7 +102,8 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class UniLowerValue : public Proxy< UniLowerValue<MT> >
+class UniLowerValue
+   : public Proxy< UniLowerValue<MT> >
 {
  private:
    //**struct BuiltinType**************************************************************************
@@ -112,7 +111,7 @@ class UniLowerValue : public Proxy< UniLowerValue<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct BuiltinType { typedef INVALID_TYPE  Type; };
+   struct BuiltinType { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
@@ -121,20 +120,20 @@ class UniLowerValue : public Proxy< UniLowerValue<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct ComplexType { typedef typename T::value_type  Type; };
+   struct ComplexType { using Type = typename T::value_type; };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef typename MT::ElementType  RepresentedType;   //!< Type of the represented matrix element.
+   using RepresentedType = ElementType_<MT>;   //!< Type of the represented matrix element.
 
    //! Value type of the represented complex element.
-   typedef typename If< IsComplex<RepresentedType>
-                      , ComplexType<RepresentedType>
-                      , BuiltinType<RepresentedType> >::Type::Type  ValueType;
+   using ValueType = typename If_< IsComplex<RepresentedType>
+                                 , ComplexType<RepresentedType>
+                                 , BuiltinType<RepresentedType> >::Type;
 
-   typedef ValueType  value_type;  //!< Value type of the represented complex element.
+   using value_type = ValueType;  //!< Value type of the represented complex element.
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -163,15 +162,15 @@ class UniLowerValue : public Proxy< UniLowerValue<MT> >
    inline void clear () const;
    inline void invert() const;
 
-   inline RepresentedType get() const;
-   inline bool            isRestricted() const;
+   inline RepresentedType get() const noexcept;
+   inline bool            isRestricted() const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Conversion operator*************************************************************************
    /*!\name Conversion operator */
    //@{
-   inline operator RepresentedType() const;
+   inline operator RepresentedType() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -437,7 +436,7 @@ inline void UniLowerValue<MT>::invert() const
 // \return Copy of the represented value.
 */
 template< typename MT >  // Type of the adapted matrix
-inline typename UniLowerValue<MT>::RepresentedType UniLowerValue<MT>::get() const
+inline typename UniLowerValue<MT>::RepresentedType UniLowerValue<MT>::get() const noexcept
 {
    return *value_;
 }
@@ -450,7 +449,7 @@ inline typename UniLowerValue<MT>::RepresentedType UniLowerValue<MT>::get() cons
 // \return \a true in case access to the matrix element is restricted, \a false if not.
 */
 template< typename MT >  // Type of the adapted matrix
-inline bool UniLowerValue<MT>::isRestricted() const
+inline bool UniLowerValue<MT>::isRestricted() const noexcept
 {
    return diagonal_;
 }
@@ -471,7 +470,7 @@ inline bool UniLowerValue<MT>::isRestricted() const
 // \return Copy of the represented value.
 */
 template< typename MT >  // Type of the adapted matrix
-inline UniLowerValue<MT>::operator RepresentedType() const
+inline UniLowerValue<MT>::operator RepresentedType() const noexcept
 {
    return *value_;
 }
@@ -574,10 +573,6 @@ inline void UniLowerValue<MT>::imag( ValueType value ) const
 /*!\name UniLowerValue global functions */
 //@{
 template< typename MT >
-inline typename ConjExprTrait< typename UniLowerValue<MT>::RepresentedType >::Type
-   conj( const UniLowerValue<MT>& value );
-
-template< typename MT >
 inline void reset( const UniLowerValue<MT>& value );
 
 template< typename MT >
@@ -586,43 +581,21 @@ inline void clear( const UniLowerValue<MT>& value );
 template< typename MT >
 inline void invert( const UniLowerValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const UniLowerValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const UniLowerValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const UniLowerValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const UniLowerValue<MT>& value );
 
 template< typename MT >
 inline bool isnan( const UniLowerValue<MT>& value );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Computing the complex conjugate of the unilower value.
-// \ingroup unilower_matrix
-//
-// \param value The given unilower value.
-// \return The complex conjugate of the unilower value.
-//
-// This function computes the complex conjugate of the unilower value. In case the value
-// represents a vector- or matrix-like data structure the function returns an expression
-// representing the complex conjugate of the vector/matrix.
-*/
-template< typename MT >
-inline typename ConjExprTrait< typename UniLowerValue<MT>::RepresentedType >::Type
-   conj( const UniLowerValue<MT>& value )
-{
-   using blaze::conj;
-
-   return conj( (~value).get() );
-}
 //*************************************************************************************************
 
 
@@ -685,12 +658,12 @@ inline void invert( const UniLowerValue<MT>& value )
 // This function checks whether the unilower value is in default state. In case it is in
 // default state, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const UniLowerValue<MT>& value )
 {
    using blaze::isDefault;
 
-   return isDefault( value.get() );
+   return isDefault<RF>( value.get() );
 }
 //*************************************************************************************************
 
@@ -707,12 +680,12 @@ inline bool isDefault( const UniLowerValue<MT>& value )
 // type, the function returns \a true if the imaginary part is equal to 0. Otherwise it returns
 // \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const UniLowerValue<MT>& value )
 {
    using blaze::isReal;
 
-   return isReal( value.get() );
+   return isReal<RF>( value.get() );
 }
 //*************************************************************************************************
 
@@ -727,12 +700,12 @@ inline bool isReal( const UniLowerValue<MT>& value )
 // This function checks whether the unilower value represents the numeric value 0. In case it
 // is 0, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const UniLowerValue<MT>& value )
 {
    using blaze::isZero;
 
-   return isZero( value.get() );
+   return isZero<RF>( value.get() );
 }
 //*************************************************************************************************
 
@@ -747,12 +720,12 @@ inline bool isZero( const UniLowerValue<MT>& value )
 // This function checks whether the unilower value represents the numeric value 1. In case it
 // is 1, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const UniLowerValue<MT>& value )
 {
    using blaze::isOne;
 
-   return isOne( value.get() );
+   return isOne<RF>( value.get() );
 }
 //*************************************************************************************************
 

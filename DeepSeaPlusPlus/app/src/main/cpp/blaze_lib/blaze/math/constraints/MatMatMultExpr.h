@@ -3,7 +3,7 @@
 //  \file blaze/math/constraints/MatMatMultExpr.h
 //  \brief Constraint on the data type
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -44,13 +44,10 @@
 #include <blaze/math/typetraits/IsMatMatMultExpr.h>
 #include <blaze/math/typetraits/IsMatrix.h>
 #include <blaze/math/typetraits/Rows.h>
-#include <blaze/util/constraints/ConstraintTest.h>
 #include <blaze/util/mpl/And.h>
 #include <blaze/util/mpl/Equal.h>
-#include <blaze/util/mpl/Not.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/mpl/SizeT.h>
-#include <blaze/util/Suffix.h>
+#include <blaze/util/mpl/PtrdiffT.h>
 
 
 namespace blaze {
@@ -62,22 +59,6 @@ namespace blaze {
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup math_constraints
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE_FAILED;
-template<> struct CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE_FAILED<true> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Constraint on the data type.
 // \ingroup math_constraints
 //
@@ -85,10 +66,7 @@ template<> struct CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE_FAILED<true> { enum { v
 // derived from the MatMatMultExpr base class), a compilation error is created.
 */
 #define BLAZE_CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE(T) \
-   typedef \
-      blaze::CONSTRAINT_TEST< \
-         blaze::CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE_FAILED< blaze::IsMatMatMultExpr<T>::value >::value > \
-      BLAZE_JOIN( CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE_TYPEDEF, __LINE__ )
+   static_assert( ::blaze::IsMatMatMultExpr<T>::value, "Non-matrix/matrix multiplication expression type detected" )
 //*************************************************************************************************
 
 
@@ -101,22 +79,6 @@ template<> struct CONSTRAINT_MUST_BE_MATMATMULTEXPR_TYPE_FAILED<true> { enum { v
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup math_constraints
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE_FAILED;
-template<> struct CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE_FAILED<true> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Constraint on the data type.
 // \ingroup math_constraints
 //
@@ -124,10 +86,7 @@ template<> struct CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE_FAILED<true> { enum
 // derived from the MatMatMultExpr base class), a compilation error is created.
 */
 #define BLAZE_CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE(T) \
-   typedef \
-      blaze::CONSTRAINT_TEST< \
-         blaze::CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE_FAILED< !blaze::IsMatMatMultExpr<T>::value >::value > \
-      BLAZE_JOIN( CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE_TYPEDEF, __LINE__ )
+   static_assert( !::blaze::IsMatMatMultExpr<T>::value, "Matrix/matrix multiplication expression type detected" )
 //*************************************************************************************************
 
 
@@ -140,22 +99,6 @@ template<> struct CONSTRAINT_MUST_NOT_BE_MATMATMULTEXPR_TYPE_FAILED<true> { enum
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup math_constraints
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CONSTRAINT_MUST_FORM_VALID_MATMATMULTEXPR_FAILED;
-template<> struct CONSTRAINT_MUST_FORM_VALID_MATMATMULTEXPR_FAILED<true> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Constraint on the data type.
 // \ingroup math_constraints
 //
@@ -163,61 +106,12 @@ template<> struct CONSTRAINT_MUST_FORM_VALID_MATMATMULTEXPR_FAILED<true> { enum 
 // a compilation error is created.
 */
 #define BLAZE_CONSTRAINT_MUST_FORM_VALID_MATMATMULTEXPR(T1,T2) \
-   typedef \
-      blaze::CONSTRAINT_TEST< \
-         blaze::CONSTRAINT_MUST_FORM_VALID_MATMATMULTEXPR_FAILED< ( \
-            blaze::And< blaze::IsMatrix<T1> \
-                      , blaze::IsMatrix<T2> \
-                      , blaze::Or< blaze::Equal< blaze::Columns<T1>, blaze::SizeT<0UL> > \
-                                 , blaze::Equal< blaze::Rows<T2>, blaze::SizeT<0UL> > \
-                                 , blaze::Equal< blaze::Columns<T1>, blaze::Rows<T2> > > \
-                      >::value ) >::value > \
-      BLAZE_JOIN( CONSTRAINT_MUST_FORM_VALID_MATMATMULTEXPR_TYPEDEF, __LINE__ )
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  MUST_NOT_FORM_VALID_MATMATMULTEXPR CONSTRAINT
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup math_constraints
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CONSTRAINT_MUST_NOT_FORM_VALID_MATMATMULTEXPR_FAILED;
-template<> struct CONSTRAINT_MUST_NOT_FORM_VALID_MATMATMULTEXPR_FAILED<true> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Constraint on the data type.
-// \ingroup math_constraints
-//
-// In case the given data types \a T1 and \a T2 do form a valid matrix/matrix multiplication,
-// a compilation error is created.
-*/
-#define BLAZE_CONSTRAINT_MUST_NOT_FORM_VALID_MATMATMULTEXPR(T1,T2) \
-   typedef \
-      blaze::CONSTRAINT_TEST< \
-         blaze::CONSTRAINT_MUST_NOT_FORM_VALID_MATMATMULTEXPR_FAILED< ( \
-            blaze::Not< blaze::And< blaze::IsMatrix<T1> \
-                                  , blaze::IsMatrix<T2> \
-                                  , blaze::Or< blaze::Equal< blaze::Columns<T1>, blaze::SizeT<0UL> > \
-                                             , blaze::Equal< blaze::Rows<T2>, blaze::SizeT<0UL> > \
-                                             , blaze::Equal< blaze::Columns<T1>, blaze::Rows<T2> > > > \
-                      >::value ) >::value > \
-      BLAZE_JOIN( CONSTRAINT_MUST_NOT_FORM_VALID_MATMATMULTEXPR_TYPEDEF, __LINE__ )
+   static_assert( ::blaze::And< ::blaze::IsMatrix<T1> \
+                              , ::blaze::IsMatrix<T2> \
+                              , ::blaze::Or< ::blaze::Equal< ::blaze::Columns<T1>, ::blaze::PtrdiffT<-1L> > \
+                                           , ::blaze::Equal< ::blaze::Rows<T2>, ::blaze::PtrdiffT<-1L> > \
+                                           , ::blaze::Equal< ::blaze::Columns<T1>, ::blaze::Rows<T2> > > \
+                              >::value, "Invalid matrix/matrix multiplication expression detected" )
 //*************************************************************************************************
 
 } // namespace blaze

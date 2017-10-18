@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/symmetricmatrix/SymmetricValue.h
 //  \brief Header file for the SymmetricValue class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,6 +40,7 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
@@ -48,7 +49,6 @@
 #include <blaze/math/constraints/Upper.h>
 #include <blaze/math/proxy/Proxy.h>
 #include <blaze/math/shims/Clear.h>
-#include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/Invert.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/IsNaN.h>
@@ -56,7 +56,6 @@
 #include <blaze/math/shims/IsReal.h>
 #include <blaze/math/shims/IsZero.h>
 #include <blaze/math/shims/Reset.h>
-#include <blaze/math/traits/ConjExprTrait.h>
 #include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/util/constraints/Const.h>
 #include <blaze/util/constraints/Numeric.h>
@@ -87,7 +86,7 @@ namespace blaze {
 // sparse symmetric matrix:
 
    \code
-   typedef blaze::SymmetricMatrix< blaze::CompressedMatrix<int> >  Symmetric;
+   using Symmetric = blaze::SymmetricMatrix< blaze::CompressedMatrix<int> >;
 
    // Creating a 3x3 symmetric sparse matrix
    //
@@ -111,11 +110,12 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class SymmetricValue : public Proxy< SymmetricValue<MT> >
+class SymmetricValue
+   : public Proxy< SymmetricValue<MT> >
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT::Iterator  IteratorType;  //!< Type of the underlying sparse matrix iterators.
+   using IteratorType = typename MT::Iterator;  //!< Type of the underlying sparse matrix iterators.
    //**********************************************************************************************
 
    //**struct BuiltinType**************************************************************************
@@ -123,7 +123,7 @@ class SymmetricValue : public Proxy< SymmetricValue<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct BuiltinType { typedef INVALID_TYPE  Type; };
+   struct BuiltinType { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
@@ -132,20 +132,20 @@ class SymmetricValue : public Proxy< SymmetricValue<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct ComplexType { typedef typename T::value_type  Type; };
+   struct ComplexType { using Type = typename T::value_type; };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef typename MT::ElementType  RepresentedType;  //!< Type of the represented matrix element.
+   using RepresentedType = ElementType_<MT>;  //!< Type of the represented matrix element.
 
    //! Value type of the represented complex element.
-   typedef typename If< IsComplex<RepresentedType>
-                      , ComplexType<RepresentedType>
-                      , BuiltinType<RepresentedType> >::Type::Type  ValueType;
+   using ValueType = typename If_< IsComplex<RepresentedType>
+                                 , ComplexType<RepresentedType>
+                                 , BuiltinType<RepresentedType> >::Type;
 
-   typedef ValueType  value_type;  //!< Value type of the represented complex element.
+   using value_type = ValueType;  //!< Value type of the represented complex element.
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -174,14 +174,14 @@ class SymmetricValue : public Proxy< SymmetricValue<MT> >
    inline void clear () const;
    inline void invert() const;
 
-   inline RepresentedType get() const;
+   inline RepresentedType get() const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Conversion operator*************************************************************************
    /*!\name Conversion operator */
    //@{
-   inline operator RepresentedType() const;
+   inline operator RepresentedType() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -452,7 +452,7 @@ inline void SymmetricValue<MT>::invert() const
 // \return Copy of the represented value.
 */
 template< typename MT >  // Type of the adapted matrix
-inline typename SymmetricValue<MT>::RepresentedType SymmetricValue<MT>::get() const
+inline typename SymmetricValue<MT>::RepresentedType SymmetricValue<MT>::get() const noexcept
 {
    return pos_->value();
 }
@@ -492,7 +492,7 @@ inline void SymmetricValue<MT>::sync() const
 // \return Copy of the represented value.
 */
 template< typename MT >  // Type of the adapted matrix
-inline SymmetricValue<MT>::operator RepresentedType() const
+inline SymmetricValue<MT>::operator RepresentedType() const noexcept
 {
    return pos_->value();
 }
@@ -587,10 +587,6 @@ inline void SymmetricValue<MT>::imag( ValueType value ) const
 /*!\name SymmetricValue global functions */
 //@{
 template< typename MT >
-inline typename ConjExprTrait< typename SymmetricValue<MT>::RepresentedType >::Type
-   conj( const SymmetricValue<MT>& value );
-
-template< typename MT >
 inline void reset( const SymmetricValue<MT>& value );
 
 template< typename MT >
@@ -599,43 +595,21 @@ inline void clear( const SymmetricValue<MT>& value );
 template< typename MT >
 inline void invert( const SymmetricValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const SymmetricValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const SymmetricValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const SymmetricValue<MT>& value );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const SymmetricValue<MT>& value );
 
 template< typename MT >
 inline bool isnan( const SymmetricValue<MT>& value );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Computing the complex conjugate of the symmetric value.
-// \ingroup symmetric_matrix
-//
-// \param value The given symmetric value.
-// \return The complex conjugate of the symmetric value.
-//
-// This function computes the complex conjugate of the symmetric value. In case the value
-// represents a vector- or matrix-like data structure the function returns an expression
-// representing the complex conjugate of the vector/matrix.
-*/
-template< typename MT >
-inline typename ConjExprTrait< typename SymmetricValue<MT>::RepresentedType >::Type
-   conj( const SymmetricValue<MT>& value )
-{
-   using blaze::conj;
-
-   return conj( (~value).get() );
-}
 //*************************************************************************************************
 
 
@@ -698,12 +672,12 @@ inline void invert( const SymmetricValue<MT>& value )
 // This function checks whether the symmetric value is in default state. In case it is in
 // default state, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const SymmetricValue<MT>& value )
 {
    using blaze::isDefault;
 
-   return isDefault( value.get() );
+   return isDefault<RF>( value.get() );
 }
 //*************************************************************************************************
 
@@ -720,12 +694,12 @@ inline bool isDefault( const SymmetricValue<MT>& value )
 // type, the function returns \a true if the imaginary part is equal to 0. Otherwise it returns
 // \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const SymmetricValue<MT>& value )
 {
    using blaze::isReal;
 
-   return isReal( value.get() );
+   return isReal<RF>( value.get() );
 }
 //*************************************************************************************************
 
@@ -740,12 +714,12 @@ inline bool isReal( const SymmetricValue<MT>& value )
 // This function checks whether the symmetric value represents the numeric value 0. In case it
 // is 0, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const SymmetricValue<MT>& value )
 {
    using blaze::isZero;
 
-   return isZero( value.get() );
+   return isZero<RF>( value.get() );
 }
 //*************************************************************************************************
 
@@ -760,12 +734,12 @@ inline bool isZero( const SymmetricValue<MT>& value )
 // This function checks whether the symmetric value represents the numeric value 1. In case it
 // is 1, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const SymmetricValue<MT>& value )
 {
    using blaze::isOne;
 
-   return isOne( value.get() );
+   return isOne<RF>( value.get() );
 }
 //*************************************************************************************************
 

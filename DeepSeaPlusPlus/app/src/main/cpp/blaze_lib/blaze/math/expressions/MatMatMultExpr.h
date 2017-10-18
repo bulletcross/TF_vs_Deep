@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/MatMatMultExpr.h
 //  \brief Header file for the MatMatMultExpr base class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -58,11 +58,14 @@ namespace blaze {
 // The MatMatMultExpr class serves as a tag for all expression templates that implement a
 // matrix/matrix multiplication. All classes, that represent a matrix multiplication and
 // that are used within the expression template environment of the Blaze library have to
-// derive from this class in order to qualify as matrix multiplication expression template.
-// Only in case a class is derived from the MatMatMultExpr base class, the IsMatMatMultExpr
-// type trait recognizes the class as valid matrix multiplication expression template.
+// derive publicly from this class in order to qualify as matrix multiplication expression
+// template. Only in case a class is derived publicly from the MatMatMultExpr base class,
+// the IsMatMatMultExpr type trait recognizes the class as valid matrix multiplication
+// expression template.
 */
-struct MatMatMultExpr : private MultExpr
+template< typename MT >  // Matrix base type of the expression
+struct MatMatMultExpr
+   : public MultExpr<MT>
 {};
 //*************************************************************************************************
 

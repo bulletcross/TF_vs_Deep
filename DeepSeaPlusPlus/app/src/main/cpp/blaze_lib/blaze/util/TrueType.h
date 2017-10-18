@@ -3,7 +3,7 @@
 //  \file blaze/util/TrueType.h
 //  \brief Header file for the TrueType type/value trait base class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,14 +40,14 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/integral_constant.hpp>
+#include <blaze/util/IntegralConstant.h>
 
 
 namespace blaze {
 
 //=================================================================================================
 //
-//  CLASS DEFINITION
+//  ALIAS DECLARATION
 //
 //=================================================================================================
 
@@ -58,7 +58,7 @@ namespace blaze {
 // The TrueType class is used as base class for type traits and value traits that evaluate to
 // \a true.
 */
-typedef boost::true_type  TrueType;
+using TrueType = BoolConstant<true>;
 //*************************************************************************************************
 
 } // namespace blaze

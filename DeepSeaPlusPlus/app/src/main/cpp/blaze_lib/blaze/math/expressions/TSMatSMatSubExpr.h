@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/TSMatSMatSubExpr.h
 //  \brief Header file for the transpose sparse matrix/sparse matrix subtraction expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,22 +40,22 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/ColumnMajorMatrix.h>
 #include <blaze/math/constraints/MatMatSubExpr.h>
+#include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/RowMajorMatrix.h>
 #include <blaze/math/constraints/SparseMatrix.h>
 #include <blaze/math/constraints/StorageOrder.h>
 #include <blaze/math/constraints/Symmetric.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/MatMatSubExpr.h>
 #include <blaze/math/expressions/SparseMatrix.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/Serial.h>
-#include <blaze/math/traits/ColumnExprTrait.h>
-#include <blaze/math/traits/RowExprTrait.h>
 #include <blaze/math/traits/SubExprTrait.h>
-#include <blaze/math/traits/SubmatrixExprTrait.h>
 #include <blaze/math/traits/SubTrait.h>
 #include <blaze/math/typetraits/Columns.h>
 #include <blaze/math/typetraits/IsComputation.h>
@@ -74,14 +74,13 @@
 #include <blaze/util/Assert.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
-#include <blaze/util/logging/FunctionTrace.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/mpl/And.h>
-#include <blaze/util/mpl/Max.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/mpl/If.h>
+#include <blaze/util/mpl/Maximum.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/RemoveReference.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -101,18 +100,18 @@ namespace blaze {
 */
 template< typename MT1    // Type of the left-hand side sparse matrix
         , typename MT2 >  // Type of the right-hand side sparse matrix
-class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
-                       , private MatMatSubExpr
-                       , private Computation
+class TSMatSMatSubExpr
+   : public MatMatSubExpr< SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false > >
+   , private Computation
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT1::ResultType     RT1;  //!< Result type of the left-hand side sparse matrix expression.
-   typedef typename MT2::ResultType     RT2;  //!< Result type of the right-hand side sparse matrix expression.
-   typedef typename MT1::ReturnType     RN1;  //!< Return type of the left-hand side sparse matrix expression.
-   typedef typename MT2::ReturnType     RN2;  //!< Return type of the right-hand side sparse matrix expression.
-   typedef typename MT1::CompositeType  CT1;  //!< Composite type of the left-hand side sparse matrix expression.
-   typedef typename MT2::CompositeType  CT2;  //!< Composite type of the right-hand side sparse matrix expression.
+   using RT1 = ResultType_<MT1>;     //!< Result type of the left-hand side sparse matrix expression.
+   using RT2 = ResultType_<MT2>;     //!< Result type of the right-hand side sparse matrix expression.
+   using RN1 = ReturnType_<MT1>;     //!< Return type of the left-hand side sparse matrix expression.
+   using RN2 = ReturnType_<MT2>;     //!< Return type of the right-hand side sparse matrix expression.
+   using CT1 = CompositeType_<MT1>;  //!< Composite type of the left-hand side sparse matrix expression.
+   using CT2 = CompositeType_<MT2>;  //!< Composite type of the right-hand side sparse matrix expression.
    //**********************************************************************************************
 
    //**Return type evaluation**********************************************************************
@@ -122,10 +121,10 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
        or matrix, \a returnExpr will be set to \a false and the subscript operator will
        return it's result by value. Otherwise \a returnExpr will be set to \a true and
        the subscript operator may return it's result as an expression. */
-   enum { returnExpr = !IsTemporary<RN1>::value && !IsTemporary<RN2>::value };
+   enum : bool { returnExpr = !IsTemporary<RN1>::value && !IsTemporary<RN2>::value };
 
    //! Expression return type for the subscript operator.
-   typedef typename SubExprTrait<RN1,RN2>::Type  ExprReturnType;
+   using ExprReturnType = SubExprTrait_<RN1,RN2>;
    //**********************************************************************************************
 
    //**Serial evaluation strategy******************************************************************
@@ -139,7 +138,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    template< typename T1, typename T2 >
    struct UseSymmetricKernel {
       BLAZE_CONSTRAINT_MATRICES_MUST_HAVE_DIFFERENT_STORAGE_ORDER( T1, T2 );
-      enum { value = IsSymmetric<T2>::value };
+      enum : bool { value = IsSymmetric<T2>::value };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -153,35 +152,35 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
        and the default strategy is chosen. */
    template< typename MT >
    struct UseSMPAssign {
-      enum { value = MT::smpAssignable };
+      enum : bool { value = MT::smpAssignable };
    };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef TSMatSMatSubExpr<MT1,MT2>           This;           //!< Type of this TSMatSMatSubExpr instance.
-   typedef typename SubTrait<RT1,RT2>::Type    ResultType;     //!< Result type for expression template evaluations.
-   typedef typename ResultType::OppositeType   OppositeType;   //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename ResultType::TransposeType  TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename ResultType::ElementType    ElementType;    //!< Resulting element type.
+   using This          = TSMatSMatSubExpr<MT1,MT2>;   //!< Type of this TSMatSMatSubExpr instance.
+   using ResultType    = SubTrait_<RT1,RT2>;          //!< Result type for expression template evaluations.
+   using OppositeType  = OppositeType_<ResultType>;   //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType = TransposeType_<ResultType>;  //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<ResultType>;    //!< Resulting element type.
 
    //! Return type for expression template evaluations.
-   typedef const typename SelectType< returnExpr, ExprReturnType, ElementType >::Type  ReturnType;
+   using ReturnType = const IfTrue_< returnExpr, ExprReturnType, ElementType >;
 
    //! Data type for composite expression templates.
-   typedef const ResultType  CompositeType;
+   using CompositeType = const ResultType;
 
    //! Composite type of the left-hand side sparse matrix expression.
-   typedef typename SelectType< IsExpression<MT1>::value, const MT1, const MT1& >::Type  LeftOperand;
+   using LeftOperand = If_< IsExpression<MT1>, const MT1, const MT1& >;
 
    //! Composite type of the right-hand side sparse matrix expression.
-   typedef typename SelectType< IsExpression<MT2>::value, const MT2, const MT2& >::Type  RightOperand;
+   using RightOperand = If_< IsExpression<MT2>, const MT2, const MT2& >;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = 0 };
+   enum : bool { smpAssignable = false };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -190,7 +189,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // \param lhs The left-hand side sparse matrix operand of the subtraction expression.
    // \param rhs The right-hand side sparse matrix operand of the subtraction expression.
    */
-   explicit inline TSMatSMatSubExpr( const MT1& lhs, const MT2& rhs )
+   explicit inline TSMatSMatSubExpr( const MT1& lhs, const MT2& rhs ) noexcept
       : lhs_( lhs )  // Left-hand side sparse matrix of the subtraction expression
       , rhs_( rhs )  // Right-hand side sparse matrix of the subtraction expression
    {
@@ -237,7 +236,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    //
    // \return The number of rows of the matrix.
    */
-   inline size_t rows() const {
+   inline size_t rows() const noexcept {
       return lhs_.rows();
    }
    //**********************************************************************************************
@@ -247,7 +246,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    //
    // \return The number of columns of the matrix.
    */
-   inline size_t columns() const {
+   inline size_t columns() const noexcept {
       return lhs_.columns();
    }
    //**********************************************************************************************
@@ -278,7 +277,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    //
    // \return The left-hand side transpose sparse matrix operand.
    */
-   inline LeftOperand leftOperand() const {
+   inline LeftOperand leftOperand() const noexcept {
       return lhs_;
    }
    //**********************************************************************************************
@@ -288,7 +287,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    //
    // \return The right-hand side sparse matrix operand.
    */
-   inline RightOperand rightOperand() const {
+   inline RightOperand rightOperand() const noexcept {
       return rhs_;
    }
    //**********************************************************************************************
@@ -300,7 +299,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return ( lhs_.canAlias( alias ) || rhs_.canAlias( alias ) );
    }
    //**********************************************************************************************
@@ -312,7 +311,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return ( lhs_.isAliased( alias ) || rhs_.isAliased( alias ) );
    }
    //**********************************************************************************************
@@ -344,11 +343,11 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
 
-      typedef typename RemoveReference<CT2>::Type::ConstIterator  RightIterator;
+      using RightIterator = ConstIterator_< RemoveReference_<CT2> >;
 
       assign( ~lhs, rhs.lhs_ );
 
-      if( !IsResizable<typename MT::ElementType>::value ) {
+      if( !IsResizable< ElementType_<MT> >::value ) {
          subAssign( ~lhs, rhs.rhs_ );
       }
       else
@@ -388,7 +387,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // subtraction expression to a row-major sparse matrix.
    */
    template< typename MT >  // Type of the target sparse matrix
-   friend inline typename DisableIf< UseSymmetricKernel<MT,MT1> >::Type
+   friend inline DisableIf_< UseSymmetricKernel<MT,MT1> >
       assign( SparseMatrix<MT,false>& lhs, const TSMatSMatSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -396,11 +395,11 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
 
-      typedef typename RT1::OppositeType::ConstIterator           LeftIterator;
-      typedef typename RemoveReference<CT2>::Type::ConstIterator  RightIterator;
+      using LeftIterator  = ConstIterator_< OppositeType_<RT1> >;
+      using RightIterator = ConstIterator_< RemoveReference_<CT2> >;
 
       // Evaluation of the left-hand side sparse matrix operand
-      const typename RT1::OppositeType A( serial( rhs.lhs_ ) );
+      const OppositeType_<RT1> A( serial( rhs.lhs_ ) );
 
       // Evaluation of the right-hand side sparse matrix operand
       CT2 B( serial( rhs.rhs_ ) );
@@ -435,7 +434,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
                ++r;
             }
             else {
-               (~lhs).append( i, l->index(), l->value()-r->value() );
+               (~lhs).append( i, l->index(), l->value() - r->value() );
                ++l;
                ++r;
             }
@@ -471,7 +470,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // sparse matrix subtraction expression to a row-major sparse matrix.
    */
    template< typename MT >  // Type of the target sparse matrix
-   friend inline typename EnableIf< UseSymmetricKernel<MT,MT1> >::Type
+   friend inline EnableIf_< UseSymmetricKernel<MT,MT1> >
       assign( SparseMatrix<MT,false>& lhs, const TSMatSMatSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -498,7 +497,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // sparse matrix subtraction expression to a column-major sparse matrix.
    */
    template< typename MT >  // Type of the target sparse matrix
-   friend inline typename DisableIf< UseSymmetricKernel<MT,MT2> >::Type
+   friend inline DisableIf_< UseSymmetricKernel<MT,MT2> >
       assign( SparseMatrix<MT,true>& lhs, const TSMatSMatSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -508,14 +507,14 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
 
-      typedef typename RemoveReference<CT1>::Type::ConstIterator  LeftIterator;
-      typedef typename RT2::OppositeType::ConstIterator           RightIterator;
+      using LeftIterator  = ConstIterator_< RemoveReference_<CT1> >;
+      using RightIterator = ConstIterator_< OppositeType_<RT2> >;
 
       // Evaluation of the left-hand side sparse matrix operand
       CT1 A( serial( rhs.lhs_ ) );
 
       // Evaluation of the right-hand side sparse matrix operand
-      const typename RT2::OppositeType B( serial( rhs.rhs_ ) );
+      const OppositeType_<RT2> B( serial( rhs.rhs_ ) );
 
       BLAZE_INTERNAL_ASSERT( A.rows()    == rhs.lhs_.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( A.columns() == rhs.lhs_.columns(), "Invalid number of columns" );
@@ -547,7 +546,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
                ++r;
             }
             else {
-               (~lhs).append( l->index(), j, l->value()-r->value() );
+               (~lhs).append( l->index(), j, l->value() - r->value() );
                ++l;
                ++r;
             }
@@ -583,7 +582,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // sparse matrix subtraction expression to a column-major sparse matrix.
    */
    template< typename MT >  // Type of the target sparse matrix
-   friend inline typename EnableIf< UseSymmetricKernel<MT,MT2> >::Type
+   friend inline EnableIf_< UseSymmetricKernel<MT,MT2> >
       assign( SparseMatrix<MT,true>& lhs, const TSMatSMatSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -662,6 +661,42 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    // No special implementation for the subtraction assignment to sparse matrices.
    //**********************************************************************************************
 
+   //**Schur product assignment to dense matrices**************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief Schur product assignment of a transpose sparse matrix-sparse matrix subtraction
+   //        to a dense matrix.
+   // \ingroup sparse_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side subtraction expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized Schur product assignment of a transpose
+   // sparse matrix-sparse matrix subtraction expression to a dense matrix.
+   */
+   template< typename MT  // Type of the target dense matrix
+           , bool SO >    // Storage order of the target dense matrix
+   friend inline void schurAssign( DenseMatrix<MT,SO>& lhs, const TSMatSMatSubExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_CONSTRAINT_MUST_BE_SPARSE_MATRIX_TYPE( ResultType );
+      BLAZE_CONSTRAINT_MUST_BE_ROW_MAJOR_MATRIX_TYPE( ResultType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      const ResultType tmp( serial( rhs ) );
+      schurAssign( ~lhs, tmp );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**Schur product assignment to sparse matrices*************************************************
+   // No special implementation for the Schur product assignment to sparse matrices.
+   //**********************************************************************************************
+
    //**Multiplication assignment to dense matrices*************************************************
    // No special implementation for the multiplication assignment to dense matrices.
    //**********************************************************************************************
@@ -695,7 +730,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT> >
       smpAddAssign( DenseMatrix<MT,SO>& lhs, const TSMatSMatSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -730,7 +765,7 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT> >
       smpSubAssign( DenseMatrix<MT,SO>& lhs, const TSMatSMatSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -746,6 +781,45 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
 
    //**SMP subtraction assignment to sparse matrices***********************************************
    // No special implementation for the SMP subtraction assignment to sparse matrices.
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to dense matrices**********************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief SMP Schur product assignment of a transpose sparse matrix-sparse matrix subtraction
+   //        to a dense matrix.
+   // \ingroup sparse_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side subtraction expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized SMP Schur product assignment of a
+   // transpose sparse matrix-sparse matrix subtraction expression to a dense matrix. Due to
+   // the explicit application of the SFINAE principle, this function can only be selected by
+   // the compiler in case the expression specific parallel evaluation strategy is selected.
+   */
+   template< typename MT  // Type of the target dense matrix
+           , bool SO >    // Storage order of the target dense matrix
+   friend inline EnableIf_< UseSMPAssign<MT> >
+      smpSchurAssign( DenseMatrix<MT,SO>& lhs, const TSMatSMatSubExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_CONSTRAINT_MUST_BE_SPARSE_MATRIX_TYPE( ResultType );
+      BLAZE_CONSTRAINT_MUST_BE_ROW_MAJOR_MATRIX_TYPE( ResultType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      const ResultType tmp( rhs );
+      smpSchurAssign( ~lhs, tmp );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to sparse matrices*********************************************
+   // No special implementation for the SMP Schur product assignment to sparse matrices.
    //**********************************************************************************************
 
    //**SMP multiplication assignment to dense matrices*********************************************
@@ -783,9 +857,9 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
 // \ingroup sparse_matrix
 //
 // \param lhs The left-hand side sparse matrix for the matrix subtraction.
-// \param rhs The right-hand side sparse matrix to be added to the left-hand side matrix.
-// \return The sum of the two matrices.
-// \exception std::invalid_argument Matrix sizes do not match
+// \param rhs The right-hand side sparse matrix to be subtracted from the left-hand side matrix.
+// \return The difference of the two matrices.
+// \exception std::invalid_argument Matrix sizes do not match.
 //
 // This operator represents the subtraction of a column-major and a row-major sparse matrix:
 
@@ -800,16 +874,16 @@ class TSMatSMatSubExpr : public SparseMatrix< TSMatSMatSubExpr<MT1,MT2>, false >
    \endcode
 
 // The operator returns an expression representing a sparse matrix of the higher-order element
-// type of the two involved matrix element types \a T1::ElementType and \a T2::ElementType.
-// Both matrix types \a T1 and \a T2 as well as the two element types \a T1::ElementType and
-// \a T2::ElementType have to be supported by the SubTrait class template.\n
+// type of the two involved matrix element types \a MT1::ElementType and \a MT2::ElementType.
+// Both matrix types \a MT1 and \a MT2 as well as the two element types \a MT1::ElementType
+// and \a MT2::ElementType have to be supported by the SubTrait class template.\n
 // In case the current number of rows and columns of the two given matrices don't match, a
 // \a std::invalid_argument is thrown.
 */
-template< typename T1    // Type of the left-hand side sparse matrix
-        , typename T2 >  // Type of the right-hand side sparse matrix
-inline const TSMatSMatSubExpr<T1,T2>
-   operator-( const SparseMatrix<T1,true>& lhs, const SparseMatrix<T2,false>& rhs )
+template< typename MT1    // Type of the left-hand side sparse matrix
+        , typename MT2 >  // Type of the right-hand side sparse matrix
+inline decltype(auto)
+   operator-( const SparseMatrix<MT1,true>& lhs, const SparseMatrix<MT2,false>& rhs )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -817,7 +891,8 @@ inline const TSMatSMatSubExpr<T1,T2>
       BLAZE_THROW_INVALID_ARGUMENT( "Matrix sizes do not match" );
    }
 
-   return TSMatSMatSubExpr<T1,T2>( ~lhs, ~rhs );
+   using ReturnType = const TSMatSMatSubExpr<MT1,MT2>;
+   return ReturnType( ~lhs, ~rhs );
 }
 //*************************************************************************************************
 
@@ -834,7 +909,7 @@ inline const TSMatSMatSubExpr<T1,T2>
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct Rows< TSMatSMatSubExpr<MT1,MT2> >
-   : public Max< Rows<MT1>, Rows<MT2> >
+   : public Maximum< Rows<MT1>, Rows<MT2> >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -852,7 +927,7 @@ struct Rows< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct Columns< TSMatSMatSubExpr<MT1,MT2> >
-   : public Max< Columns<MT1>, Columns<MT2> >
+   : public Maximum< Columns<MT1>, Columns<MT2> >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -870,7 +945,7 @@ struct Columns< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsSymmetric< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< IsSymmetric<MT1>::value && IsSymmetric<MT2>::value >
+   : public BoolConstant< IsSymmetric<MT1>::value && IsSymmetric<MT2>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -888,7 +963,7 @@ struct IsSymmetric< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsHermitian< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< IsHermitian<MT1>::value && IsHermitian<MT2>::value >
+   : public BoolConstant< IsHermitian<MT1>::value && IsHermitian<MT2>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -906,7 +981,7 @@ struct IsHermitian< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsLower< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< And< IsLower<MT1>, IsLower<MT2> >::value >
+   : public BoolConstant< And< IsLower<MT1>, IsLower<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -924,7 +999,7 @@ struct IsLower< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsUniLower< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< And< IsUniLower<MT1>, IsStrictlyLower<MT2> >::value >
+   : public BoolConstant< And< IsUniLower<MT1>, IsStrictlyLower<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -942,7 +1017,7 @@ struct IsUniLower< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsStrictlyLower< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< And< IsStrictlyLower<MT1>, IsStrictlyLower<MT2> >::value >
+   : public BoolConstant< And< IsStrictlyLower<MT1>, IsStrictlyLower<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -960,7 +1035,7 @@ struct IsStrictlyLower< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsUpper< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< And< IsUpper<MT1>, IsUpper<MT2> >::value >
+   : public BoolConstant< And< IsUpper<MT1>, IsUpper<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -978,7 +1053,7 @@ struct IsUpper< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsUniUpper< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< And< IsUniUpper<MT1>, IsStrictlyUpper<MT2> >::value >
+   : public BoolConstant< And< IsUniUpper<MT1>, IsStrictlyUpper<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -996,61 +1071,8 @@ struct IsUniUpper< TSMatSMatSubExpr<MT1,MT2> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2 >
 struct IsStrictlyUpper< TSMatSMatSubExpr<MT1,MT2> >
-   : public IsTrue< And< IsStrictlyUpper<MT1>, IsStrictlyUpper<MT2> >::value >
+   : public BoolConstant< And< IsStrictlyUpper<MT1>, IsStrictlyUpper<MT2> >::value >
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT1, typename MT2, bool AF >
-struct SubmatrixExprTrait< TSMatSMatSubExpr<MT1,MT2>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SubExprTrait< typename SubmatrixExprTrait<const MT1,AF>::Type
-                                , typename SubmatrixExprTrait<const MT2,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT1, typename MT2 >
-struct RowExprTrait< TSMatSMatSubExpr<MT1,MT2> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SubExprTrait< typename RowExprTrait<const MT1>::Type
-                                , typename RowExprTrait<const MT2>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT1, typename MT2 >
-struct ColumnExprTrait< TSMatSMatSubExpr<MT1,MT2> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SubExprTrait< typename ColumnExprTrait<const MT1>::Type
-                                , typename ColumnExprTrait<const MT2>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

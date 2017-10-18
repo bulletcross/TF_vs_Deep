@@ -3,7 +3,7 @@
 //  \file blaze/util/typetraits/IsSame.h
 //  \brief Header file for the IsSame and IsStrictlySame type traits
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,7 +41,7 @@
 //*************************************************************************************************
 
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/TrueType.h>
 #include <blaze/util/typetraits/RemoveCV.h>
 
@@ -60,30 +60,23 @@ namespace blaze {
 //
 // This class tests if the two data types \a A and \a B are equal. For this type comparison,
 // the cv-qualifiers of both data types are not ignored. If \a A and \a B are the same data
-// type, then the \a value member enumeration is set to 1, the nested type definition \a Type
-// is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to 0,
-// \a Type is \a FalseType, and the class derives from \a FalseType.
+// type, then the \a value member constant is set to \a true, the nested type definition
+// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set
+// to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
-   blaze::IsStrictlySame<int,int>::value                   // Evaluates to 1
+   blaze::IsStrictlySame<int,int>::value                   // Evaluates to 'true'
    blaze::IsStrictlySame<const double,const double>::Type  // Results in TrueType
    blaze::IsStrictlySame<volatile float,volatile float>    // Is derived from TrueType
-   blaze::IsStrictlySame<char,wchar_t>::value              // Evaluates to 0
+   blaze::IsStrictlySame<char,wchar_t>::value              // Evaluates to 'false'
    blaze::IsStrictlySame<int,const int>::Type              // Results in FalseType
    blaze::IsStrictlySame<float,volatile float>             // Is derived from FalseType
    \endcode
 */
 template< typename A, typename B >
-struct IsStrictlySame : public FalseType
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = 0 };
-   typedef FalseType  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsStrictlySame
+   : public FalseType
+{};
 //*************************************************************************************************
 
 
@@ -91,14 +84,9 @@ struct IsStrictlySame : public FalseType
 /*! \cond BLAZE_INTERNAL */
 //! Specialization of the IsStrictlySame class template for a single, matching data type.
 template< typename T >
-struct IsStrictlySame<T,T> : public TrueType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 1 };
-   typedef TrueType  Type;
-   //**********************************************************************************************
-};
+struct IsStrictlySame<T,T>
+   : public TrueType
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -119,16 +107,9 @@ struct IsStrictlySame<T,T> : public TrueType
 template< typename A, typename B >
 struct IsSameHelper
 {
- private:
-   //**********************************************************************************************
-   typedef typename RemoveCV<A>::Type  T1;
-   typedef typename RemoveCV<B>::Type  T2;
-   //**********************************************************************************************
-
  public:
    //**********************************************************************************************
-   enum { value = IsStrictlySame<T1,T2>::value };
-   typedef typename IsStrictlySame<T1,T2>::Type  Type;
+   enum : bool { value = IsStrictlySame< RemoveCV_<A>, RemoveCV_<B> >::value };
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -141,30 +122,24 @@ struct IsSameHelper
 //
 // This class tests if the two data types \a A and \a B are equal. For this type comparison,
 // the cv-qualifiers of both data types are ignored. If \a A and \a B are the same data type
-// (ignoring the cv-qualifiers), then the \a value member enumeration is set to 1, the nested
-// type definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise
-// \a value is set to 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// (ignoring the cv-qualifiers), then the \a value member constant is set to \a true, the
+// nested type definition \a Type is \a TrueType, and the class derives from \a TrueType.
+// Otherwise \a value is set to \a false, \a Type is \a FalseType, and the class derives from
+// \a FalseType.
 
    \code
-   blaze::IsSame<int,int>::value               // Evaluates to 1
+   blaze::IsSame<int,int>::value               // Evaluates to 'true'
    blaze::IsSame<int,const int>::Type          // Results in TrueType
    blaze::IsSame<float,volatile float>         // Is derived from TrueType
-   blaze::IsSame<char,wchar_t>::value          // Evaluates to 0
+   blaze::IsSame<char,wchar_t>::value          // Evaluates to 'false'
    blaze::IsSame<char,volatile float>::Type    // Results in FalseType
    blaze::IsSame<int,double>                   // Is derived from FalseType
    \endcode
 */
 template< typename A, typename B >
-struct IsSame : public IsSameHelper<A,B>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsSameHelper<A,B>::value };
-   typedef typename IsSameHelper<A,B>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsSame
+   : public BoolConstant< IsSameHelper<A,B>::value >
+{};
 //*************************************************************************************************
 
 } // namespace blaze

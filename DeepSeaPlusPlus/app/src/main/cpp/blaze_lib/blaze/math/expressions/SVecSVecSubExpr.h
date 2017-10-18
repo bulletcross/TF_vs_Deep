@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/SVecSVecSubExpr.h
 //  \brief Header file for the sparse vector/sparse vector subtraction expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,32 +40,32 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
+#include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/SparseVector.h>
 #include <blaze/math/constraints/TransposeFlag.h>
 #include <blaze/math/constraints/VecVecSubExpr.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/SparseVector.h>
 #include <blaze/math/expressions/VecVecSubExpr.h>
-#include <blaze/math/Functions.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/Serial.h>
 #include <blaze/math/traits/SubExprTrait.h>
 #include <blaze/math/traits/SubTrait.h>
-#include <blaze/math/traits/SubvectorExprTrait.h>
 #include <blaze/math/typetraits/IsComputation.h>
 #include <blaze/math/typetraits/IsExpression.h>
 #include <blaze/math/typetraits/IsResizable.h>
 #include <blaze/math/typetraits/IsTemporary.h>
 #include <blaze/math/typetraits/Size.h>
+#include <blaze/util/algorithms/Min.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/constraints/Reference.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
-#include <blaze/util/logging/FunctionTrace.h>
-#include <blaze/util/mpl/Max.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/mpl/If.h>
+#include <blaze/util/mpl/Maximum.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 
@@ -88,20 +88,18 @@ namespace blaze {
 template< typename VT1  // Type of the left-hand side sparse vector
         , typename VT2  // Type of the right-hand side sparse vector
         , bool TF >     // Transpose flag
-class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
-                      , private VecVecSubExpr
-                      , private Computation
+class SVecSVecSubExpr
+   : public VecVecSubExpr< SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF > >
+   , private Computation
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename VT1::ResultType     RT1;  //!< Result type of the left-hand side sparse vector expression.
-   typedef typename VT2::ResultType     RT2;  //!< Result type of the right-hand side sparse vector expression.
-   typedef typename VT1::ReturnType     RN1;  //!< Return type of the left-hand side sparse vector expression.
-   typedef typename VT2::ReturnType     RN2;  //!< Return type of the right-hand side sparse vector expression.
-   typedef typename VT1::CompositeType  CT1;  //!< Composite type of the left-hand side sparse vector expression.
-   typedef typename VT2::CompositeType  CT2;  //!< Composite type of the right-hand side sparse vector expression.
-   typedef typename VT1::TransposeType  TT1;  //!< Transpose type of the left-hand side sparse vector expression.
-   typedef typename VT2::TransposeType  TT2;  //!< Transpose type of the right-hand side sparse vector expression.
+   using RT1 = ResultType_<VT1>;     //!< Result type of the left-hand side sparse vector expression.
+   using RT2 = ResultType_<VT2>;     //!< Result type of the right-hand side sparse vector expression.
+   using RN1 = ReturnType_<VT1>;     //!< Return type of the left-hand side sparse vector expression.
+   using RN2 = ReturnType_<VT2>;     //!< Return type of the right-hand side sparse vector expression.
+   using CT1 = CompositeType_<VT1>;  //!< Composite type of the left-hand side sparse vector expression.
+   using CT2 = CompositeType_<VT2>;  //!< Composite type of the right-hand side sparse vector expression.
    //**********************************************************************************************
 
    //**Return type evaluation**********************************************************************
@@ -111,10 +109,10 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
        or matrix, \a returnExpr will be set to \a false and the subscript operator will
        return it's result by value. Otherwise \a returnExpr will be set to \a true and
        the subscript operator may return it's result as an expression. */
-   enum { returnExpr = !IsTemporary<RN1>::value && !IsTemporary<RN2>::value };
+   enum : bool { returnExpr = !IsTemporary<RN1>::value && !IsTemporary<RN2>::value };
 
    //! Expression return type for the subscript operator.
-   typedef typename SubExprTrait<RN1,RN2>::Type  ExprReturnType;
+   using ExprReturnType = SubExprTrait_<RN1,RN2>;
    //**********************************************************************************************
 
    //**Parallel evaluation strategy****************************************************************
@@ -126,40 +124,40 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
        and the default strategy is chosen. */
    template< typename VT >
    struct UseSMPAssign {
-      enum { value = VT::smpAssignable };
+      enum : bool { value = VT::smpAssignable };
    };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef SVecSVecSubExpr<VT1,VT2,TF>         This;           //!< Type of this SVecSVecSubExpr instance.
-   typedef typename SubTrait<RT1,RT2>::Type    ResultType;     //!< Result type for expression template evaluations.
-   typedef typename ResultType::TransposeType  TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename ResultType::ElementType    ElementType;    //!< Resulting element type.
+   using This          = SVecSVecSubExpr<VT1,VT2,TF>;  //!< Type of this SVecSVecSubExpr instance.
+   using ResultType    = SubTrait_<RT1,RT2>;           //!< Result type for expression template evaluations.
+   using TransposeType = TransposeType_<ResultType>;   //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<ResultType>;     //!< Resulting element type.
 
    //! Return type for expression template evaluations.
-   typedef const typename SelectType< returnExpr, ExprReturnType, ElementType >::Type  ReturnType;
+   using ReturnType = const IfTrue_< returnExpr, ExprReturnType, ElementType >;
 
    //! Data type for composite expression templates.
-   typedef const ResultType  CompositeType;
+   using CompositeType = const ResultType;
 
    //! Composite type of the left-hand side sparse vector expression.
-   typedef typename SelectType< IsExpression<VT1>::value, const VT1, const VT1& >::Type  LeftOperand;
+   using LeftOperand = If_< IsExpression<VT1>, const VT1, const VT1& >;
 
    //! Composite type of the right-hand side sparse vector expression.
-   typedef typename SelectType< IsExpression<VT2>::value, const VT2, const VT2& >::Type  RightOperand;
+   using RightOperand = If_< IsExpression<VT2>, const VT2, const VT2& >;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = 0 };
+   enum : bool { smpAssignable = false };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
    /*!\brief Constructor for the SVecSVecSubExpr class.
    */
-   explicit inline SVecSVecSubExpr( const VT1& lhs, const VT2& rhs )
+   explicit inline SVecSVecSubExpr( const VT1& lhs, const VT2& rhs ) noexcept
       : lhs_( lhs )  // Left-hand side sparse vector of the subtraction expression
       , rhs_( rhs )  // Right-hand side sparse vector of the subtraction expression
    {
@@ -199,7 +197,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    //
    // \return The size of the vector.
    */
-   inline size_t size() const {
+   inline size_t size() const noexcept {
       return lhs_.size();
    }
    //**********************************************************************************************
@@ -219,7 +217,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    //
    // \return The left-hand side sparse vector operand.
    */
-   inline LeftOperand leftOperand() const {
+   inline LeftOperand leftOperand() const noexcept {
       return lhs_;
    }
    //**********************************************************************************************
@@ -229,7 +227,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    //
    // \return The right-hand side sparse vector operand.
    */
-   inline RightOperand rightOperand() const {
+   inline RightOperand rightOperand() const noexcept {
       return rhs_;
    }
    //**********************************************************************************************
@@ -241,7 +239,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return ( lhs_.canAlias( alias ) || rhs_.canAlias( alias ) );
    }
    //**********************************************************************************************
@@ -253,7 +251,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return ( lhs_.isAliased( alias ) || rhs_.isAliased( alias ) );
    }
    //**********************************************************************************************
@@ -278,15 +276,15 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // type is resizable.
    */
    template< typename VT >  // Type of the target dense vector
-   friend inline typename EnableIf< IsResizable<typename VT::ElementType> >::Type
+   friend inline EnableIf_< IsResizable< ElementType_<VT> > >
       assign( DenseVector<VT,TF>& lhs, const SVecSVecSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
-      typedef typename RemoveReference<CT1>::Type::ConstIterator  LeftIterator;
-      typedef typename RemoveReference<CT2>::Type::ConstIterator  RightIterator;
+      using LeftIterator  = ConstIterator_< RemoveReference_<CT1> >;
+      using RightIterator = ConstIterator_< RemoveReference_<CT2> >;
 
       CT1 x( serial( rhs.lhs_ ) );  // Evaluation of the left-hand side sparse vector operand
       CT2 y( serial( rhs.rhs_ ) );  // Evaluation of the right-hand side sparse vector operand
@@ -326,15 +324,15 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // type is not resizable.
    */
    template< typename VT >  // Type of the target dense vector
-   friend inline typename DisableIf< IsResizable<typename VT::ElementType> >::Type
+   friend inline DisableIf_< IsResizable< ElementType_<VT> > >
       assign( DenseVector<VT,TF>& lhs, const SVecSVecSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
-      typedef typename RemoveReference<CT1>::Type::ConstIterator  LeftIterator;
-      typedef typename RemoveReference<CT2>::Type::ConstIterator  RightIterator;
+      using LeftIterator  = ConstIterator_< RemoveReference_<CT1> >;
+      using RightIterator = ConstIterator_< RemoveReference_<CT2> >;
 
       CT1 x( serial( rhs.lhs_ ) );  // Evaluation of the left-hand side sparse vector operand
       CT2 y( serial( rhs.rhs_ ) );  // Evaluation of the right-hand side sparse vector operand
@@ -376,8 +374,8 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
-      typedef typename RemoveReference<CT1>::Type::ConstIterator  LeftIterator;
-      typedef typename RemoveReference<CT2>::Type::ConstIterator  RightIterator;
+      using LeftIterator  = ConstIterator_< RemoveReference_<CT1> >;
+      using RightIterator = ConstIterator_< RemoveReference_<CT2> >;
 
       CT1 x( serial( rhs.lhs_ ) );  // Evaluation of the left-hand side sparse vector operand
       CT2 y( serial( rhs.rhs_ ) );  // Evaluation of the right-hand side sparse vector operand
@@ -499,7 +497,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -536,7 +534,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT> >
       smpAddAssign( DenseVector<VT,TF>& lhs, const SVecSVecSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -569,7 +567,7 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT> >
       smpSubAssign( DenseVector<VT,TF>& lhs, const SVecSVecSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -602,14 +600,14 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT> >
       smpMultAssign( DenseVector<VT,TF>& lhs, const SVecSVecSubExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -662,17 +660,17 @@ class SVecSVecSubExpr : public SparseVector< SVecSVecSubExpr<VT1,VT2,TF>, TF >
    \endcode
 
 // The operator returns a sparse vector of the higher-order element type of the two involved
-// vector element types \a T1::ElementType and \a T2::ElementType. Both vector types \a T1
-// and \a T2 as well as the two element types \a T1::ElementType and \a T2::ElementType have
-// to be supported by the SubTrait class template.\n
+// vector element types \a VT1::ElementType and \a VT2::ElementType. Both vector types \a VT1
+// and \a VT2 as well as the two element types \a VT1::ElementType and \a VT2::ElementType
+// have to be supported by the SubTrait class template.\n
 // In case the current sizes of the two given vectors don't match, a \a std::invalid_argument
 // is thrown.
 */
-template< typename T1  // Type of the left-hand side sparse vector
-        , typename T2  // Type of the right-hand side sparse vector
-        , bool TF >    // Transpose flag
-inline const SVecSVecSubExpr<T1,T2,TF>
-   operator-( const SparseVector<T1,TF>& lhs, const SparseVector<T2,TF>& rhs )
+template< typename VT1  // Type of the left-hand side sparse vector
+        , typename VT2  // Type of the right-hand side sparse vector
+        , bool TF >     // Transpose flag
+inline decltype(auto)
+   operator-( const SparseVector<VT1,TF>& lhs, const SparseVector<VT2,TF>& rhs )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -680,7 +678,8 @@ inline const SVecSVecSubExpr<T1,T2,TF>
       BLAZE_THROW_INVALID_ARGUMENT( "Vector sizes do not match" );
    }
 
-   return SVecSVecSubExpr<T1,T2,TF>( ~lhs, ~rhs );
+   using ReturnType = const SVecSVecSubExpr<VT1,VT2,TF>;
+   return ReturnType( ~lhs, ~rhs );
 }
 //*************************************************************************************************
 
@@ -697,31 +696,8 @@ inline const SVecSVecSubExpr<T1,T2,TF>
 /*! \cond BLAZE_INTERNAL */
 template< typename VT1, typename VT2, bool TF >
 struct Size< SVecSVecSubExpr<VT1,VT2,TF> >
-   : public Max< Size<VT1>, Size<VT2> >
+   : public Maximum< Size<VT1>, Size<VT2> >
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT1, typename VT2, bool TF, bool AF >
-struct SubvectorExprTrait< SVecSVecSubExpr<VT1,VT2,TF>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SubExprTrait< typename SubvectorExprTrait<const VT1,AF>::Type
-                                , typename SubvectorExprTrait<const VT2,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

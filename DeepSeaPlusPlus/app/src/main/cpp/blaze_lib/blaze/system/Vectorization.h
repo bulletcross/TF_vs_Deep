@@ -3,7 +3,7 @@
 //  \file blaze/system/Vectorization.h
 //  \brief System settings for the SSE mode
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -48,16 +48,13 @@
 
 //=================================================================================================
 //
-//  AVX2 ENFORCEMENT
+//  SSE/AVX MACRO DEFINITIONS
 //
 //=================================================================================================
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-#ifdef BLAZE_ENFORCE_AVX2
-#  ifndef BLAZE_ENFORCE_AVX
-#    define BLAZE_ENFORCE_AVX
-#  endif
+#ifdef __AVX512F__
 #  ifndef __AVX2__
 #    define __AVX2__
 #  endif
@@ -66,17 +63,20 @@
 //*************************************************************************************************
 
 
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+#ifdef __AVX2__
+#  ifndef __AVX__
+#    define __AVX__
+#  endif
+#endif
+/*! \endcond */
+//*************************************************************************************************
 
-
-//=================================================================================================
-//
-//  AVX ENFORCEMENT
-//
-//=================================================================================================
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-#ifdef BLAZE_ENFORCE_AVX
+#ifdef __AVX__
 #  ifndef __MMX__
 #    define __MMX__
 #  endif
@@ -97,9 +97,6 @@
 #  endif
 #  ifndef __SSE4_2__
 #    define __SSE4_2__
-#  endif
-#  ifndef __AVX__
-#    define __AVX__
 #  endif
 #endif
 /*! \endcond */
@@ -234,6 +231,60 @@
 
 
 //*************************************************************************************************
+/*!\brief Compilation switch for the AVX512F mode.
+// \ingroup system
+//
+// This compilation switch enables/disables the AVX512F mode. In case the AVX512F mode is
+// enabled (i.e. in case AVX512F functionality is available) the Blaze library attempts to
+// vectorize the linear algebra operations by AVX512F intrinsics. In case the AVX512F mode
+// is disabled, the Blaze library chooses default, non-vectorized functionality for the
+// operations.
+*/
+#if BLAZE_USE_VECTORIZATION && defined(__AVX512F__)
+#  define BLAZE_AVX512F_MODE 1
+#else
+#  define BLAZE_AVX512F_MODE 0
+#endif
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Compilation switch for the AVX512BW mode.
+// \ingroup system
+//
+// This compilation switch enables/disables the AVX512BW mode. In case the AVX512BW mode is
+// enabled (i.e. in case AVX512BW functionality is available) the Blaze library attempts to
+// vectorize the linear algebra operations by AVX512BW intrinsics. In case the AVX512BW mode
+// is disabled, the Blaze library chooses default, non-vectorized functionality for the
+// operations.
+*/
+#if BLAZE_USE_VECTORIZATION && defined(__AVX512BW__)
+#  define BLAZE_AVX512BW_MODE 1
+#else
+#  define BLAZE_AVX512BW_MODE 0
+#endif
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Compilation switch for the AVX512DQ mode.
+// \ingroup system
+//
+// This compilation switch enables/disables the AVX512DQ mode. In case the AVX512DQ mode is
+// enabled (i.e. in case AVX512DQ functionality is available) the Blaze library attempts to
+// vectorize the linear algebra operations by AVX512DQ intrinsics. In case the AVX512DQ mode
+// is disabled, the Blaze library chooses default, non-vectorized functionality for the
+// operations.
+*/
+#if BLAZE_USE_VECTORIZATION && defined(__AVX512DQ__)
+#  define BLAZE_AVX512DQ_MODE 1
+#else
+#  define BLAZE_AVX512DQ_MODE 0
+#endif
+//*************************************************************************************************
+
+
+//*************************************************************************************************
 /*!\brief Compilation switch for the MIC mode.
 // \ingroup system
 //
@@ -254,6 +305,56 @@
 
 //=================================================================================================
 //
+//  FMA MODE CONFIGURATION
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*!\brief Compilation switch for the FMA mode.
+// \ingroup system
+//
+// This compilation switch enables/disables the FMA mode. In case the FMA mode is enabled
+// (i.e. in case FMA functionality is available) the Blaze library attempts to vectorize
+// the linear algebra operations by FMA intrinsics. In case the FMA mode is disabled,
+// the Blaze library chooses default, non-vectorized functionality for the operations.
+*/
+#if BLAZE_USE_VECTORIZATION && defined(__FMA__)
+#  define BLAZE_FMA_MODE 1
+#else
+#  define BLAZE_FMA_MODE 0
+#endif
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  SVML MODE CONFIGURATION
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*!\brief Compilation switch for the SVML mode.
+// \ingroup system
+//
+// This compilation switch enables/disables the SVML mode. In case the SVML mode is enabled
+// (i.e. in case an Intel compiler is used) the Blaze library attempts to vectorize several
+// linear algebra operations by SVML intrinsics. In case the SVML mode is disabled, the
+// Blaze library chooses default, non-vectorized functionality for the operations.
+*/
+#if BLAZE_USE_VECTORIZATION && ( defined(__INTEL_COMPILER) || defined(__ICL) || defined(__ICC) || defined(__ECC) )
+#  define BLAZE_SVML_MODE 1
+#else
+#  define BLAZE_SVML_MODE 0
+#endif
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
 //  COMPILE TIME CONSTRAINTS
 //
 //=================================================================================================
@@ -262,12 +363,15 @@
 /*! \cond BLAZE_INTERNAL */
 namespace {
 
-BLAZE_STATIC_ASSERT( !BLAZE_SSE2_MODE  || BLAZE_SSE_MODE   );
-BLAZE_STATIC_ASSERT( !BLAZE_SSE3_MODE  || BLAZE_SSE2_MODE  );
-BLAZE_STATIC_ASSERT( !BLAZE_SSSE3_MODE || BLAZE_SSE3_MODE  );
-BLAZE_STATIC_ASSERT( !BLAZE_SSE4_MODE  || BLAZE_SSSE3_MODE );
-BLAZE_STATIC_ASSERT( !BLAZE_AVX_MODE   || BLAZE_SSE4_MODE  );
-BLAZE_STATIC_ASSERT( !BLAZE_AVX2_MODE  || BLAZE_AVX_MODE   );
+BLAZE_STATIC_ASSERT( !BLAZE_SSE2_MODE     || BLAZE_SSE_MODE     );
+BLAZE_STATIC_ASSERT( !BLAZE_SSE3_MODE     || BLAZE_SSE2_MODE    );
+BLAZE_STATIC_ASSERT( !BLAZE_SSSE3_MODE    || BLAZE_SSE3_MODE    );
+BLAZE_STATIC_ASSERT( !BLAZE_SSE4_MODE     || BLAZE_SSSE3_MODE   );
+BLAZE_STATIC_ASSERT( !BLAZE_AVX_MODE      || BLAZE_SSE4_MODE    );
+BLAZE_STATIC_ASSERT( !BLAZE_AVX2_MODE     || BLAZE_AVX_MODE     );
+BLAZE_STATIC_ASSERT( !BLAZE_AVX512F_MODE  || BLAZE_AVX2_MODE    );
+BLAZE_STATIC_ASSERT( !BLAZE_AVX512BW_MODE || BLAZE_AVX512F_MODE );
+BLAZE_STATIC_ASSERT( !BLAZE_AVX512DQ_MODE || BLAZE_AVX512F_MODE );
 
 }
 /*! \endcond */
@@ -282,7 +386,7 @@ BLAZE_STATIC_ASSERT( !BLAZE_AVX2_MODE  || BLAZE_AVX_MODE   );
 //
 //=================================================================================================
 
-#if BLAZE_MIC_MODE || BLAZE_AVX_MODE || BLAZE_AVX2_MODE
+#if BLAZE_AVX512F_MODE || BLAZE_MIC_MODE || BLAZE_AVX2_MODE || BLAZE_AVX_MODE
 #  include <immintrin.h>
 #elif BLAZE_SSE4_MODE
 #  include <smmintrin.h>

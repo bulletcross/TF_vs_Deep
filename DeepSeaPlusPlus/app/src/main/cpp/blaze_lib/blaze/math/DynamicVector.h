@@ -3,7 +3,7 @@
 //  \file blaze/math/DynamicVector.h
 //  \brief Header file for the complete DynamicVector implementation
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -44,7 +44,6 @@
 #include <blaze/math/dense/StaticVector.h>
 #include <blaze/math/DenseVector.h>
 #include <blaze/math/DynamicMatrix.h>
-#include <blaze/system/Precision.h>
 #include <blaze/util/Random.h>
 
 
@@ -179,38 +178,6 @@ inline void Rand< DynamicVector<Type,TF> >::randomize( DynamicVector<Type,TF>& v
    }
 }
 /*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  TYPE DEFINITIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*!\brief N-dimensional single precision vector.
-// \ingroup dynamic_vector
-*/
-typedef DynamicVector<float,false>  VecNf;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief N-dimensional double precision vector.
-// \ingroup dynamic_vector
-*/
-typedef DynamicVector<double,false>  VecNd;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief N-dimensional vector with system-specific precision.
-// \ingroup dynamic_vector
-*/
-typedef DynamicVector<real_t,false>  VecN;
 //*************************************************************************************************
 
 } // namespace blaze

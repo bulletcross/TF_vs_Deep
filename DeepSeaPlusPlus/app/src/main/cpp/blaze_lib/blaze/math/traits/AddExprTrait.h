@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/AddExprTrait.h
 //  \brief Header file for the AddExprTrait class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,44 +40,10 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/traits/AddTrait.h>
-#include <blaze/math/traits/DMatDMatAddExprTrait.h>
-#include <blaze/math/traits/DMatSMatAddExprTrait.h>
-#include <blaze/math/traits/DMatTDMatAddExprTrait.h>
-#include <blaze/math/traits/DMatTSMatAddExprTrait.h>
-#include <blaze/math/traits/DVecDVecAddExprTrait.h>
-#include <blaze/math/traits/DVecSVecAddExprTrait.h>
-#include <blaze/math/traits/SMatDMatAddExprTrait.h>
-#include <blaze/math/traits/SMatSMatAddExprTrait.h>
-#include <blaze/math/traits/SMatTDMatAddExprTrait.h>
-#include <blaze/math/traits/SMatTSMatAddExprTrait.h>
-#include <blaze/math/traits/SVecDVecAddExprTrait.h>
-#include <blaze/math/traits/SVecSVecAddExprTrait.h>
-#include <blaze/math/traits/TDMatDMatAddExprTrait.h>
-#include <blaze/math/traits/TDMatSMatAddExprTrait.h>
-#include <blaze/math/traits/TDMatTDMatAddExprTrait.h>
-#include <blaze/math/traits/TDMatTSMatAddExprTrait.h>
-#include <blaze/math/traits/TDVecTDVecAddExprTrait.h>
-#include <blaze/math/traits/TDVecTSVecAddExprTrait.h>
-#include <blaze/math/traits/TSMatDMatAddExprTrait.h>
-#include <blaze/math/traits/TSMatSMatAddExprTrait.h>
-#include <blaze/math/traits/TSMatTDMatAddExprTrait.h>
-#include <blaze/math/traits/TSMatTSMatAddExprTrait.h>
-#include <blaze/math/traits/TSVecTDVecAddExprTrait.h>
-#include <blaze/math/traits/TSVecTSVecAddExprTrait.h>
-#include <blaze/math/typetraits/IsDenseMatrix.h>
-#include <blaze/math/typetraits/IsMatrix.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
-#include <blaze/math/typetraits/IsRowVector.h>
-#include <blaze/math/typetraits/IsVector.h>
+#include <utility>
+#include <blaze/math/typetraits/HasAdd.h>
 #include <blaze/util/InvalidType.h>
 #include <blaze/util/mpl/If.h>
-#include <blaze/util/mpl/Or.h>
-#include <blaze/util/typetraits/IsConst.h>
-#include <blaze/util/typetraits/IsNumeric.h>
-#include <blaze/util/typetraits/IsReference.h>
-#include <blaze/util/typetraits/IsVolatile.h>
-#include <blaze/util/typetraits/RemoveCV.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 
 
@@ -106,136 +72,44 @@ struct AddExprTrait
  private:
    //**struct Failure******************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   struct Failure { typedef INVALID_TYPE  Type; };
+   struct Failure { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
-   //**********************************************************************************************
+   //**struct Result*******************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< IsMatrix<T1>
-                      , typename If< IsMatrix<T2>
-                                   , typename If< IsDenseMatrix<T1>
-                                                , typename If< IsDenseMatrix<T2>
-                                                             , typename If< IsRowMajorMatrix<T1>
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , DMatDMatAddExprTrait<T1,T2>
-                                                                                       , DMatTDMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , TDMatDMatAddExprTrait<T1,T2>
-                                                                                       , TDMatTDMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          >::Type
-                                                             , typename If< IsRowMajorMatrix<T1>
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , DMatSMatAddExprTrait<T1,T2>
-                                                                                       , DMatTSMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , TDMatSMatAddExprTrait<T1,T2>
-                                                                                       , TDMatTSMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          >::Type
-                                                             >::Type
-                                                , typename If< IsDenseMatrix<T2>
-                                                             , typename If< IsRowMajorMatrix<T1>
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , SMatDMatAddExprTrait<T1,T2>
-                                                                                       , SMatTDMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , TSMatDMatAddExprTrait<T1,T2>
-                                                                                       , TSMatTDMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          >::Type
-                                                             , typename If< IsRowMajorMatrix<T1>
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , SMatSMatAddExprTrait<T1,T2>
-                                                                                       , SMatTSMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          , typename If< IsRowMajorMatrix<T2>
-                                                                                       , TSMatSMatAddExprTrait<T1,T2>
-                                                                                       , TSMatTSMatAddExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          >::Type
-                                                             >::Type
-                                                >::Type
-                                   , Failure
-                                   >::Type
-                      , typename If< IsVector<T1>
-                                   , typename If< IsVector<T2>
-                                                , typename If< IsDenseVector<T1>
-                                                             , typename If< IsDenseVector<T2>
-                                                                          , typename If< IsRowVector<T1>
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , TDVecTDVecAddExprTrait<T1,T2>
-                                                                                                    , Failure
-                                                                                                    >::Type
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , Failure
-                                                                                                    , DVecDVecAddExprTrait<T1,T2>
-                                                                                                    >::Type
-                                                                                       >::Type
-                                                                          , typename If< IsRowVector<T1>
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , TDVecTSVecAddExprTrait<T1,T2>
-                                                                                                    , Failure
-                                                                                                    >::Type
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , Failure
-                                                                                                    , DVecSVecAddExprTrait<T1,T2>
-                                                                                                    >::Type
-                                                                                       >::Type
-                                                                          >::Type
-                                                             , typename If< IsDenseVector<T2>
-                                                                          , typename If< IsRowVector<T1>
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , TSVecTDVecAddExprTrait<T1,T2>
-                                                                                                    , Failure
-                                                                                                    >::Type
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , Failure
-                                                                                                    , SVecDVecAddExprTrait<T1,T2>
-                                                                                                    >::Type
-                                                                                       >::Type
-                                                                          , typename If< IsRowVector<T1>
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , TSVecTSVecAddExprTrait<T1,T2>
-                                                                                                    , Failure
-                                                                                                    >::Type
-                                                                                       , typename If< IsRowVector<T2>
-                                                                                                    , Failure
-                                                                                                    , SVecSVecAddExprTrait<T1,T2>
-                                                                                                    >::Type
-                                                                                       >::Type
-                                                                          >::Type
-                                                             >::Type
-                                                , Failure
-                                                >::Type
-                                   , typename If< IsNumeric<T1>
-                                                , typename If< IsNumeric<T2>
-                                                             , AddTrait<T1,T2>
-                                                             , Failure
-                                                             >::Type
-                                                , Failure
-                                                >::Type
-                                   >::Type
-                      >::Type  Tmp;
-
-   typedef typename RemoveReference< typename RemoveCV<T1>::Type >::Type  Type1;
-   typedef typename RemoveReference< typename RemoveCV<T2>::Type >::Type  Type2;
+   struct Result { using Type = decltype( std::declval<T1>() + std::declval<T2>() ); };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsConst<T1>, IsVolatile<T1>, IsReference<T1>
-                          , IsConst<T2>, IsVolatile<T2>, IsReference<T2> >
-                      , AddExprTrait<Type1,Type2>, Tmp >::Type::Type  Type;
+   using Type = typename If_< HasAdd< RemoveReference_<T1>, RemoveReference_<T2> >
+                            , Result
+                            , Failure >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the AddExprTrait class template.
+// \ingroup math_traits
+//
+// The AddExprTrait_ alias declaration provides a convenient shortcut to access the nested \a Type
+// of the AddExprTrait class template. For instance, given the types \a T1 and \a T2 the following
+// two type definitions are identical:
+
+   \code
+   using Type1 = typename AddExprTrait<T1,T2>::Type;
+   using Type2 = AddExprTrait_<T1,T2>;
+   \endcode
+*/
+template< typename T1    // Type of the left-hand side addition operand
+        , typename T2 >  // Type of the right-hand side addition operand
+using AddExprTrait_ = typename AddExprTrait<T1,T2>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

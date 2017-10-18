@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/DMatDMatAddExpr.h
 //  \brief Header file for the dense matrix/dense matrix addition expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,25 +41,27 @@
 //*************************************************************************************************
 
 #include <iterator>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/DenseMatrix.h>
 #include <blaze/math/constraints/MatMatAddExpr.h>
+#include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/StorageOrder.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/DenseMatrix.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/MatMatAddExpr.h>
-#include <blaze/math/Intrinsics.h>
 #include <blaze/math/shims/Serial.h>
+#include <blaze/math/SIMD.h>
 #include <blaze/math/traits/AddExprTrait.h>
 #include <blaze/math/traits/AddTrait.h>
-#include <blaze/math/traits/ColumnExprTrait.h>
-#include <blaze/math/traits/RowExprTrait.h>
-#include <blaze/math/traits/SubmatrixExprTrait.h>
 #include <blaze/math/typetraits/Columns.h>
+#include <blaze/math/typetraits/HasSIMDAdd.h>
 #include <blaze/math/typetraits/IsAligned.h>
 #include <blaze/math/typetraits/IsExpression.h>
 #include <blaze/math/typetraits/IsHermitian.h>
 #include <blaze/math/typetraits/IsLower.h>
+#include <blaze/math/typetraits/IsOperation.h>
 #include <blaze/math/typetraits/IsPadded.h>
 #include <blaze/math/typetraits/IsStrictlyLower.h>
 #include <blaze/math/typetraits/IsStrictlyUpper.h>
@@ -73,17 +75,14 @@
 #include <blaze/system/Inline.h>
 #include <blaze/system/Thresholds.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/constraints/Reference.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
-#include <blaze/util/logging/FunctionTrace.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/mpl/And.h>
-#include <blaze/util/mpl/Max.h>
+#include <blaze/util/mpl/If.h>
+#include <blaze/util/mpl/Maximum.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/Types.h>
-#include <blaze/util/typetraits/IsSame.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -104,20 +103,20 @@ namespace blaze {
 template< typename MT1  // Type of the left-hand side dense matrix
         , typename MT2  // Type of the right-hand side dense matrix
         , bool SO >     // Storage order
-class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
-                      , private MatMatAddExpr
-                      , private Computation
+class DMatDMatAddExpr
+   : public MatMatAddExpr< DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO > >
+   , private Computation
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT1::ResultType     RT1;  //!< Result type of the left-hand side dense matrix expression.
-   typedef typename MT2::ResultType     RT2;  //!< Result type of the right-hand side dense matrix expression.
-   typedef typename MT1::ReturnType     RN1;  //!< Return type of the left-hand side dense matrix expression.
-   typedef typename MT2::ReturnType     RN2;  //!< Return type of the right-hand side dense matrix expression.
-   typedef typename MT1::CompositeType  CT1;  //!< Composite type of the left-hand side dense matrix expression.
-   typedef typename MT2::CompositeType  CT2;  //!< Composite type of the right-hand side dense matrix expression.
-   typedef typename MT1::ElementType    ET1;  //!< Element type of the left-hand side dense matrix expression.
-   typedef typename MT2::ElementType    ET2;  //!< Element type of the right-hand side dense matrix expression.
+   using RT1 = ResultType_<MT1>;     //!< Result type of the left-hand side dense matrix expression.
+   using RT2 = ResultType_<MT2>;     //!< Result type of the right-hand side dense matrix expression.
+   using RN1 = ReturnType_<MT1>;     //!< Return type of the left-hand side dense matrix expression.
+   using RN2 = ReturnType_<MT2>;     //!< Return type of the right-hand side dense matrix expression.
+   using CT1 = CompositeType_<MT1>;  //!< Composite type of the left-hand side dense matrix expression.
+   using CT2 = CompositeType_<MT2>;  //!< Composite type of the right-hand side dense matrix expression.
+   using ET1 = ElementType_<MT1>;    //!< Element type of the left-hand side dense matrix expression.
+   using ET2 = ElementType_<MT2>;    //!< Element type of the right-hand side dense matrix expression.
    //**********************************************************************************************
 
    //**Return type evaluation**********************************************************************
@@ -127,10 +126,10 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
        or matrix, \a returnExpr will be set to \a false and the subscript operator will
        return it's result by value. Otherwise \a returnExpr will be set to \a true and
        the subscript operator may return it's result as an expression. */
-   enum { returnExpr = !IsTemporary<RN1>::value && !IsTemporary<RN2>::value };
+   enum : bool { returnExpr = !IsTemporary<RN1>::value && !IsTemporary<RN2>::value };
 
    //! Expression return type for the subscript operator.
-   typedef typename AddExprTrait<RN1,RN2>::Type  ExprReturnType;
+   using ExprReturnType = AddExprTrait_<RN1,RN2>;
    //**********************************************************************************************
 
    //**Serial evaluation strategy******************************************************************
@@ -141,13 +140,13 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
        can only return by value, \a useAssign will be set to 1 and the addition expression
        will be evaluated via the \a assign function family. Otherwise \a useAssign will be
        set to 0 and the expression will be evaluated via the function call operator. */
-   enum { useAssign = RequiresEvaluation<MT1>::value || RequiresEvaluation<MT2>::value || !returnExpr };
+   enum : bool { useAssign = RequiresEvaluation<MT1>::value || RequiresEvaluation<MT2>::value || !returnExpr };
 
    /*! \cond BLAZE_INTERNAL */
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename MT >
    struct UseAssign {
-      enum { value = useAssign };
+      enum : bool { value = useAssign };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -162,31 +161,30 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
        to 0 and the default strategy is chosen. */
    template< typename MT >
    struct UseSMPAssign {
-      enum { value = ( !MT1::smpAssignable || !MT2::smpAssignable ) && useAssign };
+      enum : bool { value = ( !MT1::smpAssignable || !MT2::smpAssignable ) && useAssign };
    };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef DMatDMatAddExpr<MT1,MT2,SO>                 This;           //!< Type of this DMatDMatAdd instance.
-   typedef typename AddTrait<RT1,RT2>::Type            ResultType;     //!< Result type for expression template evaluations.
-   typedef typename ResultType::OppositeType           OppositeType;   //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename ResultType::TransposeType          TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename ResultType::ElementType            ElementType;    //!< Resulting element type.
-   typedef typename IntrinsicTrait<ElementType>::Type  IntrinsicType;  //!< Resulting intrinsic element type.
+   using This          = DMatDMatAddExpr<MT1,MT2,SO>;  //!< Type of this DMatDMatAdd instance.
+   using ResultType    = AddTrait_<RT1,RT2>;           //!< Result type for expression template evaluations.
+   using OppositeType  = OppositeType_<ResultType>;    //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType = TransposeType_<ResultType>;   //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<ResultType>;     //!< Resulting element type.
 
    //! Return type for expression template evaluations.
-   typedef const typename SelectType< returnExpr, ExprReturnType, ElementType >::Type  ReturnType;
+   using ReturnType = const IfTrue_< returnExpr, ExprReturnType, ElementType >;
 
    //! Data type for composite expression templates.
-   typedef typename SelectType< useAssign, const ResultType, const DMatDMatAddExpr& >::Type  CompositeType;
+   using CompositeType = IfTrue_< useAssign, const ResultType, const DMatDMatAddExpr& >;
 
    //! Composite type of the left-hand side dense matrix expression.
-   typedef typename SelectType< IsExpression<MT1>::value, const MT1, const MT1& >::Type  LeftOperand;
+   using LeftOperand = If_< IsExpression<MT1>, const MT1, const MT1& >;
 
    //! Composite type of the right-hand side dense matrix expression.
-   typedef typename SelectType< IsExpression<MT2>::value, const MT2, const MT2& >::Type  RightOperand;
+   using RightOperand = If_< IsExpression<MT2>, const MT2, const MT2& >;
    //**********************************************************************************************
 
    //**ConstIterator class definition**************************************************************
@@ -196,24 +194,24 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    {
     public:
       //**Type definitions*************************************************************************
-      typedef std::random_access_iterator_tag  IteratorCategory;  //!< The iterator category.
-      typedef ElementType                      ValueType;         //!< Type of the underlying elements.
-      typedef ElementType*                     PointerType;       //!< Pointer return type.
-      typedef ElementType&                     ReferenceType;     //!< Reference return type.
-      typedef ptrdiff_t                        DifferenceType;    //!< Difference between two iterators.
+      using IteratorCategory = std::random_access_iterator_tag;  //!< The iterator category.
+      using ValueType        = ElementType;                      //!< Type of the underlying elements.
+      using PointerType      = ElementType*;                     //!< Pointer return type.
+      using ReferenceType    = ElementType&;                     //!< Reference return type.
+      using DifferenceType   = ptrdiff_t;                        //!< Difference between two iterators.
 
       // STL iterator requirements
-      typedef IteratorCategory  iterator_category;  //!< The iterator category.
-      typedef ValueType         value_type;         //!< Type of the underlying elements.
-      typedef PointerType       pointer;            //!< Pointer return type.
-      typedef ReferenceType     reference;          //!< Reference return type.
-      typedef DifferenceType    difference_type;    //!< Difference between two iterators.
+      using iterator_category = IteratorCategory;  //!< The iterator category.
+      using value_type        = ValueType;         //!< Type of the underlying elements.
+      using pointer           = PointerType;       //!< Pointer return type.
+      using reference         = ReferenceType;     //!< Reference return type.
+      using difference_type   = DifferenceType;    //!< Difference between two iterators.
 
       //! ConstIterator type of the left-hand side dense matrix expression.
-      typedef typename MT1::ConstIterator  LeftIteratorType;
+      using LeftIteratorType = ConstIterator_<MT1>;
 
       //! ConstIterator type of the right-hand side dense matrix expression.
-      typedef typename MT2::ConstIterator  RightIteratorType;
+      using RightIteratorType = ConstIterator_<MT2>;
       //*******************************************************************************************
 
       //**Constructor******************************************************************************
@@ -309,11 +307,11 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
       //*******************************************************************************************
 
       //**Load function****************************************************************************
-      /*!\brief Access to the intrinsic elements of the matrix.
+      /*!\brief Access to the SIMD elements of the matrix.
       //
-      // \return The resulting intrinsic value.
+      // \return The resulting SIMD element.
       */
-      inline IntrinsicType load() const {
+      inline auto load() const noexcept {
          return left_.load() + right_.load();
       }
       //*******************************************************************************************
@@ -441,12 +439,16 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template evaluation strategy.
-   enum { vectorizable = MT1::vectorizable && MT2::vectorizable &&
-                         IsSame<ET1,ET2>::value &&
-                         IntrinsicTrait<ET1>::addition };
+   enum : bool { simdEnabled = MT1::simdEnabled && MT2::simdEnabled &&
+                               HasSIMDAdd<ET1,ET2>::value };
 
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = MT1::smpAssignable && MT2::smpAssignable };
+   enum : bool { smpAssignable = MT1::smpAssignable && MT2::smpAssignable };
+   //**********************************************************************************************
+
+   //**SIMD properties*****************************************************************************
+   //! The number of elements packed within a single SIMD element.
+   enum : size_t { SIMDSIZE = SIMDTrait<ElementType>::size };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -455,7 +457,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    // \param lhs The left-hand side operand of the addition expression.
    // \param rhs The right-hand side operand of the addition expression.
    */
-   explicit inline DMatDMatAddExpr( const MT1& lhs, const MT2& rhs )
+   explicit inline DMatDMatAddExpr( const MT1& lhs, const MT2& rhs ) noexcept
       : lhs_( lhs )  // Left-hand side dense matrix of the addition expression
       , rhs_( rhs )  // Right-hand side dense matrix of the addition expression
    {
@@ -498,18 +500,17 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //**********************************************************************************************
 
    //**Load function*******************************************************************************
-   /*!\brief Access to the intrinsic elements of the matrix.
+   /*!\brief Access to the SIMD elements of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range \f$[0..M-1]\f$.
    // \param j Access index for the column. The index has to be in the range \f$[0..N-1]\f$.
    // \return Reference to the accessed values.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType load( size_t i, size_t j ) const {
-      typedef IntrinsicTrait<ElementType>  IT;
+   BLAZE_ALWAYS_INLINE auto load( size_t i, size_t j ) const noexcept {
       BLAZE_INTERNAL_ASSERT( i < lhs_.rows()   , "Invalid row access index"    );
       BLAZE_INTERNAL_ASSERT( j < lhs_.columns(), "Invalid column access index" );
-      BLAZE_INTERNAL_ASSERT( !SO || ( i % IT::size == 0UL ), "Invalid row access index"    );
-      BLAZE_INTERNAL_ASSERT( SO  || ( j % IT::size == 0UL ), "Invalid column access index" );
+      BLAZE_INTERNAL_ASSERT( !SO || ( i % SIMDSIZE == 0UL ), "Invalid row access index"    );
+      BLAZE_INTERNAL_ASSERT( SO  || ( j % SIMDSIZE == 0UL ), "Invalid column access index" );
       return lhs_.load(i,j) + rhs_.load(i,j);
    }
    //**********************************************************************************************
@@ -541,7 +542,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //
    // \return The number of rows of the matrix.
    */
-   inline size_t rows() const {
+   inline size_t rows() const noexcept {
       return lhs_.rows();
    }
    //**********************************************************************************************
@@ -551,7 +552,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //
    // \return The number of columns of the matrix.
    */
-   inline size_t columns() const {
+   inline size_t columns() const noexcept {
       return lhs_.columns();
    }
    //**********************************************************************************************
@@ -561,7 +562,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //
    // \return The left-hand side dense matrix operand.
    */
-   inline LeftOperand leftOperand() const {
+   inline LeftOperand leftOperand() const noexcept {
       return lhs_;
    }
    //**********************************************************************************************
@@ -571,7 +572,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //
    // \return The right-hand side dense matrix operand.
    */
-   inline RightOperand rightOperand() const {
+   inline RightOperand rightOperand() const noexcept {
       return rhs_;
    }
    //**********************************************************************************************
@@ -583,7 +584,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return ( IsExpression<MT1>::value && ( RequiresEvaluation<MT1>::value ? lhs_.isAliased( alias ) : lhs_.canAlias( alias ) ) ) ||
              ( IsExpression<MT2>::value && ( RequiresEvaluation<MT2>::value ? rhs_.isAliased( alias ) : rhs_.canAlias( alias ) ) );
    }
@@ -596,7 +597,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return ( lhs_.isAliased( alias ) || rhs_.isAliased( alias ) );
    }
    //**********************************************************************************************
@@ -606,7 +607,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //
    // \return \a true in case the operands are aligned, \a false if not.
    */
-   inline bool isAligned() const {
+   inline bool isAligned() const noexcept {
       return lhs_.isAligned() && rhs_.isAligned();
    }
    //**********************************************************************************************
@@ -616,9 +617,9 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    //
    // \return \a true in case the expression can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const {
+   inline bool canSMPAssign() const noexcept {
       return lhs_.canSMPAssign() || rhs_.canSMPAssign() ||
-             ( ( ( SO == rowMajor ) ? rows() : columns() ) > SMP_DMATDMATADD_THRESHOLD );
+             ( rows() * columns() >= SMP_DMATDMATADD_THRESHOLD );
    }
    //**********************************************************************************************
 
@@ -644,7 +645,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO2 >   // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseAssign<MT> >::Type
+   friend inline EnableIf_< UseAssign<MT> >
       assign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -652,10 +653,10 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
 
-      if( !IsExpression<MT1>::value && isSame( ~lhs, rhs.lhs_ ) ) {
+      if( !IsOperation<MT1>::value && isSame( ~lhs, rhs.lhs_ ) ) {
          addAssign( ~lhs, rhs.rhs_ );
       }
-      else if( !IsExpression<MT2>::value && isSame( ~lhs, rhs.rhs_ ) ) {
+      else if( !IsOperation<MT2>::value && isSame( ~lhs, rhs.rhs_ ) ) {
          addAssign( ~lhs, rhs.lhs_ );
       }
       else {
@@ -682,19 +683,19 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target sparse matrix
            , bool SO2 >   // Storage order of the target sparse matrix
-   friend inline typename EnableIf< UseAssign<MT> >::Type
+   friend inline EnableIf_< UseAssign<MT> >
       assign( SparseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
-      typedef typename SelectType< SO == SO2, ResultType, OppositeType >::Type  TmpType;
+      using TmpType = IfTrue_< SO == SO2, ResultType, OppositeType >;
 
       BLAZE_CONSTRAINT_MUST_BE_DENSE_MATRIX_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_DENSE_MATRIX_TYPE( OppositeType );
       BLAZE_CONSTRAINT_MUST_BE_MATRIX_WITH_STORAGE_ORDER( ResultType, SO );
       BLAZE_CONSTRAINT_MUST_BE_MATRIX_WITH_STORAGE_ORDER( OppositeType, !SO );
       BLAZE_CONSTRAINT_MATRICES_MUST_HAVE_SAME_STORAGE_ORDER( MT, TmpType );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename TmpType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( TmpType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
@@ -721,7 +722,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO2 >   // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseAssign<MT> >::Type
+   friend inline EnableIf_< UseAssign<MT> >
       addAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -755,7 +756,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO2 >   // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseAssign<MT> >::Type
+   friend inline EnableIf_< UseAssign<MT> >
       subAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -771,6 +772,44 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
 
    //**Subtraction assignment to sparse matrices***************************************************
    // No special implementation for the subtraction assignment to sparse matrices.
+   //**********************************************************************************************
+
+   //**Schur product assignment to dense matrices**************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief Schur product assignment of a dense matrix-dense matrix addition to a dense matrix.
+   // \ingroup dense_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side addition expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized Schur product assignment of a dense
+   // matrix-dense matrix addition expression to a dense matrix. Due to the explicit application
+   // of the SFINAE principle, this function can only be selected by the compiler in case either
+   // of the operands requires an intermediate evaluation.
+   */
+   template< typename MT  // Type of the target dense matrix
+           , bool SO2 >   // Storage order of the target dense matrix
+   friend inline EnableIf_< UseAssign<MT> >
+      schurAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_CONSTRAINT_MUST_BE_DENSE_MATRIX_TYPE( ResultType );
+      BLAZE_CONSTRAINT_MUST_BE_MATRIX_WITH_STORAGE_ORDER( ResultType, SO );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      const ResultType tmp( serial( rhs ) );
+      schurAssign( ~lhs, tmp );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**Schur product assignment to sparse matrices*************************************************
+   // No special implementation for the Schur product assignment to sparse matrices.
    //**********************************************************************************************
 
    //**Multiplication assignment to dense matrices*************************************************
@@ -797,7 +836,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO2 >   // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT> >
       smpAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -805,10 +844,10 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
 
-      if( !IsExpression<MT1>::value && isSame( ~lhs, rhs.lhs_ ) ) {
+      if( !IsOperation<MT1>::value && isSame( ~lhs, rhs.lhs_ ) ) {
          smpAddAssign( ~lhs, rhs.rhs_ );
       }
-      else if( !IsExpression<MT2>::value && isSame( ~lhs, rhs.rhs_ ) ) {
+      else if( !IsOperation<MT2>::value && isSame( ~lhs, rhs.rhs_ ) ) {
          smpAddAssign( ~lhs, rhs.lhs_ );
       }
       else {
@@ -835,19 +874,19 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target sparse matrix
            , bool SO2 >   // Storage order of the target sparse matrix
-   friend inline typename EnableIf< UseSMPAssign<MT> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT> >
       smpAssign( SparseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
-      typedef typename SelectType< SO == SO2, ResultType, OppositeType >::Type  TmpType;
+      using TmpType = IfTrue_< SO == SO2, ResultType, OppositeType >;
 
       BLAZE_CONSTRAINT_MUST_BE_DENSE_MATRIX_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_DENSE_MATRIX_TYPE( OppositeType );
       BLAZE_CONSTRAINT_MUST_BE_MATRIX_WITH_STORAGE_ORDER( ResultType, SO );
       BLAZE_CONSTRAINT_MUST_BE_MATRIX_WITH_STORAGE_ORDER( OppositeType, !SO );
       BLAZE_CONSTRAINT_MATRICES_MUST_HAVE_SAME_STORAGE_ORDER( MT, TmpType );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename TmpType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( TmpType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
@@ -874,7 +913,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO2 >   // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT> >
       smpAddAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -908,7 +947,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    */
    template< typename MT  // Type of the target dense matrix
            , bool SO2 >   // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT> >
       smpSubAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -924,6 +963,44 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
 
    //**SMP subtraction assignment to sparse matrices***********************************************
    // No special implementation for the SMP subtraction assignment to sparse matrices.
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to dense matrices**********************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief SMP Schur product assignment of a dense matrix-dense matrix addition to a dense matrix.
+   // \ingroup dense_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side addition expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance SMP optimized Schur product assignment of a dense
+   // matrix-dense matrix addition expression to a dense matrix. Due to the explicit application
+   // of the SFINAE principle, this function can only be selected by the compiler in case the
+   // expression specific parallel evaluation strategy is selected.
+   */
+   template< typename MT  // Type of the target dense matrix
+           , bool SO2 >   // Storage order of the target dense matrix
+   friend inline EnableIf_< UseSMPAssign<MT> >
+      smpSchurAssign( DenseMatrix<MT,SO2>& lhs, const DMatDMatAddExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_CONSTRAINT_MUST_BE_DENSE_MATRIX_TYPE( ResultType );
+      BLAZE_CONSTRAINT_MUST_BE_MATRIX_WITH_STORAGE_ORDER( ResultType, SO );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      const ResultType tmp( rhs );
+      smpSchurAssign( ~lhs, tmp );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to sparse matrices*********************************************
+   // No special implementation for the SMP Schur product assignment to sparse matrices.
    //**********************************************************************************************
 
    //**SMP multiplication assignment to dense matrices*********************************************
@@ -962,7 +1039,7 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
 // \param lhs The left-hand side dense matrix for the matrix addition.
 // \param rhs The right-hand side dense matrix to be added to the left-hand side matrix.
 // \return The sum of the two matrices.
-// \exception std::invalid_argument Matrix sizes do not match
+// \exception std::invalid_argument Matrix sizes do not match.
 //
 // This operator represents the addition of two dense matrices with identical storage order:
 
@@ -975,17 +1052,17 @@ class DMatDMatAddExpr : public DenseMatrix< DMatDMatAddExpr<MT1,MT2,SO>, SO >
    \endcode
 
 // The operator returns an expression representing a dense matrix of the higher-order element
-// type of the two involved matrix element types \a T1::ElementType and \a T2::ElementType.
-// Both matrix types \a T1 and \a T2 as well as the two element types \a T1::ElementType and
-// \a T2::ElementType have to be supported by the AddTrait class template.\n
+// type of the two involved matrix element types \a MT1::ElementType and \a MT2::ElementType.
+// Both matrix types \a MT1 and \a MT2 as well as the two element types \a MT1::ElementType
+// and \a MT2::ElementType have to be supported by the AddTrait class template.\n
 // In case the current number of rows and columns of the two given matrices don't match, a
 // \a std::invalid_argument is thrown.
 */
-template< typename T1  // Type of the left-hand side dense matrix
-        , typename T2  // Type of the right-hand side dense matrix
-        , bool SO >    // Storage order
-inline const DMatDMatAddExpr<T1,T2,SO>
-   operator+( const DenseMatrix<T1,SO>& lhs, const DenseMatrix<T2,SO>& rhs )
+template< typename MT1  // Type of the left-hand side dense matrix
+        , typename MT2  // Type of the right-hand side dense matrix
+        , bool SO >     // Storage order
+inline decltype(auto)
+   operator+( const DenseMatrix<MT1,SO>& lhs, const DenseMatrix<MT2,SO>& rhs )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -993,7 +1070,8 @@ inline const DMatDMatAddExpr<T1,T2,SO>
       BLAZE_THROW_INVALID_ARGUMENT( "Matrix sizes do not match" );
    }
 
-   return DMatDMatAddExpr<T1,T2,SO>( ~lhs, ~rhs );
+   using ReturnType = const DMatDMatAddExpr<MT1,MT2,SO>;
+   return ReturnType( ~lhs, ~rhs );
 }
 //*************************************************************************************************
 
@@ -1010,7 +1088,7 @@ inline const DMatDMatAddExpr<T1,T2,SO>
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct Rows< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public Max< Rows<MT1>, Rows<MT2> >
+   : public Maximum< Rows<MT1>, Rows<MT2> >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1028,7 +1106,7 @@ struct Rows< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct Columns< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public Max< Columns<MT1>, Columns<MT2> >
+   : public Maximum< Columns<MT1>, Columns<MT2> >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1046,7 +1124,7 @@ struct Columns< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsAligned< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< And< IsAligned<MT1>, IsAligned<MT2> >::value >
+   : public BoolConstant< And< IsAligned<MT1>, IsAligned<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1064,7 +1142,7 @@ struct IsAligned< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsPadded< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< And< IsPadded<MT1>, IsPadded<MT2> >::value >
+   : public BoolConstant< And< IsPadded<MT1>, IsPadded<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1082,7 +1160,7 @@ struct IsPadded< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsSymmetric< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< IsSymmetric<MT1>::value && IsSymmetric<MT2>::value >
+   : public BoolConstant< IsSymmetric<MT1>::value && IsSymmetric<MT2>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1100,7 +1178,7 @@ struct IsSymmetric< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsHermitian< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< IsHermitian<MT1>::value && IsHermitian<MT2>::value >
+   : public BoolConstant< IsHermitian<MT1>::value && IsHermitian<MT2>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1118,7 +1196,7 @@ struct IsHermitian< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsLower< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< And< IsLower<MT1>, IsLower<MT2> >::value >
+   : public BoolConstant< And< IsLower<MT1>, IsLower<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1136,8 +1214,8 @@ struct IsLower< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsUniLower< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< Or< And< IsUniLower<MT1>, IsStrictlyLower<MT2> >
-                      , And< IsUniLower<MT2>, IsStrictlyLower<MT1> > >::value >
+   : public BoolConstant< Or< And< IsUniLower<MT1>, IsStrictlyLower<MT2> >
+                            , And< IsUniLower<MT2>, IsStrictlyLower<MT1> > >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1155,7 +1233,7 @@ struct IsUniLower< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsStrictlyLower< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< And< IsStrictlyLower<MT1>, IsStrictlyLower<MT2> >::value >
+   : public BoolConstant< And< IsStrictlyLower<MT1>, IsStrictlyLower<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1173,7 +1251,7 @@ struct IsStrictlyLower< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsUpper< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< And< IsUpper<MT1>, IsUpper<MT2> >::value >
+   : public BoolConstant< And< IsUpper<MT1>, IsUpper<MT2> >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1191,8 +1269,8 @@ struct IsUpper< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsUniUpper< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< Or< And< IsUniUpper<MT1>, IsStrictlyUpper<MT2> >
-                      , And< IsUniUpper<MT2>, IsStrictlyUpper<MT1> > >::value >
+   : public BoolConstant< Or< And< IsUniUpper<MT1>, IsStrictlyUpper<MT2> >
+                            , And< IsUniUpper<MT2>, IsStrictlyUpper<MT1> > >::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1210,61 +1288,8 @@ struct IsUniUpper< DMatDMatAddExpr<MT1,MT2,SO> >
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, typename MT2, bool SO >
 struct IsStrictlyUpper< DMatDMatAddExpr<MT1,MT2,SO> >
-   : public IsTrue< And< IsStrictlyUpper<MT1>, IsStrictlyUpper<MT2> >::value >
+   : public BoolConstant< And< IsStrictlyUpper<MT1>, IsStrictlyUpper<MT2> >::value >
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT1, typename MT2, bool SO, bool AF >
-struct SubmatrixExprTrait< DMatDMatAddExpr<MT1,MT2,SO>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename AddExprTrait< typename SubmatrixExprTrait<const MT1,AF>::Type
-                                , typename SubmatrixExprTrait<const MT2,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT1, typename MT2, bool SO >
-struct RowExprTrait< DMatDMatAddExpr<MT1,MT2,SO> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename AddExprTrait< typename RowExprTrait<const MT1>::Type
-                                , typename RowExprTrait<const MT2>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT1, typename MT2, bool SO >
-struct ColumnExprTrait< DMatDMatAddExpr<MT1,MT2,SO> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename AddExprTrait< typename ColumnExprTrait<const MT1>::Type
-                                , typename ColumnExprTrait<const MT2>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

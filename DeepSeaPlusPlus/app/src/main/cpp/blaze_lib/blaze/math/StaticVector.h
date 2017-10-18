@@ -3,7 +3,7 @@
 //  \file blaze/math/StaticVector.h
 //  \brief Header file for the complete StaticVector implementation
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -44,7 +44,6 @@
 #include <blaze/math/DenseVector.h>
 #include <blaze/math/DynamicVector.h>
 #include <blaze/math/StaticMatrix.h>
-#include <blaze/system/Precision.h>
 #include <blaze/util/Random.h>
 
 
@@ -180,86 +179,6 @@ inline void Rand< StaticVector<Type,N,TF> >::randomize( StaticVector<Type,N,TF>&
    }
 }
 /*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  TYPE DEFINITIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*!\brief 2-dimensional single precision vector.
-// \ingroup static_vector_2
-*/
-typedef StaticVector<float,2UL,false>  Vec2f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 2-dimensional double precision vector.
-// \ingroup static_vector_2
-*/
-typedef StaticVector<double,2UL,false>  Vec2d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 2-dimensional vector with system-specific precision.
-// \ingroup static_vector_2
-*/
-typedef StaticVector<real_t,2UL,false>  Vec2;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 3-dimensional single precision vector.
-// \ingroup static_vector_3
-*/
-typedef StaticVector<float,3UL,false>  Vec3f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 3-dimensional double precision vector.
-// \ingroup static_vector_3
-*/
-typedef StaticVector<double,3UL,false>  Vec3d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 3-dimensional vector with system-specific precision.
-// \ingroup static_vector_3
-*/
-typedef StaticVector<real_t,3UL,false>  Vec3;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 6-dimensional single precision vector.
-// \ingroup static_vector_6
-*/
-typedef StaticVector<float,6UL,false>  Vec6f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 6-dimensional double precision vector.
-// \ingroup static_vector_6
-*/
-typedef StaticVector<double,6UL,false>  Vec6d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 6-dimensional vector with system-specific precision.
-// \ingroup static_vector_6
-*/
-typedef StaticVector<real_t,6UL,false>  Vec6;
 //*************************************************************************************************
 
 } // namespace blaze

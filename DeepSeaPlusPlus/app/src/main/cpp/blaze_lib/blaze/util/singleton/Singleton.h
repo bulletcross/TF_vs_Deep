@@ -3,7 +3,7 @@
 //  \file blaze/util/singleton/Singleton.h
 //  \brief Header file for the Singleton class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,8 +40,8 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/shared_ptr.hpp>
-#include <boost/thread/mutex.hpp>
+#include <memory>
+#include <mutex>
 #include <blaze/util/constraints/DerivedFrom.h>
 #include <blaze/util/NonCopyable.h>
 #include <blaze/util/NullType.h>
@@ -97,7 +97,7 @@ template< typename TL   // Type list of checked lifetime dependencies
         , size_t   N >  // Length of the dependency type list
 struct HasCyclicDependencyHelper<TL,NullType,N>
 {
-   enum { value = 0 };
+   enum : bool { value = 0 };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -115,9 +115,9 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,1>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
+   using D1 = typename TypeAt<D,0>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -135,11 +135,11 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,2>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -157,13 +157,13 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,3>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
-   typedef typename TypeAt<D,2>::Result  D3;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
+   using D3 = typename TypeAt<D,2>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
-                  HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
+                         HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -181,15 +181,15 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,4>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
-   typedef typename TypeAt<D,2>::Result  D3;
-   typedef typename TypeAt<D,3>::Result  D4;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
+   using D3 = typename TypeAt<D,2>::Result;
+   using D4 = typename TypeAt<D,3>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
-                  HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
-                  HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
+                         HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
+                         HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -207,17 +207,17 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,5>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
-   typedef typename TypeAt<D,2>::Result  D3;
-   typedef typename TypeAt<D,3>::Result  D4;
-   typedef typename TypeAt<D,4>::Result  D5;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
+   using D3 = typename TypeAt<D,2>::Result;
+   using D4 = typename TypeAt<D,3>::Result;
+   using D5 = typename TypeAt<D,4>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
-                  HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
-                  HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
-                  HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
+                         HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
+                         HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
+                         HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -235,19 +235,19 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,6>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
-   typedef typename TypeAt<D,2>::Result  D3;
-   typedef typename TypeAt<D,3>::Result  D4;
-   typedef typename TypeAt<D,4>::Result  D5;
-   typedef typename TypeAt<D,5>::Result  D6;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
+   using D3 = typename TypeAt<D,2>::Result;
+   using D4 = typename TypeAt<D,3>::Result;
+   using D5 = typename TypeAt<D,4>::Result;
+   using D6 = typename TypeAt<D,5>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
-                  HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
-                  HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
-                  HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value ||
-                  HasCyclicDependency<D6,TL,Contains<TL,D6>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
+                         HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
+                         HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
+                         HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value ||
+                         HasCyclicDependency<D6,TL,Contains<TL,D6>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -265,21 +265,21 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,7>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
-   typedef typename TypeAt<D,2>::Result  D3;
-   typedef typename TypeAt<D,3>::Result  D4;
-   typedef typename TypeAt<D,4>::Result  D5;
-   typedef typename TypeAt<D,5>::Result  D6;
-   typedef typename TypeAt<D,6>::Result  D7;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
+   using D3 = typename TypeAt<D,2>::Result;
+   using D4 = typename TypeAt<D,3>::Result;
+   using D5 = typename TypeAt<D,4>::Result;
+   using D6 = typename TypeAt<D,5>::Result;
+   using D7 = typename TypeAt<D,6>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
-                  HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
-                  HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
-                  HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value ||
-                  HasCyclicDependency<D6,TL,Contains<TL,D6>::value>::value ||
-                  HasCyclicDependency<D7,TL,Contains<TL,D7>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
+                         HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
+                         HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
+                         HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value ||
+                         HasCyclicDependency<D6,TL,Contains<TL,D6>::value>::value ||
+                         HasCyclicDependency<D7,TL,Contains<TL,D7>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -297,23 +297,23 @@ template< typename TL   // Type list of checked lifetime dependencies
         , typename D >  // Type list of lifetime dependencies to check
 struct HasCyclicDependencyHelper<TL,D,8>
 {
-   typedef typename TypeAt<D,0>::Result  D1;
-   typedef typename TypeAt<D,1>::Result  D2;
-   typedef typename TypeAt<D,2>::Result  D3;
-   typedef typename TypeAt<D,3>::Result  D4;
-   typedef typename TypeAt<D,4>::Result  D5;
-   typedef typename TypeAt<D,5>::Result  D6;
-   typedef typename TypeAt<D,6>::Result  D7;
-   typedef typename TypeAt<D,7>::Result  D8;
+   using D1 = typename TypeAt<D,0>::Result;
+   using D2 = typename TypeAt<D,1>::Result;
+   using D3 = typename TypeAt<D,2>::Result;
+   using D4 = typename TypeAt<D,3>::Result;
+   using D5 = typename TypeAt<D,4>::Result;
+   using D6 = typename TypeAt<D,5>::Result;
+   using D7 = typename TypeAt<D,6>::Result;
+   using D8 = typename TypeAt<D,7>::Result;
 
-   enum { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
-                  HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
-                  HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
-                  HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
-                  HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value ||
-                  HasCyclicDependency<D6,TL,Contains<TL,D6>::value>::value ||
-                  HasCyclicDependency<D7,TL,Contains<TL,D7>::value>::value ||
-                  HasCyclicDependency<D8,TL,Contains<TL,D8>::value>::value };
+   enum : bool { value = HasCyclicDependency<D1,TL,Contains<TL,D1>::value>::value ||
+                         HasCyclicDependency<D2,TL,Contains<TL,D2>::value>::value ||
+                         HasCyclicDependency<D3,TL,Contains<TL,D3>::value>::value ||
+                         HasCyclicDependency<D4,TL,Contains<TL,D4>::value>::value ||
+                         HasCyclicDependency<D5,TL,Contains<TL,D5>::value>::value ||
+                         HasCyclicDependency<D6,TL,Contains<TL,D6>::value>::value ||
+                         HasCyclicDependency<D7,TL,Contains<TL,D7>::value>::value ||
+                         HasCyclicDependency<D8,TL,Contains<TL,D8>::value>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -341,8 +341,8 @@ template< typename T                      // The type to be checked for cyclic l
         , bool C=Contains<TL,T>::value >  // Flag to indicate whether T is contained in TL
 struct HasCyclicDependency
 {
-   typedef typename Append<TL,T>::Result  ETL;
-   enum { value = HasCyclicDependencyHelper<ETL,typename T::Dependencies>::value };
+   using ETL = typename Append<TL,T>::Result;
+   enum : bool { value = HasCyclicDependencyHelper<ETL,typename T::Dependencies>::value };
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -361,32 +361,8 @@ template< typename T     // The type to be checked for cyclic lifetime dependenc
         , typename TL >  // Type list of checked lifetime dependencies
 struct HasCyclicDependency<T,TL,true>
 {
-   enum { value = 1 };
+   enum : bool { value = 1 };
 };
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  CLASS CYCLIC_LIFETIME_DEPENDENCY_TEST
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint wrapper class.
-// \ingroup singleton
-//
-// Helper class for the blaze::CYCLIC_LIFETIME_DEPENDENCY_DETECTED class template. This class
-// is used as a wrapper for the instantiation of the blaze::CYCLIC_LIFETIME_DEPENDENCY_DETECTED
-// constraint class. It serves the purpose to force the instantiation of either the defined
-// specialization or the undefined basic template during the compilation. In case the compile
-// time condition is met, the type blaze::CYCLIC_LIFETIME_DEPENDENCY_TEST<1> is defined.
-*/
-template< int > struct CYCLIC_LIFETIME_DEPENDENCY_TEST {};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -400,32 +376,13 @@ template< int > struct CYCLIC_LIFETIME_DEPENDENCY_TEST {};
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup singleton
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CYCLIC_LIFETIME_DEPENDENCY_DETECTED;
-template<> struct CYCLIC_LIFETIME_DEPENDENCY_DETECTED<false> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Constraint on the data type.
 // \ingroup singleton
 //
 // In case the given data type \a T is not an integral data type, a compilation error is created.
 */
 #define BLAZE_DETECT_CYCLIC_LIFETIME_DEPENDENCY(T) \
-   typedef \
-      blaze::CYCLIC_LIFETIME_DEPENDENCY_TEST< \
-         blaze::CYCLIC_LIFETIME_DEPENDENCY_DETECTED< blaze::HasCyclicDependency<T,blaze::NullType>::value >::value > \
-      BLAZE_JOIN( DETECT_CYCLIC_LIFETIME_DEPENDENCY_TYPEDEF, __LINE__ )
+   static_assert( ( !blaze::HasCyclicDependency<T,blaze::NullType>::value ), "Cyclic dependency detected" )
 //*************************************************************************************************
 
 
@@ -501,8 +458,8 @@ template<> struct CYCLIC_LIFETIME_DEPENDENCY_DETECTED<false> { enum { value = 1 
 //     The first template parameter has to be the class itself. The following template parameters
 //     define lifetime dependencies of this class, i.e., specify on which singleton instances the
 //     class depends. It is possible to specify up to 8 lifetime dependencies. The example below
-//     demonstrates this for the MySingleton class, which is solely depending on the Logger class,
-//     which represents the core of the Blaze logging functionality.
+//     demonstrates this for the MySingleton class, which is solely depending on another singleton
+//     called Logger.
 //  -# The class needs to befriend the Singleton via the blaze::BLAZE_BEFRIEND_SINGLETON macro.
 //     This macro provides a convenient way to express this friendship relation and works both in
 //     case the class derives publicly or non-publicly from the Singleton class. This friendship
@@ -556,8 +513,7 @@ template<> struct CYCLIC_LIFETIME_DEPENDENCY_DETECTED<false> { enum { value = 1 
 // functionality cannot be used!\n
 // When using the Singleton base class, lifetime dependencies between classes can be expressed
 // very conveniently. The following example demonstrates this by means of the MySingleton class,
-// which defines a lifetime dependency on the Logger class, which represents the core of the
-// \b Blaze logging functionality:
+// which defines a lifetime dependency on another singleton called Logger:
 
    \code
    // Definition of the MySingleton class
@@ -583,8 +539,8 @@ template<> struct CYCLIC_LIFETIME_DEPENDENCY_DETECTED<false> { enum { value = 1 
 //     The first template parameter has to be the class itself. The following template parameters
 //     define lifetime dependencies of this class, i.e., specify on which singleton instances the
 //     class depends. It is possible to specify up to 8 lifetime dependencies. The example above
-//     demonstrates this for the MySingleton class, which is solely depending on the Logger class,
-//     which represents the core of the Blaze logging functionality.
+//     demonstrates this for the MySingleton class, which is solely depending on another singleton
+//     called Logger.
 //  -# The class needs to befriend the Singleton via the blaze::BLAZE_BEFRIEND_SINGLETON macro.
 //     This macro provides a convenient way to express this friendship relation and works both in
 //     case the class derives publicly or non-publicly from the Singleton class. This friendship
@@ -603,15 +559,16 @@ template< typename T                // Type of the singleton (CRTP pattern)
         , typename D6 = NullType    // Type of the sixth lifetime dependency
         , typename D7 = NullType    // Type of the seventh lifetime dependency
         , typename D8 = NullType >  // Type of the eighth lifetime dependency
-class Singleton : private NonCopyable
+class Singleton
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,D3,D4,D5,D6,D7,D8>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,D3,D4,D5,D6,D7,D8>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_8( D1, D2, D3, D4, D5, D6, D7, D8 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_8( D1, D2, D3, D4, D5, D6, D7, D8 );
    //**********************************************************************************************
 
  protected:
@@ -661,10 +618,9 @@ class Singleton : private NonCopyable
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -674,22 +630,14 @@ class Singleton : private NonCopyable
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   boost::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
-   boost::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
-   boost::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
-   boost::shared_ptr<D6> dependency6_;  //!< Handle to the sixth lifetime dependency.
-   boost::shared_ptr<D7> dependency7_;  //!< Handle to the seventh lifetime dependency.
-   boost::shared_ptr<D8> dependency8_;  //!< Handle to the eighth lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
+   std::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
+   std::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
+   std::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
+   std::shared_ptr<D6> dependency6_;  //!< Handle to the sixth lifetime dependency.
+   std::shared_ptr<D7> dependency7_;  //!< Handle to the seventh lifetime dependency.
+   std::shared_ptr<D8> dependency8_;  //!< Handle to the eighth lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -720,15 +668,16 @@ template< typename T     // Type of the singleton (CRTP pattern)
         , typename D5    // Type of the fifth lifetime dependency
         , typename D6    // Type of the sixth lifetime dependency
         , typename D7 >  // Type of the eighth lifetime dependency
-class Singleton<T,D1,D2,D3,D4,D5,D6,D7,NullType> : private NonCopyable
+class Singleton<T,D1,D2,D3,D4,D5,D6,D7,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,D3,D4,D5,D6,D7,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,D3,D4,D5,D6,D7,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_7( D1, D2, D3, D4, D5, D6, D7 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_7( D1, D2, D3, D4, D5, D6, D7 );
    //**********************************************************************************************
 
  protected:
@@ -775,10 +724,9 @@ class Singleton<T,D1,D2,D3,D4,D5,D6,D7,NullType> : private NonCopyable
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -788,21 +736,13 @@ class Singleton<T,D1,D2,D3,D4,D5,D6,D7,NullType> : private NonCopyable
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   boost::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
-   boost::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
-   boost::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
-   boost::shared_ptr<D6> dependency6_;  //!< Handle to the sixth lifetime dependency.
-   boost::shared_ptr<D7> dependency7_;  //!< Handle to the seventh lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
+   std::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
+   std::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
+   std::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
+   std::shared_ptr<D6> dependency6_;  //!< Handle to the sixth lifetime dependency.
+   std::shared_ptr<D7> dependency7_;  //!< Handle to the seventh lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -833,15 +773,16 @@ template< typename T     // Type of the singleton (CRTP pattern)
         , typename D4    // Type of the fourth lifetime dependency
         , typename D5    // Type of the fifth lifetime dependency
         , typename D6 >  // Type of the eighth lifetime dependency
-class Singleton<T,D1,D2,D3,D4,D5,D6,NullType,NullType> : private NonCopyable
+class Singleton<T,D1,D2,D3,D4,D5,D6,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,D3,D4,D5,D6,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,D3,D4,D5,D6,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_6( D1, D2, D3, D4, D5, D6 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_6( D1, D2, D3, D4, D5, D6 );
    //**********************************************************************************************
 
  protected:
@@ -885,10 +826,9 @@ class Singleton<T,D1,D2,D3,D4,D5,D6,NullType,NullType> : private NonCopyable
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -898,20 +838,12 @@ class Singleton<T,D1,D2,D3,D4,D5,D6,NullType,NullType> : private NonCopyable
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   boost::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
-   boost::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
-   boost::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
-   boost::shared_ptr<D6> dependency6_;  //!< Handle to the sixth lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
+   std::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
+   std::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
+   std::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
+   std::shared_ptr<D6> dependency6_;  //!< Handle to the sixth lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -941,15 +873,16 @@ template< typename T     // Type of the singleton (CRTP pattern)
         , typename D3    // Type of the third lifetime dependency
         , typename D4    // Type of the fourth lifetime dependency
         , typename D5 >  // Type of the fifth lifetime dependency
-class Singleton<T,D1,D2,D3,D4,D5,NullType,NullType,NullType> : private NonCopyable
+class Singleton<T,D1,D2,D3,D4,D5,NullType,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,D3,D4,D5,NullType,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,D3,D4,D5,NullType,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_5( D1, D2, D3, D4, D5 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_5( D1, D2, D3, D4, D5 );
    //**********************************************************************************************
 
  protected:
@@ -990,10 +923,9 @@ class Singleton<T,D1,D2,D3,D4,D5,NullType,NullType,NullType> : private NonCopyab
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -1003,19 +935,11 @@ class Singleton<T,D1,D2,D3,D4,D5,NullType,NullType,NullType> : private NonCopyab
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   boost::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
-   boost::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
-   boost::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
+   std::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
+   std::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
+   std::shared_ptr<D5> dependency5_;  //!< Handle to the fifth lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -1044,15 +968,16 @@ template< typename T     // Type of the singleton (CRTP pattern)
         , typename D2    // Type of the second lifetime dependency
         , typename D3    // Type of the third lifetime dependency
         , typename D4 >  // Type of the fourth lifetime dependency
-class Singleton<T,D1,D2,D3,D4,NullType,NullType,NullType,NullType> : private NonCopyable
+class Singleton<T,D1,D2,D3,D4,NullType,NullType,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,D3,D4,NullType,NullType,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,D3,D4,NullType,NullType,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_4( D1, D2, D3, D4 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_4( D1, D2, D3, D4 );
    //**********************************************************************************************
 
  protected:
@@ -1090,10 +1015,9 @@ class Singleton<T,D1,D2,D3,D4,NullType,NullType,NullType,NullType> : private Non
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -1103,18 +1027,10 @@ class Singleton<T,D1,D2,D3,D4,NullType,NullType,NullType,NullType> : private Non
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   boost::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
-   boost::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
+   std::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
+   std::shared_ptr<D4> dependency4_;  //!< Handle to the fourth lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -1142,15 +1058,16 @@ template< typename T     // Type of the singleton (CRTP pattern)
         , typename D1    // Type of the first lifetime dependency
         , typename D2    // Type of the second lifetime dependency
         , typename D3 >  // Type of the third lifetime dependency
-class Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType> : private NonCopyable
+class Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_3( D1, D2, D3 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_3( D1, D2, D3 );
    //**********************************************************************************************
 
  protected:
@@ -1185,10 +1102,9 @@ class Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType> : priva
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -1198,17 +1114,9 @@ class Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType> : priva
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   boost::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
+   std::shared_ptr<D3> dependency3_;  //!< Handle to the third lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -1235,15 +1143,16 @@ class Singleton<T,D1,D2,D3,NullType,NullType,NullType,NullType,NullType> : priva
 template< typename T     // Type of the singleton (CRTP pattern)
         , typename D1    // Type of the first lifetime dependency
         , typename D2 >  // Type of the second lifetime dependency
-class Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType> : private NonCopyable
+class Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_2( D1, D2 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_2( D1, D2 );
    //**********************************************************************************************
 
  protected:
@@ -1275,10 +1184,9 @@ class Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType> :
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -1288,16 +1196,8 @@ class Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType> :
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
-   boost::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the first lifetime dependency.
+   std::shared_ptr<D2> dependency2_;  //!< Handle to the second lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -1323,15 +1223,16 @@ class Singleton<T,D1,D2,NullType,NullType,NullType,NullType,NullType,NullType> :
 */
 template< typename T     // Type of the singleton (CRTP pattern)
         , typename D1 >  // Type of the lifetime dependency
-class Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullType> : private NonCopyable
+class Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef BLAZE_TYPELIST_1( D1 )  Dependencies;
+   using Dependencies = BLAZE_TYPELIST_1( D1 );
    //**********************************************************************************************
 
  protected:
@@ -1360,10 +1261,9 @@ class Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullT
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
    //@}
@@ -1373,15 +1273,7 @@ class Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullT
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   boost::shared_ptr<D1> dependency1_;  //!< Handle to the lifetime dependency.
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
+   std::shared_ptr<D1> dependency1_;  //!< Handle to the lifetime dependency.
    //@}
    //**********************************************************************************************
 };
@@ -1406,15 +1298,16 @@ class Singleton<T,D1,NullType,NullType,NullType,NullType,NullType,NullType,NullT
 // are specified.
 */
 template< typename T >  // Type of the singleton (CRTP pattern)
-class Singleton<T,NullType,NullType,NullType,NullType,NullType,NullType,NullType,NullType> : private NonCopyable
+class Singleton<T,NullType,NullType,NullType,NullType,NullType,NullType,NullType,NullType>
+   : private NonCopyable
 {
  public:
    //**Type definitions****************************************************************************
    //! Type of this Singleton instance.
-   typedef Singleton<T,NullType,NullType,NullType,NullType,NullType,NullType,NullType,NullType>  SingletonType;
+   using SingletonType = Singleton<T,NullType,NullType,NullType,NullType,NullType,NullType,NullType,NullType>;
 
    //! Type list of all lifetime dependencies.
-   typedef NullType  Dependencies;
+   using Dependencies = NullType;
    //**********************************************************************************************
 
  protected:
@@ -1440,97 +1333,16 @@ class Singleton<T,NullType,NullType,NullType,NullType,NullType,NullType,NullType
    //**Instance function***************************************************************************
    /*!\name Instance function */
    //@{
-   static boost::shared_ptr<T> instance()
+   static std::shared_ptr<T> instance()
    {
-      boost::mutex::scoped_lock lock( instanceMutex_ );
-      static boost::shared_ptr<T> object( new T() );
+      static std::shared_ptr<T> object( new T() );
       return object;
    }
-   //@}
-   //**********************************************************************************************
-
- protected:
-   //**Member variables****************************************************************************
-   /*!\name Member variables */
-   //@{
-   static boost::mutex instanceMutex_;  //!< Synchronization mutex for access to the singleton.
    //@}
    //**********************************************************************************************
 };
 /*! \endcond */
 //*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  DEFINITION AND INITIALIZATION OF THE STATIC MEMBER VARIABLES
-//
-//=================================================================================================
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B    // Type of the second lifetime dependency
-        , typename C    // Type of the third lifetime dependency
-        , typename D    // Type of the fourth lifetime dependency
-        , typename E    // Type of the fifth lifetime dependency
-        , typename F    // Type of the sixth lifetime dependency
-        , typename G    // Type of the seventh lifetime dependency
-        , typename H >  // Type of the eighth lifetime dependency
-boost::mutex Singleton<T,A,B,C,D,E,F,G,H>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B    // Type of the second lifetime dependency
-        , typename C    // Type of the third lifetime dependency
-        , typename D    // Type of the fourth lifetime dependency
-        , typename E    // Type of the fifth lifetime dependency
-        , typename F    // Type of the sixth lifetime dependency
-        , typename G >  // Type of the seventh lifetime dependency
-boost::mutex Singleton<T,A,B,C,D,E,F,G,NullType>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B    // Type of the second lifetime dependency
-        , typename C    // Type of the third lifetime dependency
-        , typename D    // Type of the fourth lifetime dependency
-        , typename E    // Type of the fifth lifetime dependency
-        , typename F >  // Type of the sixth lifetime dependency
-boost::mutex Singleton<T,A,B,C,D,E,F,NullType,NullType>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B    // Type of the second lifetime dependency
-        , typename C    // Type of the third lifetime dependency
-        , typename D    // Type of the fourth lifetime dependency
-        , typename E >  // Type of the fifth lifetime dependency
-boost::mutex Singleton<T,A,B,C,D,E,NullType,NullType,NullType>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B    // Type of the second lifetime dependency
-        , typename C    // Type of the third lifetime dependency
-        , typename D >  // Type of the fourth lifetime dependency
-boost::mutex Singleton<T,A,B,C,D,NullType,NullType,NullType,NullType>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B    // Type of the second lifetime dependency
-        , typename C >  // Type of the third lifetime dependency
-boost::mutex Singleton<T,A,B,C,NullType,NullType,NullType,NullType,NullType>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A    // Type of the first lifetime dependency
-        , typename B >  // Type of the second lifetime dependency
-boost::mutex Singleton<T,A,B,NullType,NullType,NullType,NullType,NullType,NullType>::instanceMutex_;
-
-template< typename T    // Type of the singleton (CRTP pattern)
-        , typename A >  // Type of the first lifetime dependency
-boost::mutex Singleton<T,A,NullType,NullType,NullType,NullType,NullType,NullType,NullType>::instanceMutex_;
-
-template< typename T >  // Type of the singleton (CRTP pattern)
-boost::mutex Singleton<T,NullType,NullType,NullType,NullType,NullType,NullType,NullType,NullType>::instanceMutex_;
 
 } // namespace blaze
 

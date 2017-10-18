@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/CrossTrait.h
 //  \brief Header file for the cross product trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,7 +41,11 @@
 //*************************************************************************************************
 
 #include <blaze/util/InvalidType.h>
+#include <blaze/util/mpl/If.h>
+#include <blaze/util/mpl/Or.h>
+#include <blaze/util/typetraits/Decay.h>
 #include <blaze/util/typetraits/IsConst.h>
+#include <blaze/util/typetraits/IsReference.h>
 #include <blaze/util/typetraits/IsVolatile.h>
 
 
@@ -71,7 +75,9 @@ namespace blaze {
 //
 // <ul>
 //    <li>blaze::StaticVector</li>
+//    <li>blaze::HybridVector</li>
 //    <li>blaze::DynamicVector</li>
+//    <li>blaze::CustomVector</li>
 //    <li>blaze::CompressedVector</li>
 // </ul>
 //
@@ -86,8 +92,8 @@ namespace blaze {
    template< typename T1, typename T2 >
    struct CrossTrait< StaticVector<T1,3UL,false>, StaticVector<T2,3UL,false> >
    {
-      typedef StaticVector< typename SubTrait< typename MultTrait<T1,T2>::Type
-                                             , typename MultTrait<T1,T2>::Type >::Type, 3UL, false >  Type;
+      using Type = StaticVector< typename SubTrait< typename MultTrait<T1,T2>::Type
+                                                  , typename MultTrait<T1,T2>::Type >::Type, 3UL, false >;
    };
    \endcode
 
@@ -97,24 +103,60 @@ namespace blaze {
 // the two given data types the resulting data type is selected:
 
    \code
-   template< typename T1, typename T2 >    // The two generic types
-   typename CrossTrait<T1,T2>::Type        // The resulting generic return type
-   cross( T1 t1, T2 t2 )                   //
-   {                                       // The function 'cross' returns the cross
-      return t1 % t2;                      // product of the two given values
-   }                                       //
+   template< typename T1, typename T2 >  // The two generic types
+   typename CrossTrait<T1,T2>::Type      // The resulting generic return type
+   cross( T1 t1, T2 t2 )                 //
+   {                                     // The function 'cross' returns the cross
+      return t1 % t2;                    // product of the two given values
+   }                                     //
    \endcode
 */
 template< typename T1    // Type of the left-hand side operand
         , typename T2 >  // Type of the right-hand side operand
 struct CrossTrait
 {
+ private:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef INVALID_TYPE  Type;
+   using Type1 = Decay_<T1>;
+   using Type2 = Decay_<T2>;
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**struct Failure******************************************************************************
+   /*! \cond BLAZE_INTERNAL */
+   struct Failure { using Type = INVALID_TYPE; };
+   /*! \endcond */
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   /*! \cond BLAZE_INTERNAL */
+   using Type = typename If_< Or< IsConst<T1>, IsVolatile<T1>, IsReference<T1>
+                                , IsConst<T2>, IsVolatile<T2>, IsReference<T2> >
+                            , CrossTrait<Type1,Type2>
+                            , Failure >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the CrossTrait class template.
+// \ingroup math_traits
+//
+// The CrossTrait_ alias declaration provides a convenient shortcut to access the nested \a Type
+// of the CrossTrait class template. For instance, given the types \a T1 and \a T2 the following
+// two type definitions are identical:
+
+   \code
+   using Type1 = typename CrossTrait<T1,T2>::Type;
+   using Type2 = CrossTrait_<T1,T2>;
+   \endcode
+*/
+template< typename T1, typename T2 >
+using CrossTrait_ = typename CrossTrait<T1,T2>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

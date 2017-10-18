@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/symmetricmatrix/NonNumericProxy.h
 //  \brief Header file for the NonNumericProxy class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,22 +40,22 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
 #include <blaze/math/constraints/SparseMatrix.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/Upper.h>
+#include <blaze/math/InitializerList.h>
 #include <blaze/math/proxy/Proxy.h>
 #include <blaze/math/shims/Clear.h>
-#include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/IsNaN.h>
 #include <blaze/math/shims/IsOne.h>
 #include <blaze/math/shims/IsReal.h>
 #include <blaze/math/shims/IsZero.h>
 #include <blaze/math/shims/Reset.h>
-#include <blaze/math/traits/ConjExprTrait.h>
 #include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/constraints/Const.h>
@@ -89,7 +89,7 @@ namespace blaze {
    using blaze::StaticVector;
    using blaze::SymmetricMatrix;
 
-   typedef StaticVector<int,3UL>  Vector;
+   using Vector = StaticVector<int,3UL>;
 
    // Creating a 3x3 symmetric sparses matrix
    SymmetricMatrix< CompressedMatrix< Vector > > A( 3UL );
@@ -100,24 +100,25 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class NonNumericProxy : public Proxy< NonNumericProxy<MT>, typename MT::ElementType::ValueType >
+class NonNumericProxy
+   : public Proxy< NonNumericProxy<MT>, ValueType_< ElementType_<MT> > >
 {
  private:
    //**Enumerations********************************************************************************
    //! Compile time flag indicating whether the given matrix type is a row-major matrix.
-   enum { rmm = IsRowMajorMatrix<MT>::value };
+   enum : bool { rmm = IsRowMajorMatrix<MT>::value };
    //**********************************************************************************************
 
    //**Type definitions****************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename MT::ElementType  ET;  //!< Element type of the adapted matrix.
+   using ET = ElementType_<MT>;  //!< Element type of the adapted matrix.
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef typename ET::ValueType  RepresentedType;  //!< Type of the represented matrix element.
-   typedef typename ET::Reference  RawReference;     //!< Raw reference to the represented element.
+   using RepresentedType = ValueType_<ET>;  //!< Type of the represented matrix element.
+   using RawReference    = Reference_<ET>;  //!< Raw reference to the represented element.
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -138,26 +139,34 @@ class NonNumericProxy : public Proxy< NonNumericProxy<MT>, typename MT::ElementT
    //**Operators***********************************************************************************
    /*!\name Operators */
    //@{
-                          inline NonNumericProxy& operator= ( const NonNumericProxy& nnp );
+   inline NonNumericProxy& operator= ( const NonNumericProxy& nnp );
+
+   template< typename T >
+   inline NonNumericProxy& operator=( initializer_list<T> list );
+
+   template< typename T >
+   inline NonNumericProxy& operator=( initializer_list< initializer_list<T> > list );
+
    template< typename T > inline NonNumericProxy& operator= ( const T& value );
    template< typename T > inline NonNumericProxy& operator+=( const T& value );
    template< typename T > inline NonNumericProxy& operator-=( const T& value );
    template< typename T > inline NonNumericProxy& operator*=( const T& value );
    template< typename T > inline NonNumericProxy& operator/=( const T& value );
+   template< typename T > inline NonNumericProxy& operator%=( const T& value );
    //@}
    //**********************************************************************************************
 
    //**Utility functions***************************************************************************
    /*!\name Utility functions */
    //@{
-   inline RawReference get() const;
+   inline RawReference get() const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Conversion operator*************************************************************************
    /*!\name Conversion operator */
    //@{
-   inline operator RawReference() const;
+   inline operator RawReference() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -223,7 +232,7 @@ inline NonNumericProxy<MT>::NonNumericProxy( MT& matrix, size_t i, size_t j )
 
    if( pos == matrix_.end(index) )
    {
-      const typename MT::ElementType element( ( RepresentedType() ) );
+      const ElementType_<MT> element( ( RepresentedType() ) );
       matrix_.insert( i_, j_, element );
       if( i_ != j_ )
          matrix_.insert( j_, i_, element );
@@ -296,6 +305,40 @@ template< typename MT >  // Type of the adapted matrix
 inline NonNumericProxy<MT>& NonNumericProxy<MT>::operator=( const NonNumericProxy& nnp )
 {
    get() = nnp.get();
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Initializer list assignment to the represented matrix element.
+//
+// \param list The list to be assigned to the matrix element.
+// \return Reference to the assigned proxy.
+*/
+template< typename MT >  // Type of the adapted matrix
+template< typename T >   // Type of the right-hand side value
+inline NonNumericProxy<MT>& NonNumericProxy<MT>::operator=( initializer_list<T> list )
+{
+   get() = list;
+
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Initializer list assignment to the represented matrix element.
+//
+// \param list The list to be assigned to the matrix element.
+// \return Reference to the assigned proxy.
+*/
+template< typename MT >  // Type of the adapted matrix
+template< typename T >   // Type of the right-hand side value
+inline NonNumericProxy<MT>& NonNumericProxy<MT>::operator=( initializer_list< initializer_list<T> > list )
+{
+   get() = list;
+
    return *this;
 }
 //*************************************************************************************************
@@ -381,6 +424,22 @@ inline NonNumericProxy<MT>& NonNumericProxy<MT>::operator/=( const T& value )
 //*************************************************************************************************
 
 
+//*************************************************************************************************
+/*!\brief Modulo assignment to the represented matrix element.
+//
+// \param value The right-hand side value for the modulo operation.
+// \return Reference to the assigned access proxy.
+*/
+template< typename MT >  // Type of the adapted matrix
+template< typename T >   // Type of the right-hand side value
+inline NonNumericProxy<MT>& NonNumericProxy<MT>::operator%=( const T& value )
+{
+   get() %= value;
+   return *this;
+}
+//*************************************************************************************************
+
+
 
 
 //=================================================================================================
@@ -395,7 +454,7 @@ inline NonNumericProxy<MT>& NonNumericProxy<MT>::operator/=( const T& value )
 // \return Direct/raw reference to the accessed matrix element.
 */
 template< typename MT >  // Type of the sparse matrix
-inline typename NonNumericProxy<MT>::RawReference NonNumericProxy<MT>::get() const
+inline typename NonNumericProxy<MT>::RawReference NonNumericProxy<MT>::get() const noexcept
 {
    const typename MT::Iterator pos( matrix_.find( i_, j_ ) );
    BLAZE_INTERNAL_ASSERT( pos != matrix_.end( rmm ? i_ : j_ ), "Missing matrix element detected" );
@@ -418,7 +477,7 @@ inline typename NonNumericProxy<MT>::RawReference NonNumericProxy<MT>::get() con
 // \return Direct/raw reference to the represented matrix element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline NonNumericProxy<MT>::operator RawReference() const
+inline NonNumericProxy<MT>::operator RawReference() const noexcept
 {
    return get();
 }
@@ -437,52 +496,26 @@ inline NonNumericProxy<MT>::operator RawReference() const
 /*!\name NonNumericProxy global functions */
 //@{
 template< typename MT >
-inline typename ConjExprTrait< typename NonNumericProxy<MT>::RepresentedType >::Type
-   conj( const NonNumericProxy<MT>& proxy );
-
-template< typename MT >
 inline void reset( const NonNumericProxy<MT>& proxy );
 
 template< typename MT >
 inline void clear( const NonNumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const NonNumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const NonNumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const NonNumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const NonNumericProxy<MT>& proxy );
 
 template< typename MT >
 inline bool isnan( const NonNumericProxy<MT>& proxy );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Computing the complex conjugate of the represented element.
-// \ingroup symmetric_matrix
-//
-// \param proxy The given proxy instance.
-// \return The complex conjugate of the represented element.
-//
-// This function computes the complex conjugate of the element represented by the access proxy.
-// In case the proxy represents a vector- or matrix-like data structure the function returns an
-// expression representing the complex conjugate of the vector/matrix.
-*/
-template< typename MT >
-inline typename ConjExprTrait< typename NonNumericProxy<MT>::RepresentedType >::Type
-   conj( const NonNumericProxy<MT>& proxy )
-{
-   using blaze::conj;
-
-   return conj( (~proxy).get() );
-}
 //*************************************************************************************************
 
 
@@ -539,12 +572,12 @@ inline void clear( const NonNumericProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy is in default state.
 // In case it is in default state, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const NonNumericProxy<MT>& proxy )
 {
    using blaze::isDefault;
 
-   return isDefault( proxy.get() );
+   return isDefault<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -561,12 +594,12 @@ inline bool isDefault( const NonNumericProxy<MT>& proxy )
 // the element is of complex type, the function returns \a true if the imaginary part is equal
 // to 0. Otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const NonNumericProxy<MT>& proxy )
 {
    using blaze::isReal;
 
-   return isReal( proxy.get() );
+   return isReal<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -581,12 +614,12 @@ inline bool isReal( const NonNumericProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy represents the numeric
 // value 0. In case it is 0, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const NonNumericProxy<MT>& proxy )
 {
    using blaze::isZero;
 
-   return isZero( proxy.get() );
+   return isZero<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -601,12 +634,12 @@ inline bool isZero( const NonNumericProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy represents the numeric
 // value 1. In case it is 1, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const NonNumericProxy<MT>& proxy )
 {
    using blaze::isOne;
 
-   return isOne( proxy.get() );
+   return isOne<RF>( proxy.get() );
 }
 //*************************************************************************************************
 

@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/UniUpperMatrix.h
 //  \brief Header file for the implementation of a upper unitriangular matrix adaptor
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,48 +40,57 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/adaptors/uniuppermatrix/BaseTemplate.h>
 #include <blaze/math/adaptors/uniuppermatrix/Dense.h>
 #include <blaze/math/adaptors/uniuppermatrix/Sparse.h>
-#include <blaze/math/adaptors/uppermatrix/BaseTemplate.h>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
 #include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/UniTriangular.h>
 #include <blaze/math/constraints/Upper.h>
-#include <blaze/math/dense/StaticMatrix.h>
 #include <blaze/math/Forward.h>
-#include <blaze/math/Functions.h>
-#include <blaze/math/lapack/trtri.h>
+#include <blaze/math/InversionFlag.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/IsOne.h>
 #include <blaze/math/traits/AddTrait.h>
+#include <blaze/math/traits/BinaryMapTrait.h>
 #include <blaze/math/traits/ColumnTrait.h>
-#include <blaze/math/traits/DerestrictTrait.h>
+#include <blaze/math/traits/DeclDiagTrait.h>
+#include <blaze/math/traits/DeclHermTrait.h>
+#include <blaze/math/traits/DeclLowTrait.h>
+#include <blaze/math/traits/DeclSymTrait.h>
+#include <blaze/math/traits/DeclUppTrait.h>
 #include <blaze/math/traits/DivTrait.h>
-#include <blaze/math/traits/MathTrait.h>
 #include <blaze/math/traits/MultTrait.h>
 #include <blaze/math/traits/RowTrait.h>
+#include <blaze/math/traits/SchurTrait.h>
 #include <blaze/math/traits/SubmatrixTrait.h>
 #include <blaze/math/traits/SubTrait.h>
+#include <blaze/math/traits/UnaryMapTrait.h>
 #include <blaze/math/typetraits/Columns.h>
 #include <blaze/math/typetraits/HasConstDataAccess.h>
+#include <blaze/math/typetraits/HighType.h>
 #include <blaze/math/typetraits/IsAdaptor.h>
 #include <blaze/math/typetraits/IsAligned.h>
 #include <blaze/math/typetraits/IsPadded.h>
 #include <blaze/math/typetraits/IsResizable.h>
 #include <blaze/math/typetraits/IsRestricted.h>
+#include <blaze/math/typetraits/IsShrinkable.h>
 #include <blaze/math/typetraits/IsSquare.h>
 #include <blaze/math/typetraits/IsUniUpper.h>
+#include <blaze/math/typetraits/LowType.h>
 #include <blaze/math/typetraits/RemoveAdaptor.h>
 #include <blaze/math/typetraits/Rows.h>
+#include <blaze/util/algorithms/Min.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/EnableIf.h>
+#include <blaze/util/IntegralConstant.h>
+#include <blaze/util/TrueType.h>
 #include <blaze/util/typetraits/IsNumeric.h>
 #include <blaze/util/Unused.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -104,14 +113,14 @@ inline void reset( UniUpperMatrix<MT,SO,DF>& m, size_t i );
 template< typename MT, bool SO, bool DF >
 inline void clear( UniUpperMatrix<MT,SO,DF>& m );
 
-template< typename MT, bool SO, bool DF >
+template< bool RF, typename MT, bool SO, bool DF >
 inline bool isDefault( const UniUpperMatrix<MT,SO,DF>& m );
 
 template< typename MT, bool SO, bool DF >
 inline bool isIntact( const UniUpperMatrix<MT,SO,DF>& m );
 
 template< typename MT, bool SO, bool DF >
-inline void swap( UniUpperMatrix<MT,SO,DF>& a, UniUpperMatrix<MT,SO,DF>& b ) /* throw() */;
+inline void swap( UniUpperMatrix<MT,SO,DF>& a, UniUpperMatrix<MT,SO,DF>& b ) noexcept;
 //@}
 //*************************************************************************************************
 
@@ -183,7 +192,8 @@ inline void clear( UniUpperMatrix<MT,SO,DF>& m )
 //
 // This function checks whether the resizable upper unitriangular matrix is in default state.
 */
-template< typename MT  // Type of the adapted matrix
+template< bool RF      // Relaxation flag
+        , typename MT  // Type of the adapted matrix
         , bool SO      // Storage order of the adapted matrix
         , bool DF >    // Density flag
 inline bool isDefault_backend( const UniUpperMatrix<MT,SO,DF>& m, TrueType )
@@ -204,14 +214,53 @@ inline bool isDefault_backend( const UniUpperMatrix<MT,SO,DF>& m, TrueType )
 //
 // This function checks whether the fixed-size upper unitriangular matrix is in default state.
 */
-template< typename MT  // Type of the adapted matrix
+template< bool RF      // Relaxation flag
+        , typename MT  // Type of the adapted matrix
         , bool SO      // Storage order of the adapted matrix
         , bool DF >    // Density flag
 inline bool isDefault_backend( const UniUpperMatrix<MT,SO,DF>& m, FalseType )
 {
-   return isIdentity( m );
+   return isIdentity<RF>( m );
 }
 /*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns whether the given uniupper matrix is in default state.
+// \ingroup uniupper_matrix
+//
+// \param m The uniupper matrix to be tested for its default state.
+// \return \a true in case the given matrix is component-wise zero, \a false otherwise.
+//
+// This function checks whether the upper unitriangular matrix is in default state. The following
+// example demonstrates the use of the \a isDefault function:
+
+   \code
+   using blaze::DynamicMatrix;
+   using blaze::UniUpperMatrix;
+   using blaze::rowMajor;
+
+   UniUpperMatrix< DynamicMatrix<int,rowMajor> > A;
+   // ... Resizing and initialization
+   if( isDefault( A ) ) { ... }
+   \endcode
+
+// Optionally, it is possible to switch between strict semantics (blaze::strict) and relaxed
+// semantics (blaze::relaxed):
+
+   \code
+   if( isDefault<relaxed>( A ) ) { ... }
+   \endcode
+*/
+template< bool RF      // Relaxation flag
+        , typename MT  // Type of the adapted matrix
+        , bool SO      // Storage order of the adapted matrix
+        , bool DF >    // Density flag
+inline bool isDefault( const UniUpperMatrix<MT,SO,DF>& m )
+{
+   return isDefault_backend<RF>( m, typename IsResizable<MT>::Type() );
+}
 //*************************************************************************************************
 
 
@@ -247,275 +296,20 @@ inline bool isIntact( const UniUpperMatrix<MT,SO,DF>& m )
 
 
 //*************************************************************************************************
-/*!\brief Returns whether the given uniupper matrix is in default state.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper matrix to be tested for its default state.
-// \return \a true in case the given matrix is component-wise zero, \a false otherwise.
-//
-// This function checks whether the upper unitriangular matrix is in default state. The following
-// example demonstrates the use of the \a isDefault function:
-
-   \code
-   using blaze::DynamicMatrix;
-   using blaze::UniUpperMatrix;
-   using blaze::rowMajor;
-
-   UniUpperMatrix< DynamicMatrix<int,rowMajor> > A;
-   // ... Resizing and initialization
-   if( isDefault( A ) ) { ... }
-   \endcode
-*/
-template< typename MT  // Type of the adapted matrix
-        , bool SO      // Storage order of the adapted matrix
-        , bool DF >    // Density flag
-inline bool isDefault( const UniUpperMatrix<MT,SO,DF>& m )
-{
-   return isDefault_backend( m, typename IsResizable<MT>::Type() );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Swapping the contents of two matrices.
 // \ingroup uniupper_matrix
 //
 // \param a The first matrix to be swapped.
 // \param b The second matrix to be swapped.
 // \return void
-// \exception no-throw guarantee.
 */
 template< typename MT  // Type of the adapted matrix
         , bool SO      // Storage order of the adapted matrix
         , bool DF >    // Density flag
-inline void swap( UniUpperMatrix<MT,SO,DF>& a, UniUpperMatrix<MT,SO,DF>& b ) /* throw() */
+inline void swap( UniUpperMatrix<MT,SO,DF>& a, UniUpperMatrix<MT,SO,DF>& b ) noexcept
 {
    a.swap( b );
 }
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place inversion of the given uniupper dense \f$ 2 \times 2 \f$ matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense \f$ 2 \times 2 \f$ matrix via the rule of Sarrus.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invert2x2( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-
-   BLAZE_INTERNAL_ASSERT( m.rows()    == 2UL, "Invalid number of rows detected"    );
-   BLAZE_INTERNAL_ASSERT( m.columns() == 2UL, "Invalid number of columns detected" );
-
-   typedef typename MT::ElementType  ET;
-
-   typename DerestrictTrait<MT>::Type A( derestrict( m ) );
-
-   A(0,1) = -A(0,1);
-
-   BLAZE_INTERNAL_ASSERT( isIntact( m ), "Broken invariant detected" );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place inversion of the given uniupper dense \f$ 3 \times 3 \f$ matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense \f$ 3 \times 3 \f$ matrix via the rule of Sarrus.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invert3x3( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-
-   BLAZE_INTERNAL_ASSERT( m.rows()    == 3UL, "Invalid number of rows detected"    );
-   BLAZE_INTERNAL_ASSERT( m.columns() == 3UL, "Invalid number of columns detected" );
-
-   typedef typename MT::ElementType  ET;
-
-   const StaticMatrix<ET,3UL,3UL,SO> A( m );
-   typename DerestrictTrait<MT>::Type B( derestrict( m ) );
-
-   B(0,1) = - A(0,1);
-   B(0,2) =   A(0,1)*A(1,2) - A(0,2);
-   B(1,2) = - A(1,2);
-
-   BLAZE_INTERNAL_ASSERT( isIntact( m ), "Broken invariant detected" );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place inversion of the given uniupper dense \f$ 4 \times 4 \f$ matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense \f$ 4 \times 4 \f$ matrix via the rule of Sarrus.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invert4x4( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-
-   BLAZE_INTERNAL_ASSERT( m.rows()    == 4UL, "Invalid number of rows detected"    );
-   BLAZE_INTERNAL_ASSERT( m.columns() == 4UL, "Invalid number of columns detected" );
-
-   typedef typename MT::ElementType  ET;
-
-   const StaticMatrix<ET,4UL,4UL,SO> A( m );
-   typename DerestrictTrait<MT>::Type B( derestrict( m ) );
-
-   ET tmp( A(0,1)*A(1,2) - A(0,2) );
-
-   B(0,1) = - A(0,1);
-   B(0,2) =   tmp;
-   B(1,2) = - A(1,2);
-   B(0,3) =   A(0,1)*A(1,3) - A(0,3) - A(2,3)*tmp;
-   B(1,3) =   A(2,3)*A(1,2) - A(1,3);
-   B(2,3) = - A(2,3);
-
-   BLAZE_INTERNAL_ASSERT( isIntact( m ), "Broken invariant detected" );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place inversion of the given uniupper dense \f$ 5 \times 5 \f$ matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense \f$ 5 \times 5 \f$ matrix via the rule of Sarrus.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invert5x5( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-
-   BLAZE_INTERNAL_ASSERT( m.rows()    == 5UL, "Invalid number of rows detected"    );
-   BLAZE_INTERNAL_ASSERT( m.columns() == 5UL, "Invalid number of columns detected" );
-
-   typedef typename MT::ElementType  ET;
-
-   const StaticMatrix<ET,5UL,5UL,SO> A( m );
-   typename DerestrictTrait<MT>::Type B( derestrict( m ) );
-
-   const ET tmp2( A(0,1)*A(1,2) - A(0,2) );
-
-   const ET tmp8 ( A(2,3)*tmp2 - A(0,1)*A(1,3) + A(0,3) );
-   const ET tmp9 ( A(2,3)*A(1,2) - A(1,3) );
-   const ET tmp10( A(2,3) );
-
-   B(0,1) = - A(0,1);
-   B(0,2) =   A(0,1)*A(1,2) - A(0,2);
-   B(1,2) = - A(1,2);
-   B(0,3) = - tmp8;
-   B(1,3) =   tmp9;
-   B(2,3) = - A(2,3);
-   B(0,4) =   A(3,4)*tmp8 - A(2,4)*tmp2 + A(0,1)*A(1,4) - A(0,4);
-   B(1,4) =   A(2,4)*A(1,2) - A(1,4) - A(3,4)*tmp9;
-   B(2,4) =   A(3,4)*A(2,3) - A(2,4);
-   B(3,4) = - A(3,4);
-
-   BLAZE_INTERNAL_ASSERT( isIntact( m ), "Broken invariant detected" );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place inversion of the given uniupper dense \f$ 6 \times 6 \f$ matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense \f$ 6 \times 6 \f$ matrix via the rule of Sarrus.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invert6x6( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-
-   BLAZE_INTERNAL_ASSERT( m.rows()    == 6UL, "Invalid number of rows detected"    );
-   BLAZE_INTERNAL_ASSERT( m.columns() == 6UL, "Invalid number of columns detected" );
-
-   typedef typename MT::ElementType  ET;
-
-   const StaticMatrix<ET,6UL,6UL,SO> A( m );
-   typename DerestrictTrait<MT>::Type B( derestrict( m ) );
-
-   const ET tmp1( A(0,1)*A(1,2) - A(0,2) );
-   const ET tmp2( A(2,3)*tmp1 - A(0,1)*A(1,3) + A(0,3) );
-   const ET tmp3( A(2,3)*A(1,2) - A(1,3) );
-   const ET tmp4( A(2,4)*tmp1 - A(0,1)*A(1,4) + A(0,4) - A(3,4)*tmp2 );
-   const ET tmp5( A(2,4)*A(1,2) - A(1,4) - A(3,4)*tmp3 );
-   const ET tmp6( A(2,4) - A(3,4)*A(2,3) );
-
-   B(0,1) = - A(0,1);
-   B(0,2) =   A(0,1)*A(1,2) - A(0,2);
-   B(1,2) = - A(1,2);
-   B(0,3) = - tmp2;
-   B(1,3) =   tmp3;
-   B(2,3) = - A(2,3);
-   B(0,4) = - tmp4;
-   B(1,4) =   tmp5;
-   B(2,4) = - tmp6;
-   B(3,4) = - A(3,4);
-   B(0,5) = - A(2,5)*tmp1 + A(0,1)*A(1,5) - A(0,5) + A(3,5)*tmp2 + A(4,5)*tmp4;
-   B(1,5) =   A(2,5)*A(1,2) - A(1,5) - A(3,5)*tmp3 - A(4,5)*tmp5;
-   B(2,5) = - A(2,5) + A(3,5)*A(2,3) + A(4,5)*tmp6;
-   B(3,5) = - A(3,5) + A(4,5)*A(3,4);
-   B(4,5) = - A(4,5);
-
-   BLAZE_INTERNAL_ASSERT( isIntact( m ), "Broken invariant detected" );
-}
-/*! \endcond */
 //*************************************************************************************************
 
 
@@ -526,141 +320,41 @@ inline void invert6x6( UniUpperMatrix<MT,SO,true>& m )
 //
 // \param m The uniupper dense matrix to be inverted.
 // \return void
+// \exception std::invalid_argument Inversion of singular matrix failed.
 //
-// This function inverts the given uniupper dense matrix by means of the most suited matrix
-// inversion algorithm.
+// This function inverts the given uniupper dense matrix by means of the specified matrix inversion
+// algorithm \c IF. The The inversion fails if the given matrix is singular and not invertible.
+// In this case a \a std::invalid_argument exception is thrown.
 //
 // \note The matrix inversion can only be used for dense matrices with \c float, \c double,
 // \c complex<float> or \c complex<double> element type. The attempt to call the function with
 // matrices of any other element type results in a compile time error!
 //
-// \note This function can only be used if the fitting LAPACK library is available and linked to
+// \note This function can only be used if a fitting LAPACK library is available and linked to
 // the executable. Otherwise a linker error will be created.
 //
 // \note This function does only provide the basic exception safety guarantee, i.e. in case of an
 // exception \a m may already have been modified.
 */
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invertByDefault( UniUpperMatrix<MT,SO,true>& m )
+template< InversionFlag IF  // Inversion algorithm
+        , typename MT       // Type of the dense matrix
+        , bool SO >         // Storage order of the dense matrix
+inline void invert( UniUpperMatrix<MT,SO,true>& m )
 {
-   invertByLU( m );
-}
-/*! \endcond */
-//*************************************************************************************************
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT> );
 
+   if( IF == asLower || IF == asUniLower ) {
+      BLAZE_INTERNAL_ASSERT( isIdentity( m ), "Violation of preconditions detected" );
+      return;
+   }
 
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place LU-based inversion of the given uniupper dense matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense matrix by means of an LU decomposition.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a linker error will be created.
-//
-// \note This function does only provide the basic exception safety guarantee, i.e. in case of an
-// exception \a m may already have been modified.
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invertByLU( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
+   constexpr InversionFlag flag( ( IF == byLU || IF == asGeneral || IF == asUpper || IF == asUniUpper)
+                                 ? ( asUniUpper )
+                                 : ( asDiagonal ) );
 
-   typename DerestrictTrait<MT>::Type A( derestrict( ~m ) );
+   invert<flag>( derestrict( m ) );
 
-   trtri( A, 'U', 'U' );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place Bunch-Kaufman-based inversion of the given uniupper dense matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense matrix by means of a Bunch-Kaufman decomposition.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a linker error will be created.
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invertByLDLT( UniUpperMatrix<MT,SO,true>& m )
-{
-   invertByLLH( m );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place Bunch-Kaufman-based inversion of the given uniupper dense matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense matrix by means of a Bunch-Kaufman decomposition.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a linker error will be created.
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invertByLDLH( UniUpperMatrix<MT,SO,true>& m )
-{
-   invertByLLH( m );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief In-place Cholesky-based inversion of the given uniupper dense matrix.
-// \ingroup uniupper_matrix
-//
-// \param m The uniupper dense matrix to be inverted.
-// \return void
-//
-// This function inverts the given uniupper dense matrix by means of a Cholesky decomposition.
-//
-// \note The matrix inversion can only be used for dense matrices with \c float, \c double,
-// \c complex<float> or \c complex<double> element type. The attempt to call the function with
-// matrices of any other element type results in a compile time error!
-*/
-template< typename MT  // Type of the dense matrix
-        , bool SO >    // Storage order of the dense matrix
-inline void invertByLLH( UniUpperMatrix<MT,SO,true>& m )
-{
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-
-   BLAZE_INTERNAL_ASSERT( isIdentity( ~m ), "Violation of preconditions detected" );
-
-   UNUSED_PARAMETER( m );
+   BLAZE_INTERNAL_ASSERT( isIntact( m ), "Broken invariant detected" );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -689,7 +383,7 @@ template< typename MT1, bool SO1, typename MT2, typename MT3, typename MT4, bool
 inline void lu( const UniUpperMatrix<MT1,SO1,true>& A, DenseMatrix<MT2,SO1>& L,
                 DenseMatrix<MT3,SO1>& U, Matrix<MT4,SO2>& P )
 {
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
 
    BLAZE_CONSTRAINT_MUST_NOT_BE_SYMMETRIC_MATRIX_TYPE( MT2 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_HERMITIAN_MATRIX_TYPE( MT2 );
@@ -701,12 +395,12 @@ inline void lu( const UniUpperMatrix<MT1,SO1,true>& A, DenseMatrix<MT2,SO1>& L,
    BLAZE_CONSTRAINT_MUST_NOT_BE_UNITRIANGULAR_MATRIX_TYPE( MT3 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_LOWER_MATRIX_TYPE( MT3 );
 
-   typedef typename MT2::ElementType  ET2;
-   typedef typename MT4::ElementType  ET4;
+   using ET2 = ElementType_<MT2>;
+   using ET4 = ElementType_<MT4>;
 
    const size_t n( (~A).rows() );
 
-   typename DerestrictTrait<MT2>::Type L2( derestrict( ~L ) );
+   decltype(auto) L2( derestrict( ~L ) );
 
    (~U) = A;
 
@@ -858,7 +552,7 @@ inline bool tryAssign( const UniUpperMatrix<MT,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename VT::ConstIterator  RhsIterator;
+   using RhsIterator = typename VT::ConstIterator;
 
    if( column >= row + (~rhs).size() )
       return true;
@@ -916,7 +610,7 @@ inline bool tryAssign( const UniUpperMatrix<MT,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename VT::ConstIterator  RhsIterator;
+   using RhsIterator = typename VT::ConstIterator;
 
    if( row < column )
       return true;
@@ -1095,7 +789,7 @@ inline bool tryAssign( const UniUpperMatrix<MT1,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename MT2::ConstIterator  RhsIterator;
+   using RhsIterator = typename MT2::ConstIterator;
 
    const size_t M( (~rhs).rows()    );
    const size_t N( (~rhs).columns() );
@@ -1161,7 +855,7 @@ inline bool tryAssign( const UniUpperMatrix<MT1,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename MT2::ConstIterator  RhsIterator;
+   using RhsIterator = typename MT2::ConstIterator;
 
    const size_t M( (~rhs).rows()    );
    const size_t N( (~rhs).columns() );
@@ -1322,7 +1016,7 @@ inline bool tryAddAssign( const UniUpperMatrix<MT,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename VT::ConstIterator  RhsIterator;
+   using RhsIterator = typename VT::ConstIterator;
 
    const RhsIterator last( (~rhs).end() );
    RhsIterator element( (~rhs).lowerBound( ( column <= row )?( 0UL ):( column - row ) ) );
@@ -1370,7 +1064,7 @@ inline bool tryAddAssign( const UniUpperMatrix<MT,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename VT::ConstIterator  RhsIterator;
+   using RhsIterator = typename VT::ConstIterator;
 
    if( row < column )
       return true;
@@ -1536,7 +1230,7 @@ inline bool tryAddAssign( const UniUpperMatrix<MT1,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename MT2::ConstIterator  RhsIterator;
+   using RhsIterator = typename MT2::ConstIterator;
 
    const size_t M( (~rhs).rows()    );
    const size_t N( (~rhs).columns() );
@@ -1596,7 +1290,7 @@ inline bool tryAddAssign( const UniUpperMatrix<MT1,SO,DF>& lhs,
 
    UNUSED_PARAMETER( lhs );
 
-   typedef typename MT2::ConstIterator  RhsIterator;
+   using RhsIterator = typename MT2::ConstIterator;
 
    const size_t M( (~rhs).rows()    );
    const size_t N( (~rhs).columns() );
@@ -1766,6 +1460,91 @@ inline bool tryMultAssign( const UniUpperMatrix<MT,SO,DF>& lhs,
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the Schur product assignment of a matrix to an uniupper
+//        matrix.
+// \ingroup uniupper_matrix
+//
+// \param lhs The target left-hand side uniupper matrix.
+// \param rhs The right-hand side matrix for the Schur product.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT1  // Type of the adapted matrix
+        , bool SO1      // Storage order of the adapted matrix
+        , bool DF       // Density flag
+        , typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline bool trySchurAssign( const UniUpperMatrix<MT1,SO1,DF>& lhs,
+                            const Matrix<MT2,SO2>& rhs, size_t row, size_t column )
+{
+   BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( MT2 );
+
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).rows() <= lhs.rows() - row, "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).columns() <= lhs.columns() - column, "Invalid number of columns" );
+
+   UNUSED_PARAMETER( lhs );
+
+   const size_t M( (~rhs).rows()    );
+   const size_t N( (~rhs).columns() );
+
+   if( ( row + 1UL >= column + N ) || ( column + 1UL >= row + M ) )
+      return true;
+
+   size_t i( row < column ? column - row : 0UL );
+   size_t j( column < row ? row - column : 0UL );
+
+   for( ; i<M && j<N; ++i, ++j )
+   {
+      if( !isOne( (~rhs)(i,j) ) )
+         return false;
+   }
+
+   return true;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the division assignment of a vector to an uniupper matrix.
+// \ingroup uniupper_matrix
+//
+// \param lhs The target left-hand side uniupper matrix.
+// \param rhs The right-hand side vector divisor.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT  // Type of the adapted matrix
+        , bool SO      // Storage order of the adapted matrix
+        , bool DF      // Density flag
+        , typename VT  // Type of the right-hand side vector
+        , bool TF >    // Transpose flag of the right-hand side vector
+inline bool tryDivAssign( const UniUpperMatrix<MT,SO,DF>& lhs,
+                          const Vector<VT,TF>& rhs, size_t row, size_t column )
+{
+   return tryMultAssign( lhs, ~rhs, row, column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
 /*!\brief Returns a reference to the instance without the access restrictions to the lower part.
 // \ingroup math_shims
 //
@@ -1800,7 +1579,8 @@ inline MT& derestrict( UniUpperMatrix<MT,SO,DF>& m )
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct Rows< UniUpperMatrix<MT,SO,DF> > : public Rows<MT>
+struct Rows< UniUpperMatrix<MT,SO,DF> >
+   : public Rows<MT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1817,7 +1597,8 @@ struct Rows< UniUpperMatrix<MT,SO,DF> > : public Rows<MT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct Columns< UniUpperMatrix<MT,SO,DF> > : public Columns<MT>
+struct Columns< UniUpperMatrix<MT,SO,DF> >
+   : public Columns<MT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1834,7 +1615,8 @@ struct Columns< UniUpperMatrix<MT,SO,DF> > : public Columns<MT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsSquare< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
+struct IsSquare< UniUpperMatrix<MT,SO,DF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1851,7 +1633,8 @@ struct IsSquare< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsUniUpper< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
+struct IsUniUpper< UniUpperMatrix<MT,SO,DF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1868,7 +1651,8 @@ struct IsUniUpper< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsAdaptor< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
+struct IsAdaptor< UniUpperMatrix<MT,SO,DF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1885,7 +1669,8 @@ struct IsAdaptor< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsRestricted< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
+struct IsRestricted< UniUpperMatrix<MT,SO,DF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1902,7 +1687,8 @@ struct IsRestricted< UniUpperMatrix<MT,SO,DF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct HasConstDataAccess< UniUpperMatrix<MT,SO,true> > : public IsTrue<true>
+struct HasConstDataAccess< UniUpperMatrix<MT,SO,true> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1919,7 +1705,8 @@ struct HasConstDataAccess< UniUpperMatrix<MT,SO,true> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsAligned< UniUpperMatrix<MT,SO,DF> > : public IsTrue< IsAligned<MT>::value >
+struct IsAligned< UniUpperMatrix<MT,SO,DF> >
+   : public BoolConstant< IsAligned<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1936,7 +1723,8 @@ struct IsAligned< UniUpperMatrix<MT,SO,DF> > : public IsTrue< IsAligned<MT>::val
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsPadded< UniUpperMatrix<MT,SO,DF> > : public IsTrue< IsPadded<MT>::value >
+struct IsPadded< UniUpperMatrix<MT,SO,DF> >
+   : public BoolConstant< IsPadded<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1953,7 +1741,26 @@ struct IsPadded< UniUpperMatrix<MT,SO,DF> > : public IsTrue< IsPadded<MT>::value
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF >
-struct IsResizable< UniUpperMatrix<MT,SO,DF> > : public IsTrue< IsResizable<MT>::value >
+struct IsResizable< UniUpperMatrix<MT,SO,DF> >
+   : public BoolConstant< IsResizable<MT>::value >
+{};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ISSHRINKABLE SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct IsShrinkable< UniUpperMatrix<MT,SO,DF> >
+   : public BoolConstant< IsShrinkable<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1972,26 +1779,7 @@ struct IsResizable< UniUpperMatrix<MT,SO,DF> > : public IsTrue< IsResizable<MT>:
 template< typename MT, bool SO, bool DF >
 struct RemoveAdaptor< UniUpperMatrix<MT,SO,DF> >
 {
-   typedef MT  Type;
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  DERESTRICTTRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO, bool DF >
-struct DerestrictTrait< UniUpperMatrix<MT,SO,DF> >
-{
-   typedef MT&  Type;
+   using Type = MT;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2010,139 +1798,151 @@ struct DerestrictTrait< UniUpperMatrix<MT,SO,DF> >
 template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
 struct AddTrait< UniUpperMatrix<MT,SO1,DF>, StaticMatrix<T,M,N,SO2> >
 {
-   typedef typename AddTrait< MT, StaticMatrix<T,M,N,SO2> >::Type  Type;
+   using Type = AddTrait_< MT, StaticMatrix<T,M,N,SO2> >;
 };
 
 template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
 struct AddTrait< StaticMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename AddTrait< StaticMatrix<T,M,N,SO1>, MT >::Type  Type;
+   using Type = AddTrait_< StaticMatrix<T,M,N,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
 struct AddTrait< UniUpperMatrix<MT,SO1,DF>, HybridMatrix<T,M,N,SO2> >
 {
-   typedef typename AddTrait< MT, HybridMatrix<T,M,N,SO2> >::Type  Type;
+   using Type = AddTrait_< MT, HybridMatrix<T,M,N,SO2> >;
 };
 
 template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
 struct AddTrait< HybridMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename AddTrait< HybridMatrix<T,M,N,SO1>, MT >::Type  Type;
+   using Type = AddTrait_< HybridMatrix<T,M,N,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
 struct AddTrait< UniUpperMatrix<MT,SO1,DF>, DynamicMatrix<T,SO2> >
 {
-   typedef typename AddTrait< MT, DynamicMatrix<T,SO2> >::Type  Type;
+   using Type = AddTrait_< MT, DynamicMatrix<T,SO2> >;
 };
 
 template< typename T, bool SO1, typename MT, bool SO2, bool DF >
 struct AddTrait< DynamicMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename AddTrait< DynamicMatrix<T,SO1>, MT >::Type  Type;
+   using Type = AddTrait_< DynamicMatrix<T,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool AF, bool PF, bool SO2 >
 struct AddTrait< UniUpperMatrix<MT,SO1,DF>, CustomMatrix<T,AF,PF,SO2> >
 {
-   typedef typename AddTrait< MT, CustomMatrix<T,AF,PF,SO2> >::Type  Type;
+   using Type = AddTrait_< MT, CustomMatrix<T,AF,PF,SO2> >;
 };
 
 template< typename T, bool AF, bool PF, bool SO1, typename MT, bool SO2, bool DF >
 struct AddTrait< CustomMatrix<T,AF,PF,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename AddTrait< CustomMatrix<T,AF,PF,SO1>, MT >::Type  Type;
+   using Type = AddTrait_< CustomMatrix<T,AF,PF,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
 struct AddTrait< UniUpperMatrix<MT,SO1,DF>, CompressedMatrix<T,SO2> >
 {
-   typedef typename AddTrait< MT, CompressedMatrix<T,SO2> >::Type  Type;
+   using Type = AddTrait_< MT, CompressedMatrix<T,SO2> >;
 };
 
 template< typename T, bool SO1, typename MT, bool SO2, bool DF >
 struct AddTrait< CompressedMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename AddTrait< CompressedMatrix<T,SO1>, MT >::Type  Type;
+   using Type = AddTrait_< CompressedMatrix<T,SO1>, MT >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
+struct AddTrait< UniUpperMatrix<MT,SO1,DF>, IdentityMatrix<T,SO2> >
+{
+   using Type = UpperMatrix< AddTrait_< MT, IdentityMatrix<T,SO2> > >;
+};
+
+template< typename T, bool SO1, typename MT, bool SO2, bool DF >
+struct AddTrait< IdentityMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UpperMatrix< AddTrait_< IdentityMatrix<T,SO1>, MT > >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2, bool NF >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, SymmetricMatrix<MT2,SO2,DF2,NF> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, bool NF, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< SymmetricMatrix<MT1,SO1,DF1,NF>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, HermitianMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< HermitianMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, LowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< LowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, UniLowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, StrictlyLowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< StrictlyLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename AddTrait<MT1,MT2>::Type  Type;
+   using Type = AddTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, UpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename AddTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< AddTrait_<MT1,MT2> >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename AddTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< AddTrait_<MT1,MT2> >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename AddTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< AddTrait_<MT1,MT2> >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2161,139 +1961,314 @@ struct AddTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
 struct SubTrait< UniUpperMatrix<MT,SO1,DF>, StaticMatrix<T,M,N,SO2> >
 {
-   typedef typename SubTrait< MT, StaticMatrix<T,M,N,SO2> >::Type  Type;
+   using Type = SubTrait_< MT, StaticMatrix<T,M,N,SO2> >;
 };
 
 template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
 struct SubTrait< StaticMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename SubTrait< StaticMatrix<T,M,N,SO1>, MT >::Type  Type;
+   using Type = SubTrait_< StaticMatrix<T,M,N,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
 struct SubTrait< UniUpperMatrix<MT,SO1,DF>, HybridMatrix<T,M,N,SO2> >
 {
-   typedef typename SubTrait< MT, HybridMatrix<T,M,N,SO2> >::Type  Type;
+   using Type = SubTrait_< MT, HybridMatrix<T,M,N,SO2> >;
 };
 
 template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
 struct SubTrait< HybridMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename SubTrait< HybridMatrix<T,M,N,SO1>, MT >::Type  Type;
+   using Type = SubTrait_< HybridMatrix<T,M,N,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
 struct SubTrait< UniUpperMatrix<MT,SO1,DF>, DynamicMatrix<T,SO2> >
 {
-   typedef typename SubTrait< MT, DynamicMatrix<T,SO2> >::Type  Type;
+   using Type = SubTrait_< MT, DynamicMatrix<T,SO2> >;
 };
 
 template< typename T, bool SO1, typename MT, bool SO2, bool DF >
 struct SubTrait< DynamicMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename SubTrait< DynamicMatrix<T,SO1>, MT >::Type  Type;
+   using Type = SubTrait_< DynamicMatrix<T,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool AF, bool PF, bool SO2 >
 struct SubTrait< UniUpperMatrix<MT,SO1,DF>, CustomMatrix<T,AF,PF,SO2> >
 {
-   typedef typename SubTrait< MT, CustomMatrix<T,AF,PF,SO2> >::Type  Type;
+   using Type = SubTrait_< MT, CustomMatrix<T,AF,PF,SO2> >;
 };
 
 template< typename T, bool AF, bool PF, bool SO1, typename MT, bool SO2, bool DF >
 struct SubTrait< CustomMatrix<T,AF,PF,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename SubTrait< CustomMatrix<T,AF,PF,SO1>, MT >::Type  Type;
+   using Type = SubTrait_< CustomMatrix<T,AF,PF,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
 struct SubTrait< UniUpperMatrix<MT,SO1,DF>, CompressedMatrix<T,SO2> >
 {
-   typedef typename SubTrait< MT, CompressedMatrix<T,SO2> >::Type  Type;
+   using Type = SubTrait_< MT, CompressedMatrix<T,SO2> >;
 };
 
 template< typename T, bool SO1, typename MT, bool SO2, bool DF >
 struct SubTrait< CompressedMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename SubTrait< CompressedMatrix<T,SO1>, MT >::Type  Type;
+   using Type = SubTrait_< CompressedMatrix<T,SO1>, MT >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
+struct SubTrait< UniUpperMatrix<MT,SO1,DF>, IdentityMatrix<T,SO2> >
+{
+   using Type = StrictlyUpperMatrix< SubTrait_< MT, IdentityMatrix<T,SO2> > >;
+};
+
+template< typename T, bool SO1, typename MT, bool SO2, bool DF >
+struct SubTrait< IdentityMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = StrictlyUpperMatrix< SubTrait_< IdentityMatrix<T,SO1>, MT > >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2, bool NF >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, SymmetricMatrix<MT2,SO2,DF2,NF> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, bool NF, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< SymmetricMatrix<MT1,SO1,DF1,NF>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, HermitianMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< HermitianMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, LowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< LowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, UniLowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, StrictlyLowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< StrictlyLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename SubTrait<MT1,MT2>::Type  Type;
+   using Type = SubTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, UpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename SubTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< SubTrait_<MT1,MT2> >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename SubTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< SubTrait_<MT1,MT2> >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename SubTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< SubTrait_<MT1,MT2> >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  SCHURTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
+struct SchurTrait< UniUpperMatrix<MT,SO1,DF>, StaticMatrix<T,M,N,SO2> >
+{
+   using Type = UpperMatrix< SchurTrait_< MT, StaticMatrix<T,M,N,SO2> > >;
+};
+
+template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
+struct SchurTrait< StaticMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UpperMatrix< SchurTrait_< StaticMatrix<T,M,N,SO1>, MT > >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
+struct SchurTrait< UniUpperMatrix<MT,SO1,DF>, HybridMatrix<T,M,N,SO2> >
+{
+   using Type = UpperMatrix< SchurTrait_< MT, HybridMatrix<T,M,N,SO2> > >;
+};
+
+template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
+struct SchurTrait< HybridMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UpperMatrix< SchurTrait_< HybridMatrix<T,M,N,SO1>, MT > >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
+struct SchurTrait< UniUpperMatrix<MT,SO1,DF>, DynamicMatrix<T,SO2> >
+{
+   using Type = UpperMatrix< SchurTrait_< MT, DynamicMatrix<T,SO2> > >;
+};
+
+template< typename T, bool SO1, typename MT, bool SO2, bool DF >
+struct SchurTrait< DynamicMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UpperMatrix< SchurTrait_< DynamicMatrix<T,SO1>, MT > >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool AF, bool PF, bool SO2 >
+struct SchurTrait< UniUpperMatrix<MT,SO1,DF>, CustomMatrix<T,AF,PF,SO2> >
+{
+   using Type = UpperMatrix< SchurTrait_< MT, CustomMatrix<T,AF,PF,SO2> > >;
+};
+
+template< typename T, bool AF, bool PF, bool SO1, typename MT, bool SO2, bool DF >
+struct SchurTrait< CustomMatrix<T,AF,PF,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UpperMatrix< SchurTrait_< CustomMatrix<T,AF,PF,SO1>, MT > >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
+struct SchurTrait< UniUpperMatrix<MT,SO1,DF>, CompressedMatrix<T,SO2> >
+{
+   using Type = UpperMatrix< SchurTrait_< MT, CompressedMatrix<T,SO2> > >;
+};
+
+template< typename T, bool SO1, typename MT, bool SO2, bool DF >
+struct SchurTrait< CompressedMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UpperMatrix< SchurTrait_< CompressedMatrix<T,SO1>, MT > >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
+struct SchurTrait< UniUpperMatrix<MT,SO1,DF>, IdentityMatrix<T,SO2> >
+{
+   using Type = IdentityMatrix< MultTrait_< ElementType_<MT>, T >, SO2 >;
+};
+
+template< typename T, bool SO1, typename MT, bool SO2, bool DF >
+struct SchurTrait< IdentityMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = IdentityMatrix< MultTrait_< T, ElementType_<MT> >, SO1 >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2, bool NF >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, SymmetricMatrix<MT2,SO2,DF2,NF> >
+{
+   using Type = UpperMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, bool NF, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< SymmetricMatrix<MT1,SO1,DF1,NF>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UpperMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, HermitianMatrix<MT2,SO2,DF2> >
+{
+   using Type = UpperMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< HermitianMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UpperMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, LowerMatrix<MT2,SO2,DF2> >
+{
+   using Type = DiagonalMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< LowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = DiagonalMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, UniLowerMatrix<MT2,SO2,DF2> >
+{
+   using Type = IdentityMatrix< MultTrait_< ElementType_<MT1>, ElementType_<MT2> >, SO1 >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = IdentityMatrix< MultTrait_< ElementType_<MT1>, ElementType_<MT2> >, SO1 >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, StrictlyLowerMatrix<MT2,SO2,DF2> >
+{
+   using Type = DiagonalMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< StrictlyLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = DiagonalMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, UpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UpperMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UpperMatrix< SchurTrait_<MT1,MT2> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct SchurTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UniUpperMatrix< SchurTrait_<MT1,MT2> >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2310,213 +2285,225 @@ struct SubTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF, typename T >
-struct MultTrait< UniUpperMatrix<MT,SO,DF>, T, typename EnableIf< IsNumeric<T> >::Type >
+struct MultTrait< UniUpperMatrix<MT,SO,DF>, T, EnableIf_< IsNumeric<T> > >
 {
-   typedef UpperMatrix< typename MultTrait<MT,T>::Type >  Type;
+   using Type = UpperMatrix< MultTrait_<MT,T> >;
 };
 
 template< typename T, typename MT, bool SO, bool DF >
-struct MultTrait< T, UniUpperMatrix<MT,SO,DF>, typename EnableIf< IsNumeric<T> >::Type >
+struct MultTrait< T, UniUpperMatrix<MT,SO,DF>, EnableIf_< IsNumeric<T> > >
 {
-   typedef UpperMatrix< typename MultTrait<T,MT>::Type >  Type;
+   using Type = UpperMatrix< MultTrait_<T,MT> >;
 };
 
 template< typename MT, bool SO, bool DF, typename T, size_t N >
 struct MultTrait< UniUpperMatrix<MT,SO,DF>, StaticVector<T,N,false> >
 {
-   typedef typename MultTrait< MT, StaticVector<T,N,false> >::Type  Type;
+   using Type = MultTrait_< MT, StaticVector<T,N,false> >;
 };
 
 template< typename T, size_t N, typename MT, bool SO, bool DF >
 struct MultTrait< StaticVector<T,N,true>, UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename MultTrait< StaticVector<T,N,true>, MT >::Type  Type;
+   using Type = MultTrait_< StaticVector<T,N,true>, MT >;
 };
 
 template< typename MT, bool SO, bool DF, typename T, size_t N >
 struct MultTrait< UniUpperMatrix<MT,SO,DF>, HybridVector<T,N,false> >
 {
-   typedef typename MultTrait< MT, HybridVector<T,N,false> >::Type  Type;
+   using Type = MultTrait_< MT, HybridVector<T,N,false> >;
 };
 
 template< typename T, size_t N, typename MT, bool SO, bool DF >
 struct MultTrait< HybridVector<T,N,true>, UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename MultTrait< HybridVector<T,N,true>, MT >::Type  Type;
+   using Type = MultTrait_< HybridVector<T,N,true>, MT >;
 };
 
 template< typename MT, bool SO, bool DF, typename T >
 struct MultTrait< UniUpperMatrix<MT,SO,DF>, DynamicVector<T,false> >
 {
-   typedef typename MultTrait< MT, DynamicVector<T,false> >::Type  Type;
+   using Type = MultTrait_< MT, DynamicVector<T,false> >;
 };
 
 template< typename T, typename MT, bool SO, bool DF >
 struct MultTrait< DynamicVector<T,true>, UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename MultTrait< DynamicVector<T,true>, MT >::Type  Type;
+   using Type = MultTrait_< DynamicVector<T,true>, MT >;
 };
 
 template< typename MT, bool SO, bool DF, typename T, bool AF, bool PF >
 struct MultTrait< UniUpperMatrix<MT,SO,DF>, CustomVector<T,AF,PF,false> >
 {
-   typedef typename MultTrait< MT, CustomVector<T,AF,PF,false> >::Type  Type;
+   using Type = MultTrait_< MT, CustomVector<T,AF,PF,false> >;
 };
 
 template< typename T, bool AF, bool PF, typename MT, bool SO, bool DF >
 struct MultTrait< CustomVector<T,AF,PF,true>, UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename MultTrait< CustomVector<T,AF,PF,true>, MT >::Type  Type;
+   using Type = MultTrait_< CustomVector<T,AF,PF,true>, MT >;
 };
 
 template< typename MT, bool SO, bool DF, typename T >
 struct MultTrait< UniUpperMatrix<MT,SO,DF>, CompressedVector<T,false> >
 {
-   typedef typename MultTrait< MT, CompressedVector<T,false> >::Type  Type;
+   using Type = MultTrait_< MT, CompressedVector<T,false> >;
 };
 
 template< typename T, typename MT, bool SO, bool DF >
 struct MultTrait< CompressedVector<T,true>, UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename MultTrait< CompressedVector<T,true>, MT >::Type  Type;
+   using Type = MultTrait_< CompressedVector<T,true>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
 struct MultTrait< UniUpperMatrix<MT,SO1,DF>, StaticMatrix<T,M,N,SO2> >
 {
-   typedef typename MultTrait< MT, StaticMatrix<T,M,N,SO2> >::Type  Type;
+   using Type = MultTrait_< MT, StaticMatrix<T,M,N,SO2> >;
 };
 
 template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
 struct MultTrait< StaticMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename MultTrait< StaticMatrix<T,M,N,SO1>, MT >::Type  Type;
+   using Type = MultTrait_< StaticMatrix<T,M,N,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, size_t M, size_t N, bool SO2 >
 struct MultTrait< UniUpperMatrix<MT,SO1,DF>, HybridMatrix<T,M,N,SO2> >
 {
-   typedef typename MultTrait< MT, HybridMatrix<T,M,N,SO2> >::Type  Type;
+   using Type = MultTrait_< MT, HybridMatrix<T,M,N,SO2> >;
 };
 
 template< typename T, size_t M, size_t N, bool SO1, typename MT, bool SO2, bool DF >
 struct MultTrait< HybridMatrix<T,M,N,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename MultTrait< HybridMatrix<T,M,N,SO1>, MT >::Type  Type;
+   using Type = MultTrait_< HybridMatrix<T,M,N,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
 struct MultTrait< UniUpperMatrix<MT,SO1,DF>, DynamicMatrix<T,SO2> >
 {
-   typedef typename MultTrait< MT, DynamicMatrix<T,SO2> >::Type  Type;
+   using Type = MultTrait_< MT, DynamicMatrix<T,SO2> >;
 };
 
 template< typename T, bool SO1, typename MT, bool SO2, bool DF >
 struct MultTrait< DynamicMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename MultTrait< DynamicMatrix<T,SO1>, MT >::Type  Type;
+   using Type = MultTrait_< DynamicMatrix<T,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool AF, bool PF, bool SO2 >
 struct MultTrait< UniUpperMatrix<MT,SO1,DF>, CustomMatrix<T,AF,PF,SO2> >
 {
-   typedef typename MultTrait< MT, CustomMatrix<T,AF,PF,SO2> >::Type  Type;
+   using Type = MultTrait_< MT, CustomMatrix<T,AF,PF,SO2> >;
 };
 
 template< typename T, bool AF, bool PF, bool SO1, typename MT, bool SO2, bool DF >
 struct MultTrait< CustomMatrix<T,AF,PF,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename MultTrait< CustomMatrix<T,AF,PF,SO1>, MT >::Type  Type;
+   using Type = MultTrait_< CustomMatrix<T,AF,PF,SO1>, MT >;
 };
 
 template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
 struct MultTrait< UniUpperMatrix<MT,SO1,DF>, CompressedMatrix<T,SO2> >
 {
-   typedef typename MultTrait< MT, CompressedMatrix<T,SO2> >::Type  Type;
+   using Type = MultTrait_< MT, CompressedMatrix<T,SO2> >;
 };
 
 template< typename T, bool SO1, typename MT, bool SO2, bool DF >
 struct MultTrait< CompressedMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
 {
-   typedef typename MultTrait< CompressedMatrix<T,SO1>, MT >::Type  Type;
+   using Type = MultTrait_< CompressedMatrix<T,SO1>, MT >;
+};
+
+template< typename MT, bool SO1, bool DF, typename T, bool SO2 >
+struct MultTrait< UniUpperMatrix<MT,SO1,DF>, IdentityMatrix<T,SO2> >
+{
+   using Type = UniUpperMatrix< MultTrait_< MT, IdentityMatrix<T,SO2> > >;
+};
+
+template< typename T, bool SO1, typename MT, bool SO2, bool DF >
+struct MultTrait< IdentityMatrix<T,SO1>, UniUpperMatrix<MT,SO2,DF> >
+{
+   using Type = UniUpperMatrix< MultTrait_< IdentityMatrix<T,SO1>, MT > >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2, bool NF >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, SymmetricMatrix<MT2,SO2,DF2,NF> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, bool NF, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< SymmetricMatrix<MT1,SO1,DF1,NF>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, HermitianMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< HermitianMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, LowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< LowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, UniLowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, StrictlyLowerMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< StrictlyLowerMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef typename MultTrait<MT1,MT2>::Type  Type;
+   using Type = MultTrait_<MT1,MT2>;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, UpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename MultTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< MultTrait_<MT1,MT2> >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UpperMatrix< typename MultTrait<MT1,MT2>::Type >  Type;
+   using Type = UpperMatrix< MultTrait_<MT1,MT2> >;
 };
 
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
 struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 {
-   typedef UniUpperMatrix< typename MultTrait<MT1,MT2>::Type >  Type;
+   using Type = UniUpperMatrix< MultTrait_<MT1,MT2> >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2533,9 +2520,9 @@ struct MultTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO, bool DF, typename T >
-struct DivTrait< UniUpperMatrix<MT,SO,DF>, T, typename EnableIf< IsNumeric<T> >::Type >
+struct DivTrait< UniUpperMatrix<MT,SO,DF>, T, EnableIf_< IsNumeric<T> > >
 {
-   typedef UpperMatrix< typename DivTrait<MT,T>::Type >  Type;
+   using Type = UpperMatrix< DivTrait_<MT,T> >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2545,17 +2532,252 @@ struct DivTrait< UniUpperMatrix<MT,SO,DF>, T, typename EnableIf< IsNumeric<T> >:
 
 //=================================================================================================
 //
-//  MATHTRAIT SPECIALIZATIONS
+//  UNARYMAPTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Abs >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Abs> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Floor >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Floor> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Ceil >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Ceil> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Trunc >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Trunc> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Round >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Round> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Conj >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Conj> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Real >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Real> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Sqrt >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Sqrt> >;
+};
+
+template< typename MT, bool SO, bool DF >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Cbrt >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_<MT,Cbrt> >;
+};
+
+template< typename MT, bool SO, bool DF, typename ET >
+struct UnaryMapTrait< UniUpperMatrix<MT,SO,DF>, Pow<ET> >
+{
+   using Type = UniUpperMatrix< UnaryMapTrait_< MT, Pow<ET> > >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  BINARYMAPTRAIT SPECIALIZATIONS
 //
 //=================================================================================================
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
-struct MathTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+struct BinaryMapTrait< UniUpperMatrix<MT1,SO1,DF1>, UpperMatrix<MT2,SO2,DF2>, Min >
 {
-   typedef UniUpperMatrix< typename MathTrait<MT1,MT2>::HighType >  HighType;
-   typedef UniUpperMatrix< typename MathTrait<MT1,MT2>::LowType  >  LowType;
+   using Type = UpperMatrix< BinaryMapTrait_<MT1,MT2,Min> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct BinaryMapTrait< UniUpperMatrix<MT1,SO1,DF1>, UpperMatrix<MT2,SO2,DF2>, Max >
+{
+   using Type = UpperMatrix< BinaryMapTrait_<MT1,MT2,Max> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct BinaryMapTrait< UpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2>, Min >
+{
+   using Type = UpperMatrix< BinaryMapTrait_<MT1,MT2,Min> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct BinaryMapTrait< UpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2>, Max >
+{
+   using Type = UpperMatrix< BinaryMapTrait_<MT1,MT2,Max> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct BinaryMapTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2>, Min >
+{
+   using Type = UpperMatrix< BinaryMapTrait_<MT1,MT2,Min> >;
+};
+
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct BinaryMapTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2>, Max >
+{
+   using Type = UpperMatrix< BinaryMapTrait_<MT1,MT2,Max> >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  DECLSYMTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct DeclSymTrait< UniUpperMatrix<MT,SO,DF> >
+{
+   using Type = IdentityMatrix< ElementType_<MT>, SO >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  DECLHERMTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct DeclHermTrait< UniUpperMatrix<MT,SO,DF> >
+{
+   using Type = IdentityMatrix< ElementType_<MT>, SO >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  DECLLOWTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct DeclLowTrait< UniUpperMatrix<MT,SO,DF> >
+{
+   using Type = IdentityMatrix< ElementType_<MT>, SO >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  DECLUPPTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct DeclUppTrait< UniUpperMatrix<MT,SO,DF> >
+{
+   using Type = UniUpperMatrix<MT,SO,DF>;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  DECLDIAGTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO, bool DF >
+struct DeclDiagTrait< UniUpperMatrix<MT,SO,DF> >
+{
+   using Type = IdentityMatrix< ElementType_<MT>, SO >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  HIGHTYPE SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct HighType< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UniUpperMatrix< typename HighType<MT1,MT2>::Type >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  LOWTYPE SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT1, bool SO1, bool DF1, typename MT2, bool SO2, bool DF2 >
+struct LowType< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
+{
+   using Type = UniUpperMatrix< typename LowType<MT1,MT2>::Type >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2574,7 +2796,7 @@ struct MathTrait< UniUpperMatrix<MT1,SO1,DF1>, UniUpperMatrix<MT2,SO2,DF2> >
 template< typename MT, bool SO, bool DF >
 struct SubmatrixTrait< UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename SubmatrixTrait<MT>::Type  Type;
+   using Type = SubmatrixTrait_<MT>;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2593,7 +2815,7 @@ struct SubmatrixTrait< UniUpperMatrix<MT,SO,DF> >
 template< typename MT, bool SO, bool DF >
 struct RowTrait< UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename RowTrait<MT>::Type  Type;
+   using Type = RowTrait_<MT>;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2612,7 +2834,7 @@ struct RowTrait< UniUpperMatrix<MT,SO,DF> >
 template< typename MT, bool SO, bool DF >
 struct ColumnTrait< UniUpperMatrix<MT,SO,DF> >
 {
-   typedef typename ColumnTrait<MT>::Type  Type;
+   using Type = ColumnTrait_<MT>;
 };
 /*! \endcond */
 //*************************************************************************************************

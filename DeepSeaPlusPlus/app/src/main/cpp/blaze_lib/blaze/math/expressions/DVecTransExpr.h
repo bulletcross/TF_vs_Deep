@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/DVecTransExpr.h
 //  \brief Header file for the dense vector transpose expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,38 +41,32 @@
 //*************************************************************************************************
 
 #include <iterator>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/DenseVector.h>
 #include <blaze/math/constraints/TransposeFlag.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/DenseVector.h>
 #include <blaze/math/expressions/DVecTransposer.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/SVecTransposer.h>
+#include <blaze/math/expressions/Transformation.h>
 #include <blaze/math/expressions/VecTransExpr.h>
-#include <blaze/math/Intrinsics.h>
-#include <blaze/math/traits/DVecTransExprTrait.h>
-#include <blaze/math/traits/SubvectorExprTrait.h>
-#include <blaze/math/traits/TDVecTransExprTrait.h>
-#include <blaze/math/traits/TransExprTrait.h>
+#include <blaze/math/SIMD.h>
 #include <blaze/math/typetraits/IsAligned.h>
-#include <blaze/math/typetraits/IsColumnVector.h>
 #include <blaze/math/typetraits/IsComputation.h>
-#include <blaze/math/typetraits/IsDenseVector.h>
 #include <blaze/math/typetraits/IsExpression.h>
 #include <blaze/math/typetraits/IsPadded.h>
-#include <blaze/math/typetraits/IsRowVector.h>
 #include <blaze/math/typetraits/RequiresEvaluation.h>
 #include <blaze/math/typetraits/Size.h>
 #include <blaze/system/Inline.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/EmptyType.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/InvalidType.h>
-#include <blaze/util/logging/FunctionTrace.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/mpl/If.h>
 #include <blaze/util/Types.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -92,13 +86,13 @@ namespace blaze {
 */
 template< typename VT  // Type of the dense vector
         , bool TF >    // Transpose flag
-class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
-                    , private VecTransExpr
-                    , private SelectType< IsComputation<VT>::value, Computation, EmptyType >::Type
+class DVecTransExpr
+   : public VecTransExpr< DenseVector< DVecTransExpr<VT,TF>, TF > >
+   , private If< IsComputation<VT>, Computation, Transformation >::Type
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename VT::CompositeType  CT;  //!< Composite type of the dense vector expression.
+   using CT = CompositeType_<VT>;  //!< Composite type of the dense vector expression.
    //**********************************************************************************************
 
    //**Serial evaluation strategy******************************************************************
@@ -109,13 +103,13 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
        be set to 1 and the transposition expression will be evaluated via the \a assign function
        family. Otherwise \a useAssign will be set to 0 and the expression will be evaluated via
        the subscript operator. */
-   enum { useAssign = RequiresEvaluation<VT>::value };
+   enum : bool { useAssign = RequiresEvaluation<VT>::value };
 
    /*! \cond BLAZE_INTERNAL */
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename VT2 >
    struct UseAssign {
-      enum { value = useAssign };
+      enum : bool { value = useAssign };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -129,275 +123,56 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
        strategy is selected. Otherwise \a value is set to 0 and the default strategy is chosen. */
    template< typename VT2 >
    struct UseSMPAssign {
-      enum { value = VT2::smpAssignable && useAssign };
+      enum : bool { value = VT2::smpAssignable && useAssign };
+   };
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**********************************************************************************************
+   /*! \cond BLAZE_INTERNAL */
+   //! Helper structure to acquire the type of constant iterators of the given vector type.
+   /*! The GetConstIterator struct helps to acquire the constant iterator type of the given
+       vector type. In case the given vector has a nested \a ConstIterator type, the nested
+       type definition \a Type is set to that type. Otherwise \a Type is set to INVALID_TYPE. */
+   template< typename VT2 >
+   struct GetConstIterator {
+      BLAZE_CREATE_HAS_TYPE_MEMBER_TYPE_TRAIT( HasConstIterator, ConstIterator );
+      struct Success { using Type = typename VT2::ConstIterator; };
+      struct Failure { using Type = INVALID_TYPE; };
+      using Type = typename If_< HasConstIterator<VT2>, Success, Failure >::Type;
    };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef DVecTransExpr<VT,TF>        This;           //!< Type of this DVecTransExpr instance.
-   typedef typename VT::TransposeType  ResultType;     //!< Result type for expression template evaluations.
-   typedef typename VT::ResultType     TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename VT::ElementType    ElementType;    //!< Resulting element type.
-   typedef typename VT::ReturnType     ReturnType;     //!< Return type for expression template evaluations.
-
-   //! Resulting intrinsic element type.
-   typedef typename IntrinsicTrait<ElementType>::Type  IntrinsicType;
+   using This          = DVecTransExpr<VT,TF>;  //!< Type of this DVecTransExpr instance.
+   using ResultType    = TransposeType_<VT>;    //!< Result type for expression template evaluations.
+   using TransposeType = ResultType_<VT>;       //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<VT>;      //!< Resulting element type.
+   using ReturnType    = ReturnType_<VT>;       //!< Return type for expression template evaluations.
 
    //! Data type for composite expression templates.
-   typedef typename SelectType< useAssign, const ResultType, const DVecTransExpr& >::Type  CompositeType;
+   using CompositeType = IfTrue_< useAssign, const ResultType, const DVecTransExpr& >;
+
+   //! Iterator over the elements of the dense vector.
+   using ConstIterator = typename GetConstIterator<VT>::Type;
 
    //! Composite data type of the dense vector expression.
-   typedef typename SelectType< IsExpression<VT>::value, const VT, const VT& >::Type  Operand;
-   //**********************************************************************************************
-
-   //**ConstIterator class definition**************************************************************
-   /*!\brief Iterator over the elements of the dense vector.
-   */
-   class ConstIterator
-   {
-    public:
-      //**Type definitions*************************************************************************
-      typedef std::random_access_iterator_tag  IteratorCategory;  //!< The iterator category.
-      typedef ElementType                      ValueType;         //!< Type of the underlying elements.
-      typedef ElementType*                     PointerType;       //!< Pointer return type.
-      typedef ElementType&                     ReferenceType;     //!< Reference return type.
-      typedef ptrdiff_t                        DifferenceType;    //!< Difference between two iterators.
-
-      // STL iterator requirements
-      typedef IteratorCategory  iterator_category;  //!< The iterator category.
-      typedef ValueType         value_type;         //!< Type of the underlying elements.
-      typedef PointerType       pointer;            //!< Pointer return type.
-      typedef ReferenceType     reference;          //!< Reference return type.
-      typedef DifferenceType    difference_type;    //!< Difference between two iterators.
-
-      //! ConstIterator type of the dense vector expression.
-      typedef typename VT::ConstIterator  IteratorType;
-      //*******************************************************************************************
-
-      //**Constructor******************************************************************************
-      /*!\brief Constructor for the ConstIterator class.
-      //
-      // \param iterator Iterator to the initial element.
-      */
-      explicit inline ConstIterator( IteratorType iterator )
-         : iterator_( iterator )  // Iterator to the current element
-      {}
-      //*******************************************************************************************
-
-      //**Addition assignment operator*************************************************************
-      /*!\brief Addition assignment operator.
-      //
-      // \param inc The increment of the iterator.
-      // \return The incremented iterator.
-      */
-      inline ConstIterator& operator+=( size_t inc ) {
-         iterator_ += inc;
-         return *this;
-      }
-      //*******************************************************************************************
-
-      //**Subtraction assignment operator**********************************************************
-      /*!\brief Subtraction assignment operator.
-      //
-      // \param dec The decrement of the iterator.
-      // \return The decremented iterator.
-      */
-      inline ConstIterator& operator-=( size_t dec ) {
-         iterator_ -= dec;
-         return *this;
-      }
-      //*******************************************************************************************
-
-      //**Prefix increment operator****************************************************************
-      /*!\brief Pre-increment operator.
-      //
-      // \return Reference to the incremented iterator.
-      */
-      inline ConstIterator& operator++() {
-         ++iterator_;
-         return *this;
-      }
-      //*******************************************************************************************
-
-      //**Postfix increment operator***************************************************************
-      /*!\brief Post-increment operator.
-      //
-      // \return The previous position of the iterator.
-      */
-      inline const ConstIterator operator++( int ) {
-         return ConstIterator( iterator_++ );
-      }
-      //*******************************************************************************************
-
-      //**Prefix decrement operator****************************************************************
-      /*!\brief Pre-decrement operator.
-      //
-      // \return Reference to the decremented iterator.
-      */
-      inline ConstIterator& operator--() {
-         --iterator_;
-         return *this;
-      }
-      //*******************************************************************************************
-
-      //**Postfix decrement operator***************************************************************
-      /*!\brief Post-decrement operator.
-      //
-      // \return The previous position of the iterator.
-      */
-      inline const ConstIterator operator--( int ) {
-         return ConstIterator( iterator_-- );
-      }
-      //*******************************************************************************************
-
-      //**Element access operator******************************************************************
-      /*!\brief Direct access to the element at the current iterator position.
-      //
-      // \return The resulting value.
-      */
-      inline ReturnType operator*() const {
-         return *iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Load function****************************************************************************
-      /*!\brief Access to the intrinsic elements of the vector.
-      //
-      // \return The resulting intrinsic value.
-      */
-      inline IntrinsicType load() const {
-         return iterator_.load();
-      }
-      //*******************************************************************************************
-
-      //**Equality operator************************************************************************
-      /*!\brief Equality comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return \a true if the iterators refer to the same element, \a false if not.
-      */
-      inline bool operator==( const ConstIterator& rhs ) const {
-         return iterator_ == rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Inequality operator**********************************************************************
-      /*!\brief Inequality comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return \a true if the iterators don't refer to the same element, \a false if they do.
-      */
-      inline bool operator!=( const ConstIterator& rhs ) const {
-         return iterator_ != rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Less-than operator***********************************************************************
-      /*!\brief Less-than comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return \a true if the left-hand side iterator is smaller, \a false if not.
-      */
-      inline bool operator<( const ConstIterator& rhs ) const {
-         return iterator_ < rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Greater-than operator********************************************************************
-      /*!\brief Greater-than comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return \a true if the left-hand side iterator is greater, \a false if not.
-      */
-      inline bool operator>( const ConstIterator& rhs ) const {
-         return iterator_ > rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Less-or-equal-than operator**************************************************************
-      /*!\brief Less-than comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return \a true if the left-hand side iterator is smaller or equal, \a false if not.
-      */
-      inline bool operator<=( const ConstIterator& rhs ) const {
-         return iterator_ <= rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Greater-or-equal-than operator***********************************************************
-      /*!\brief Greater-than comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return \a true if the left-hand side iterator is greater or equal, \a false if not.
-      */
-      inline bool operator>=( const ConstIterator& rhs ) const {
-         return iterator_ >= rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Subtraction operator*********************************************************************
-      /*!\brief Calculating the number of elements between two iterators.
-      //
-      // \param rhs The right-hand side iterator.
-      // \return The number of elements between the two iterators.
-      */
-      inline DifferenceType operator-( const ConstIterator& rhs ) const {
-         return iterator_ - rhs.iterator_;
-      }
-      //*******************************************************************************************
-
-      //**Addition operator************************************************************************
-      /*!\brief Addition between a ConstIterator and an integral value.
-      //
-      // \param it The iterator to be incremented.
-      // \param inc The number of elements the iterator is incremented.
-      // \return The incremented iterator.
-      */
-      friend inline const ConstIterator operator+( const ConstIterator& it, size_t inc ) {
-         return ConstIterator( it.iterator_ + inc );
-      }
-      //*******************************************************************************************
-
-      //**Addition operator************************************************************************
-      /*!\brief Addition between an integral value and a ConstIterator.
-      //
-      // \param inc The number of elements the iterator is incremented.
-      // \param it The iterator to be incremented.
-      // \return The incremented iterator.
-      */
-      friend inline const ConstIterator operator+( size_t inc, const ConstIterator& it ) {
-         return ConstIterator( it.iterator_ + inc );
-      }
-      //*******************************************************************************************
-
-      //**Subtraction operator*********************************************************************
-      /*!\brief Subtraction between a ConstIterator and an integral value.
-      //
-      // \param it The iterator to be decremented.
-      // \param dec The number of elements the iterator is decremented.
-      // \return The decremented iterator.
-      */
-      friend inline const ConstIterator operator-( const ConstIterator& it, size_t dec ) {
-         return ConstIterator( it.iterator_ - dec );
-      }
-      //*******************************************************************************************
-
-    private:
-      //**Member variables*************************************************************************
-      IteratorType iterator_;  //!< Iterator to the current element.
-      //*******************************************************************************************
-   };
+   using Operand = If_< IsExpression<VT>, const VT, const VT& >;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template evaluation strategy.
-   enum { vectorizable = VT::vectorizable };
+   enum : bool { simdEnabled = VT::simdEnabled };
 
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = VT::smpAssignable };
+   enum : bool { smpAssignable = VT::smpAssignable };
+   //**********************************************************************************************
+
+   //**SIMD properties*****************************************************************************
+   //! The number of elements packed within a single SIMD element.
+   enum : size_t { SIMDSIZE = SIMDTrait<ElementType>::size };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -405,7 +180,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //
    // \param dv The dense vector operand of the transposition expression.
    */
-   explicit inline DVecTransExpr( const VT& dv )
+   explicit inline DVecTransExpr( const VT& dv ) noexcept
       : dv_( dv )  // Dense vector of the transposition expression
    {}
    //**********************************************************************************************
@@ -438,15 +213,14 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //**********************************************************************************************
 
    //**Load function*******************************************************************************
-   /*!\brief Access to the intrinsic elements of the vector.
+   /*!\brief Access to the SIMD elements of the vector.
    //
    // \param index Access index. The index has to be in the range \f$[0..N-1]\f$.
    // \return Reference to the accessed values.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType load( size_t index ) const {
-      typedef IntrinsicTrait<ElementType>  IT;
+   BLAZE_ALWAYS_INLINE auto load( size_t index ) const noexcept {
       BLAZE_INTERNAL_ASSERT( index < dv_.size()      , "Invalid vector access index" );
-      BLAZE_INTERNAL_ASSERT( index % IT::size == 0UL , "Invalid vector access index" );
+      BLAZE_INTERNAL_ASSERT( index % SIMDSIZE == 0UL , "Invalid vector access index" );
       return dv_.load( index );
    }
    //**********************************************************************************************
@@ -456,7 +230,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //
    // \return Pointer to the internal element storage.
    */
-   inline const ElementType* data() const {
+   inline const ElementType* data() const noexcept {
       return dv_.data();
    }
    //**********************************************************************************************
@@ -486,7 +260,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //
    // \return The size of the vector.
    */
-   inline size_t size() const {
+   inline size_t size() const noexcept {
       return dv_.size();
    }
    //**********************************************************************************************
@@ -496,7 +270,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //
    // \return The dense vector operand.
    */
-   inline Operand operand() const {
+   inline Operand operand() const noexcept {
       return dv_;
    }
    //**********************************************************************************************
@@ -508,7 +282,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return dv_.canAlias( alias );
    }
    //**********************************************************************************************
@@ -520,7 +294,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return dv_.isAliased( alias );
    }
    //**********************************************************************************************
@@ -530,7 +304,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //
    // \return \a true in case the operands are aligned, \a false if not.
    */
-   inline bool isAligned() const {
+   inline bool isAligned() const noexcept {
       return dv_.isAligned();
    }
    //**********************************************************************************************
@@ -540,7 +314,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    //
    // \return \a true in case the expression can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const {
+   inline bool canSMPAssign() const noexcept {
       return dv_.canSMPAssign();
    }
    //**********************************************************************************************
@@ -565,7 +339,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // the operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       assign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -593,7 +367,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // the operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target sparse vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       assign( SparseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -621,7 +395,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // the operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       addAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -653,7 +427,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       subAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -685,7 +459,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       multAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -700,6 +474,38 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
 
    //**Multiplication assignment to sparse vectors*************************************************
    // No special implementation for the multiplication assignment to sparse vectors.
+   //**********************************************************************************************
+
+   //**Division assignment to dense vectors********************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief Division assignment of a dense vector transposition expression to a dense vector.
+   // \ingroup dense_vector
+   //
+   // \param lhs The target left-hand side dense vector.
+   // \param rhs The right-hand side transposition expression divisor.
+   // \return void
+   //
+   // This function implements the performance optimized division assignment of a dense vector
+   // transposition expression to a dense vector. Due to the explicit application of the SFINAE
+   // principle, this function can only be selected by the compiler in case the operand requires
+   // an intermediate evaluation.
+   */
+   template< typename VT2 >  // Type of the target dense vector
+   friend inline EnableIf_< UseAssign<VT2> >
+      divAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
+
+      DVecTransposer<VT2,!TF> tmp( ~lhs );
+      divAssign( tmp, rhs.dv_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**Division assignment to sparse vectors*******************************************************
+   // No special implementation for the division assignment to sparse vectors.
    //**********************************************************************************************
 
    //**SMP assignment to dense vectors*************************************************************
@@ -717,7 +523,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -745,7 +551,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target sparse vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpAssign( SparseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -773,7 +579,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpAddAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -805,7 +611,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpSubAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -837,7 +643,7 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
    // specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpMultAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -852,6 +658,38 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
 
    //**SMP multiplication assignment to sparse vectors*********************************************
    // No special implementation for the SMP multiplication assignment to sparse vectors.
+   //**********************************************************************************************
+
+   //**SMP division assignment to dense vectors****************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief SMP division assignment of a dense vector transposition expression to a dense vector.
+   // \ingroup dense_vector
+   //
+   // \param lhs The target left-hand side dense vector.
+   // \param rhs The right-hand side transposition expression divisor.
+   // \return void
+   //
+   // This function implements the performance optimized SMP division assignment of a dense
+   // vector transposition expression to a dense vector. Due to the explicit application of
+   // the SFINAE principle, this function can only be selected by the compiler in case the
+   // expression specific parallel evaluation strategy is selected.
+   */
+   template< typename VT2 >  // Type of the target dense vector
+   friend inline EnableIf_< UseSMPAssign<VT2> >
+      smpDivAssign( DenseVector<VT2,TF>& lhs, const DVecTransExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
+
+      DVecTransposer<VT2,!TF> tmp( ~lhs );
+      smpDivAssign( tmp, rhs.dv_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**SMP division assignment to sparse vectors***************************************************
+   // No special implementation for the SMP division assignment to sparse vectors.
    //**********************************************************************************************
 
    //**Compile time checks*************************************************************************
@@ -893,11 +731,12 @@ class DVecTransExpr : public DenseVector< DVecTransExpr<VT,TF>, TF >
 */
 template< typename VT  // Type of the dense vector
         , bool TF >    // Transpose flag
-inline const DVecTransExpr<VT,!TF> trans( const DenseVector<VT,TF>& dv )
+inline decltype(auto) trans( const DenseVector<VT,TF>& dv )
 {
    BLAZE_FUNCTION_TRACE;
 
-   return DVecTransExpr<VT,!TF>( ~dv );
+   using ReturnType = const DVecTransExpr<VT,!TF>;
+   return ReturnType( ~dv );
 }
 //*************************************************************************************************
 
@@ -932,11 +771,36 @@ inline const DVecTransExpr<VT,!TF> trans( const DenseVector<VT,TF>& dv )
 */
 template< typename VT  // Type of the dense vector
         , bool TF >    // Transpose flag
-inline typename DVecTransExpr<VT,TF>::Operand trans( const DVecTransExpr<VT,TF>& dv )
+inline decltype(auto) trans( const DVecTransExpr<VT,TF>& dv )
 {
    BLAZE_FUNCTION_TRACE;
 
    return dv.operand();
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Calculation of the transpose of the given dense vector-scalar multiplication.
+// \ingroup dense_vector
+//
+// \param dv The dense vector-scalar multiplication expression to be transposed.
+// \return The transpose of the expression.
+//
+// This operator implements the performance optimized treatment of the transpose of a dense
+// vector-scalar multiplication. It restructures the expression \f$ a=trans(b*s1) \f$ to the
+// expression \f$ a=trans(b)*s1 \f$.
+*/
+template< typename VT  // Type of the left-hand side dense vector
+        , typename ST  // Type of the right-hand side scalar value
+        , bool TF >    // Transpose flag
+inline decltype(auto) trans( const DVecScalarMultExpr<VT,ST,TF>& dv )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   return trans( dv.leftOperand() ) * dv.rightOperand();
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -953,7 +817,8 @@ inline typename DVecTransExpr<VT,TF>::Operand trans( const DVecTransExpr<VT,TF>&
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename VT, bool TF >
-struct Size< DVecTransExpr<VT,TF> > : public Size<VT>
+struct Size< DVecTransExpr<VT,TF> >
+   : public Size<VT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -970,7 +835,8 @@ struct Size< DVecTransExpr<VT,TF> > : public Size<VT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename VT, bool TF >
-struct IsAligned< DVecTransExpr<VT,TF> > : public IsTrue< IsAligned<VT>::value >
+struct IsAligned< DVecTransExpr<VT,TF> >
+   : public BoolConstant< IsAligned<VT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -987,62 +853,9 @@ struct IsAligned< DVecTransExpr<VT,TF> > : public IsTrue< IsAligned<VT>::value >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename VT, bool TF >
-struct IsPadded< DVecTransExpr<VT,TF> > : public IsTrue< IsPadded<VT>::value >
+struct IsPadded< DVecTransExpr<VT,TF> >
+   : public BoolConstant< IsPadded<VT>::value >
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT >
-struct DVecTransExprTrait< DVecTransExpr<VT,false> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsDenseVector<VT>::value && IsRowVector<VT>::value
-                              , typename DVecTransExpr<VT,false>::Operand
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT >
-struct TDVecTransExprTrait< DVecTransExpr<VT,true> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsDenseVector<VT>::value && IsColumnVector<VT>::value
-                              , typename DVecTransExpr<VT,true>::Operand
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT, bool TF, bool AF >
-struct SubvectorExprTrait< DVecTransExpr<VT,TF>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename TransExprTrait< typename SubvectorExprTrait<const VT,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

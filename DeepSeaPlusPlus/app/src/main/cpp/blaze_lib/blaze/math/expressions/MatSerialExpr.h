@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/MatSerialExpr.h
 //  \brief Header file for the MatSerialExpr base class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -56,13 +56,16 @@ namespace blaze {
 // \ingroup math
 //
 // The MatSerialExpr class serves as a tag for all expression templates that enforce a serial
-// evaluation of a matrix. All classes, that represent a matrix serialization operation and that
-// are used within the expression template environment of the Blaze library have to derive from
-// this class in order to qualify as matrix serial evaluation expression template. Only in case
-// a class is derived from the MatSerialExpr base class, the IsMatSerialExpr type trait recognizes
-// the class as valid matrix serial evaluation expression template.
+// evaluation of a matrix. All classes, that represent a matrix serialization operation and
+// that are used within the expression template environment of the Blaze library have to
+// derive publicly from this class in order to qualify as matrix serial evaluation expression
+// template. Only in case a class is derived publicly from the MatSerialExpr base class, the
+// IsMatSerialExpr type trait recognizes the class as valid matrix serial evaluation expression
+// template.
 */
-struct MatSerialExpr : private SerialExpr
+template< typename MT >  // Matrix base type of the expression
+struct MatSerialExpr
+   : public SerialExpr<MT>
 {};
 //*************************************************************************************************
 

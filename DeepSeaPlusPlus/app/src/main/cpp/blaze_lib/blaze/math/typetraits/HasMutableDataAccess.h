@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/HasMutableDataAccess.h
 //  \brief Header file for the HasMutableDataAccess type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -57,10 +57,10 @@ namespace blaze {
 // \ingroup math_type_traits
 //
 // This type trait tests whether the given data type provides a low-level access to mutable data
-// via a non-const 'data' member function. In case the according member function is provided, the
-// \a value member enumeration is set to 1, the nested type definition \a Type is \a TrueType, and
-// the class derives from \a TrueType. Otherwise \a value is set to 0, \a Type is \a FalseType,
-// and the class derives from \a FalseType. Examples:
+// via a non-const 'data' member function. In case the according member function is provided,
+// the \a value member constant is set to \a true, the nested type definition \a Type is
+// \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to \a false,
+// \a Type is \a FalseType, and the class derives from \a FalseType. Examples:
 
    \code
    blaze::HasMutableDataAccess< StaticVector<float,3U> >::value      // Evaluates to 1
@@ -72,16 +72,9 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-struct HasMutableDataAccess : public FalseType
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = 0 };
-   typedef FalseType  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct HasMutableDataAccess
+   : public FalseType
+{};
 //*************************************************************************************************
 
 
@@ -91,14 +84,9 @@ struct HasMutableDataAccess : public FalseType
 // \ingroup math_type_traits
 */
 template< typename T >
-struct HasMutableDataAccess< const T > : public HasMutableDataAccess<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = HasMutableDataAccess<T>::value };
-   typedef typename HasMutableDataAccess<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct HasMutableDataAccess< const T >
+   : public HasMutableDataAccess<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -109,14 +97,9 @@ struct HasMutableDataAccess< const T > : public HasMutableDataAccess<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct HasMutableDataAccess< volatile T > : public HasMutableDataAccess<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = HasMutableDataAccess<T>::value };
-   typedef typename HasMutableDataAccess<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct HasMutableDataAccess< volatile T >
+   : public HasMutableDataAccess<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -127,14 +110,9 @@ struct HasMutableDataAccess< volatile T > : public HasMutableDataAccess<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct HasMutableDataAccess< const volatile T > : public HasMutableDataAccess<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = HasMutableDataAccess<T>::value };
-   typedef typename HasMutableDataAccess<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct HasMutableDataAccess< const volatile T >
+   : public HasMutableDataAccess<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 

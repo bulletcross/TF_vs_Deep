@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/SubvectorTrait.h
 //  \brief Header file for the subvector trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -43,11 +43,10 @@
 #include <blaze/util/InvalidType.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/mpl/Or.h>
+#include <blaze/util/typetraits/Decay.h>
 #include <blaze/util/typetraits/IsConst.h>
 #include <blaze/util/typetraits/IsReference.h>
 #include <blaze/util/typetraits/IsVolatile.h>
-#include <blaze/util/typetraits/RemoveCV.h>
-#include <blaze/util/typetraits/RemoveReference.h>
 
 
 namespace blaze {
@@ -77,13 +76,11 @@ namespace blaze {
 //    <li>blaze::StaticVector</li>
 //    <li>blaze::HybridVector</li>
 //    <li>blaze::DynamicVector</li>
+//    <li>blaze::CustomVector</li>
 //    <li>blaze::CompressedVector</li>
-//    <li>blaze::DenseSubvector</li>
-//    <li>blaze::DenseRow</li>
-//    <li>blaze::DenseColumn</li>
-//    <li>blaze::SparseSubvector</li>
-//    <li>blaze::SparseRow</li>
-//    <li>blaze::SparseColumn</li>
+//    <li>blaze::Subvector</li>
+//    <li>blaze::Row</li>
+//    <li>blaze::Column</li>
 // </ul>
 //
 //
@@ -97,7 +94,7 @@ namespace blaze {
    template< typename T1, bool TF >
    struct SubvectorTrait< DynamicVector<T1,TF> >
    {
-      typedef DynamicVector<T1,TF>  Type;
+      using Type = DynamicVector<T1,TF>;
    };
    \endcode
 
@@ -111,12 +108,12 @@ namespace blaze {
    using blaze::rowVector;
 
    // Definition of the result type of a dynamic column vector
-   typedef blaze::DynamicVector<int,columnVector>      VectorType1;
-   typedef typename SubvectorTrait<VectorType1>::Type  ResultType1;
+   using VectorType1 = blaze::DynamicVector<int,columnVector>;
+   using ResultType1 = typename blaze::SubvectorTrait<VectorType1>::Type;
 
    // Definition of the result type of the static row vector
-   typedef blaze::StaticVector<int,3UL,rowVector>      VectorType2;
-   typedef typename SubvectorTrait<VectorType2>::Type  ResultType2;
+   using VectorType2 = blaze::StaticVector<int,3UL,rowVector>;
+   using ResultType2 = typename blaze::SubvectorTrait<VectorType2>::Type;
    \endcode
 */
 template< typename VT >  // Type of the vector
@@ -125,24 +122,37 @@ struct SubvectorTrait
  private:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   struct Failure { typedef INVALID_TYPE  Type; };
-   /*! \endcond */
-   //**********************************************************************************************
-
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   typedef typename RemoveReference< typename RemoveCV<VT>::Type >::Type  Tmp;
+   struct Failure { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsConst<VT>, IsVolatile<VT>, IsReference<VT> >
-                      , SubvectorTrait<Tmp>, Failure >::Type::Type  Type;
+   using Type = typename If_< Or< IsConst<VT>, IsVolatile<VT>, IsReference<VT> >
+                            , SubvectorTrait< Decay_<VT> >
+                            , Failure >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the SubvectorTrait type trait.
+// \ingroup math_traits
+//
+// The SubvectorTrait_ alias declaration provides a convenient shortcut to access the nested
+// \a Type of the SubvectorTrait class template. For instance, given the vector type \a VT the
+// following two type definitions are identical:
+
+   \code
+   using Type1 = typename SubvectorTrait<VT>::Type;
+   using Type2 = SubvectorTrait_<VT>;
+   \endcode
+*/
+template< typename VT >  // Type of the vector
+using SubvectorTrait_ = typename SubvectorTrait<VT>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

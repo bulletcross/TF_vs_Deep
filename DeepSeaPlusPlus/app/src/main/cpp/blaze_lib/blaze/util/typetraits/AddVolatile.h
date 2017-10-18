@@ -3,7 +3,7 @@
 //  \file blaze/util/typetraits/AddVolatile.h
 //  \brief Header file for the AddVolatile type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,7 +40,7 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/add_volatile.hpp>
+#include <type_traits>
 
 
 namespace blaze {
@@ -71,10 +71,28 @@ struct AddVolatile
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename boost::add_volatile<T>::type  Type;
+   using Type = typename std::add_volatile<T>::type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the AddVolatile type trait.
+// \ingroup type_traits
+//
+// The AddVolatile_ alias declaration provides a convenient shortcut to access the nested \a Type
+// of the AddVolatile class template. For instance, given the type \a T the following two type
+// definitions are identical:
+
+   \code
+   using Type1 = typename AddVolatile<T>::Type;
+   using Type2 = AddVolatile_<T>;
+   \endcode
+*/
+template< typename T >
+using AddVolatile_ = typename AddVolatile<T>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

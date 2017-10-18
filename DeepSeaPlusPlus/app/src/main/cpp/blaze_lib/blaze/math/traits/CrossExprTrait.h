@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/CrossExprTrait.h
 //  \brief Header file for the CrossExprTrait class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,20 +40,13 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/traits/DVecDVecCrossExprTrait.h>
-#include <blaze/math/traits/DVecSVecCrossExprTrait.h>
-#include <blaze/math/traits/SVecDVecCrossExprTrait.h>
-#include <blaze/math/traits/SVecSVecCrossExprTrait.h>
+#include <utility>
 #include <blaze/math/typetraits/IsColumnVector.h>
-#include <blaze/math/typetraits/IsVector.h>
+#include <blaze/math/typetraits/IsRowVector.h>
 #include <blaze/util/InvalidType.h>
+#include <blaze/util/mpl/And.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/typetraits/IsConst.h>
-#include <blaze/util/typetraits/IsNumeric.h>
-#include <blaze/util/typetraits/IsReference.h>
-#include <blaze/util/typetraits/IsVolatile.h>
-#include <blaze/util/typetraits/RemoveCV.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 
 
@@ -82,49 +75,47 @@ struct CrossExprTrait
  private:
    //**struct Failure******************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   struct Failure { typedef INVALID_TYPE  Type; };
+   struct Failure { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
-   //**********************************************************************************************
+   //**struct Result*******************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< IsVector<T1>
-                      , typename If< IsVector<T2>
-                                   , typename If< IsColumnVector<T1>
-                                                , typename If< IsColumnVector<T2>
-                                                             , typename If< IsDenseVector<T1>
-                                                                          , typename If< IsDenseVector<T2>
-                                                                                       , DVecDVecCrossExprTrait<T1,T2>
-                                                                                       , DVecSVecCrossExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          , typename If< IsDenseVector<T2>
-                                                                                       , SVecDVecCrossExprTrait<T1,T2>
-                                                                                       , SVecSVecCrossExprTrait<T1,T2>
-                                                                                       >::Type
-                                                                          >::Type
-                                                             , Failure
-                                                             >::Type
-                                                , Failure
-                                                >::Type
-                                   , Failure
-                                   >::Type
-                      , Failure
-                      >::Type  Tmp;
-
-   typedef typename RemoveReference< typename RemoveCV<T1>::Type >::Type  Type1;
-   typedef typename RemoveReference< typename RemoveCV<T2>::Type >::Type  Type2;
+   struct Result { using Type = decltype( std::declval<T1>() % std::declval<T2>() ); };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsConst<T1>, IsVolatile<T1>, IsReference<T1>
-                          , IsConst<T2>, IsVolatile<T2>, IsReference<T2> >
-                      , CrossExprTrait<Type1,Type2>, Tmp >::Type::Type  Type;
+   using Type = typename If_< Or< And< IsColumnVector< RemoveReference_<T1> >
+                                     , IsColumnVector< RemoveReference_<T2> > >
+                                , And< IsRowVector< RemoveReference_<T1> >
+                                     , IsRowVector< RemoveReference_<T2> > > >
+                            , Result
+                            , Failure >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the CrossExprTrait class template.
+// \ingroup math_traits
+//
+// The CrossExprTrait_ alias declaration provides a convenient shortcut to access the nested
+// \a Type of the CrossExprTrait class template. For instance, given the types \a T1 and \a T2
+// the following two type definitions are identical:
+
+   \code
+   using Type1 = typename CrossExprTrait<T1,T2>::Type;
+   using Type2 = CrossExprTrait_<T1,T2>;
+   \endcode
+*/
+template< typename T1    // Type of the left-hand side cross product operand
+        , typename T2 >  // Type of the right-hand side cross product operand
+using CrossExprTrait_ = typename CrossExprTrait<T1,T2>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

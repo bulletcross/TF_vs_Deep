@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsMatrix.h
 //  \brief Header file for the IsMatrix type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,11 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/typetraits/IsDenseMatrix.h>
-#include <blaze/math/typetraits/IsSparseMatrix.h>
+#include <utility>
+#include <blaze/math/expressions/Matrix.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -63,9 +63,17 @@ namespace blaze {
 template< typename T >
 struct IsMatrixHelper
 {
+ private:
    //**********************************************************************************************
-   enum { value = IsDenseMatrix<T>::value || IsSparseMatrix<T>::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   template< typename MT, bool SO >
+   static TrueType test( const Matrix<MT,SO>& );
+
+   static FalseType test( ... );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -77,10 +85,10 @@ struct IsMatrixHelper
 // \ingroup math_type_traits
 //
 // This type trait tests whether or not the given template parameter is a N-dimensional dense
-// or sparse matrix type. In case the type is a matrix type, the \a value member enumeration
-// is set to 1, the nested type definition \a Type is \a TrueType, and the class derives from
-// \a TrueType. Otherwise \a yes is set to 0, \a Type is \a FalseType, and the class derives
-// from \a FalseType.
+// or sparse matrix type. In case the type is a matrix type, the \a value member constant is
+// set to \a true, the nested type definition \a Type is \a TrueType, and the class derives
+// from \a TrueType. Otherwise \a yes is set to \a false, \a Type is \a FalseType, and the
+// class derives from \a FalseType.
 
    \code
    blaze::IsMatrix< StaticMatrix<float,3U,3U,false> >::value  // Evaluates to 1
@@ -92,16 +100,9 @@ struct IsMatrixHelper
    \endcode
 */
 template< typename T >
-struct IsMatrix : public IsMatrixHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsMatrixHelper<T>::value };
-   typedef typename IsMatrixHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsMatrix
+   : public IsMatrixHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

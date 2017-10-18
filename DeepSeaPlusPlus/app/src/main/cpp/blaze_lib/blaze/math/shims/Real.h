@@ -3,7 +3,7 @@
 //  \file blaze/math/shims/Real.h
 //  \brief Header file for the real shim
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -79,8 +79,7 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-BLAZE_ALWAYS_INLINE typename EnableIf< IsBuiltin<T>, T >::Type
-   real( T a )
+BLAZE_ALWAYS_INLINE constexpr EnableIf_< IsBuiltin<T>, T > real( T a ) noexcept
 {
    return a;
 }

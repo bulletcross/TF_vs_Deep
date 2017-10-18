@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/SVecScalarDivExpr.h
 //  \brief Header file for the sparse vector/scalar division expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,9 +41,11 @@
 //*************************************************************************************************
 
 #include <iterator>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/SparseVector.h>
 #include <blaze/math/constraints/TransposeFlag.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/SparseVector.h>
@@ -52,31 +54,30 @@
 #include <blaze/math/sparse/ValueIndexPair.h>
 #include <blaze/math/traits/DivExprTrait.h>
 #include <blaze/math/traits/DivTrait.h>
-#include <blaze/math/traits/MultExprTrait.h>
 #include <blaze/math/traits/MultTrait.h>
-#include <blaze/math/traits/SubvectorExprTrait.h>
-#include <blaze/math/typetraits/IsColumnVector.h>
 #include <blaze/math/typetraits/IsComputation.h>
 #include <blaze/math/typetraits/IsExpression.h>
 #include <blaze/math/typetraits/IsInvertible.h>
 #include <blaze/math/typetraits/IsMultExpr.h>
-#include <blaze/math/typetraits/IsRowVector.h>
-#include <blaze/math/typetraits/IsSparseVector.h>
 #include <blaze/math/typetraits/IsTemporary.h>
 #include <blaze/math/typetraits/RequiresEvaluation.h>
 #include <blaze/math/typetraits/Size.h>
+#include <blaze/math/typetraits/UnderlyingBuiltin.h>
+#include <blaze/math/typetraits/UnderlyingNumeric.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/constraints/FloatingPoint.h>
 #include <blaze/util/constraints/Numeric.h>
-#include <blaze/util/constraints/Reference.h>
 #include <blaze/util/constraints/SameType.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/FunctionTrace.h>
 #include <blaze/util/InvalidType.h>
-#include <blaze/util/logging/FunctionTrace.h>
 #include <blaze/util/mpl/And.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/mpl/If.h>
+#include <blaze/util/mpl/Or.h>
 #include <blaze/util/Types.h>
+#include <blaze/util/typetraits/IsBuiltin.h>
+#include <blaze/util/typetraits/IsComplex.h>
+#include <blaze/util/typetraits/IsFloatingPoint.h>
 #include <blaze/util/typetraits/IsNumeric.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 
@@ -99,15 +100,15 @@ namespace blaze {
 template< typename VT  // Type of the left-hand side sparse vector
         , typename ST  // Type of the right-hand side scalar value
         , bool TF >    // Transpose flag
-class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
-                        , private VecScalarDivExpr
-                        , private Computation
+class SVecScalarDivExpr
+   : public VecScalarDivExpr< SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF > >
+   , private Computation
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename VT::ResultType     RT;  //!< Result type of the sparse vector expression.
-   typedef typename VT::ReturnType     RN;  //!< Return type of the sparse vector expression.
-   typedef typename VT::CompositeType  CT;  //!< Composite type of the sparse vector expression.
+   using RT = ResultType_<VT>;     //!< Result type of the sparse vector expression.
+   using RN = ReturnType_<VT>;     //!< Return type of the sparse vector expression.
+   using CT = CompositeType_<VT>;  //!< Composite type of the sparse vector expression.
    //**********************************************************************************************
 
    //**Return type evaluation**********************************************************************
@@ -117,10 +118,10 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
        or matrix, \a returnExpr will be set to \a false and the subscript operator will
        return it's result by value. Otherwise \a returnExpr will be set to \a true and
        the subscript operator may return it's result as an expression. */
-   enum { returnExpr = !IsTemporary<RN>::value };
+   enum : bool { returnExpr = !IsTemporary<RN>::value };
 
    //! Expression return type for the subscript operator.
-   typedef typename DivExprTrait<RN,ST>::Type  ExprReturnType;
+   using ExprReturnType = DivExprTrait_<RN,ST>;
    //**********************************************************************************************
 
    //**Serial evaluation strategy******************************************************************
@@ -131,13 +132,13 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
        multiplication expression will be evaluated via the \a assign function family. Otherwise
        \a useAssign will be set to 0 and the expression will be evaluated via the subscript
        operator. */
-   enum { useAssign = RequiresEvaluation<VT>::value };
+   enum : bool { useAssign = RequiresEvaluation<VT>::value };
 
    /*! \cond BLAZE_INTERNAL */
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename VT2 >
    struct UseAssign {
-      enum { value = useAssign };
+      enum : bool { value = useAssign };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -152,34 +153,34 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
        set to 0 and the default strategy is chosen. */
    template< typename VT2 >
    struct UseSMPAssign {
-      enum { value = ( !VT2::smpAssignable || !VT::smpAssignable ) && useAssign };
+      enum : bool { value = ( !VT2::smpAssignable || !VT::smpAssignable ) && useAssign };
    };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef SVecScalarDivExpr<VT,ST,TF>         This;           //!< Type of this SVecScalarDivExpr instance.
-   typedef typename DivTrait<RT,ST>::Type      ResultType;     //!< Result type for expression template evaluations.
-   typedef typename ResultType::TransposeType  TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename ResultType::ElementType    ElementType;    //!< Resulting element type.
+   using This          = SVecScalarDivExpr<VT,ST,TF>;  //!< Type of this SVecScalarDivExpr instance.
+   using ResultType    = DivTrait_<RT,ST>;             //!< Result type for expression template evaluations.
+   using TransposeType = TransposeType_<ResultType>;   //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<ResultType>;     //!< Resulting element type.
 
    //! Return type for expression template evaluations.
-   typedef const typename SelectType< returnExpr, ExprReturnType, ElementType >::Type  ReturnType;
+   using ReturnType = const IfTrue_< returnExpr, ExprReturnType, ElementType >;
 
    //! Data type for composite expression templates.
-   typedef typename SelectType< useAssign, const ResultType, const SVecScalarDivExpr& >::Type  CompositeType;
+   using CompositeType = IfTrue_< useAssign, const ResultType, const SVecScalarDivExpr& >;
 
    //! Composite type of the left-hand side sparse vector expression.
-   typedef typename SelectType< IsExpression<VT>::value, const VT, const VT& >::Type  LeftOperand;
+   using LeftOperand = If_< IsExpression<VT>, const VT, const VT& >;
 
    //! Composite type of the right-hand side scalar value.
-   typedef ST  RightOperand;
+   using RightOperand = ST;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = 0 };
+   enum : bool { smpAssignable = false };
    //**********************************************************************************************
 
    //**ConstIterator class definition**************************************************************
@@ -190,23 +191,23 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
     public:
       //**Type definitions*************************************************************************
       //! Element type of the sparse vector expression.
-      typedef ValueIndexPair<ElementType>  Element;
+      using Element = ValueIndexPair<ElementType>;
 
       //! Iterator type of the sparse vector expression.
-      typedef typename RemoveReference<LeftOperand>::Type::ConstIterator  IteratorType;
+      using IteratorType = ConstIterator_< RemoveReference_<LeftOperand> >;
 
-      typedef std::forward_iterator_tag  IteratorCategory;  //!< The iterator category.
-      typedef Element                    ValueType;         //!< Type of the underlying pointers.
-      typedef ValueType*                 PointerType;       //!< Pointer return type.
-      typedef ValueType&                 ReferenceType;     //!< Reference return type.
-      typedef ptrdiff_t                  DifferenceType;    //!< Difference between two iterators.
+      using IteratorCategory = std::forward_iterator_tag;  //!< The iterator category.
+      using ValueType        = Element;                    //!< Type of the underlying pointers.
+      using PointerType      = ValueType*;                 //!< Pointer return type.
+      using ReferenceType    = ValueType&;                 //!< Reference return type.
+      using DifferenceType   = ptrdiff_t;                  //!< Difference between two iterators.
 
       // STL iterator requirements
-      typedef IteratorCategory  iterator_category;  //!< The iterator category.
-      typedef ValueType         value_type;         //!< Type of the underlying pointers.
-      typedef PointerType       pointer;            //!< Pointer return type.
-      typedef ReferenceType     reference;          //!< Reference return type.
-      typedef DifferenceType    difference_type;    //!< Difference between two iterators.
+      using iterator_category = IteratorCategory;  //!< The iterator category.
+      using value_type        = ValueType;         //!< Type of the underlying pointers.
+      using pointer           = PointerType;       //!< Pointer return type.
+      using reference         = ReferenceType;     //!< Reference return type.
+      using difference_type   = DifferenceType;    //!< Difference between two iterators.
       //*******************************************************************************************
 
       //**Constructor******************************************************************************
@@ -316,7 +317,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // \param vector The left-hand side sparse vector of the division expression.
    // \param scalar The right-hand side scalar of the division expression.
    */
-   explicit inline SVecScalarDivExpr( const VT& vector, ST scalar )
+   explicit inline SVecScalarDivExpr( const VT& vector, ST scalar ) noexcept
       : vector_( vector )  // Left-hand side sparse vector of the division expression
       , scalar_( scalar )  // Right-hand side scalar of the division expression
    {}
@@ -374,7 +375,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    //
    // \return The size of the vector.
    */
-   inline size_t size() const {
+   inline size_t size() const noexcept {
       return vector_.size();
    }
    //**********************************************************************************************
@@ -430,7 +431,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    //
    // \return The left-hand side sparse vector operand.
    */
-   inline LeftOperand leftOperand() const {
+   inline LeftOperand leftOperand() const noexcept {
       return vector_;
    }
    //**********************************************************************************************
@@ -440,7 +441,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    //
    // \return The right-hand side scalar operand.
    */
-   inline RightOperand rightOperand() const {
+   inline RightOperand rightOperand() const noexcept {
       return scalar_;
    }
    //**********************************************************************************************
@@ -452,7 +453,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return vector_.canAlias( alias );
    }
    //**********************************************************************************************
@@ -464,7 +465,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return vector_.isAliased( alias );
    }
    //**********************************************************************************************
@@ -490,7 +491,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       assign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -518,7 +519,7 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target sparse vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       assign( SparseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -546,14 +547,14 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       addAssign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -582,14 +583,14 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       subAssign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -618,14 +619,14 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // vector operand requires an intermediate evaluation.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseAssign<VT2> >::Type
+   friend inline EnableIf_< UseAssign<VT2> >
       multAssign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -662,14 +663,14 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpAddAssign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -698,14 +699,14 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // expression specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpSubAssign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -734,14 +735,14 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    // specific parallel evaluation strategy is selected.
    */
    template< typename VT2 >  // Type of the target dense vector
-   friend inline typename EnableIf< UseSMPAssign<VT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<VT2> >
       smpMultAssign( DenseVector<VT2,TF>& lhs, const SVecScalarDivExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
 
       BLAZE_CONSTRAINT_MUST_BE_SPARSE_VECTOR_TYPE( ResultType );
       BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( ResultType, TF );
-      BLAZE_CONSTRAINT_MUST_BE_REFERENCE_TYPE( typename ResultType::CompositeType );
+      BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType );
 
       BLAZE_INTERNAL_ASSERT( (~lhs).size() == rhs.size(), "Invalid vector sizes" );
 
@@ -778,6 +779,38 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
 //=================================================================================================
 
 //*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Auxiliary helper struct for the sparse vector/scalar division operator.
+// \ingroup math_traits
+*/
+template< typename VT  // Type of the left-hand side sparse vector
+        , typename ST  // Type of the right-hand side scalar
+        , bool TF >    // Transpose flag
+struct SVecScalarDivExprHelper
+{
+ private:
+   //**********************************************************************************************
+   using ScalarType = If_< Or< IsFloatingPoint< UnderlyingBuiltin_<VT> >
+                             , IsFloatingPoint< UnderlyingBuiltin_<ST> > >
+                         , If_< And< IsComplex< UnderlyingNumeric_<VT> >
+                                   , IsBuiltin<ST> >
+                              , DivTrait_< UnderlyingBuiltin_<VT>, ST >
+                              , DivTrait_< UnderlyingNumeric_<VT>, ST > >
+                         , ST >;
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = If_< IsInvertible<ScalarType>
+                   , SVecScalarMultExpr<VT,ScalarType,TF>
+                   , SVecScalarDivExpr<VT,ScalarType,TF> >;
+   //**********************************************************************************************
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
 /*!\brief Division operator for the divison of a sparse vector by a scalar value
 //        (\f$ \vec{a}=\vec{b}/s \f$).
 // \ingroup sparse_vector
@@ -795,23 +828,23 @@ class SVecScalarDivExpr : public SparseVector< SVecScalarDivExpr<VT,ST,TF>, TF >
    \endcode
 
 // The operator returns a sparse vector of the higher-order element type of the involved data
-// types \a T1::ElementType and \a T2. Note that this operator only works for scalar values
+// types \a VT::ElementType and \a ST. Note that this operator only works for scalar values
 // of built-in data type.
 //
-// \note: A division by zero is only checked by an user assert.
+// \note A division by zero is only checked by an user assert.
 */
-template< typename T1  // Type of the left-hand side sparse vector
-        , typename T2  // Type of the right-hand side scalar
-        , bool TF >    // Transpose flag
-inline const typename EnableIf< IsNumeric<T2>, typename DivExprTrait<T1,T2>::Type >::Type
-   operator/( const SparseVector<T1,TF>& vec, T2 scalar )
+template< typename VT  // Type of the left-hand side sparse vector
+        , typename ST  // Type of the right-hand side scalar
+        , bool TF      // Transpose flag
+        , typename = EnableIf_< IsNumeric<ST> > >
+inline decltype(auto) operator/( const SparseVector<VT,TF>& vec, ST scalar )
 {
    BLAZE_FUNCTION_TRACE;
 
-   BLAZE_USER_ASSERT( scalar != T2(0), "Division by zero detected" );
+   BLAZE_USER_ASSERT( scalar != ST(0), "Division by zero detected" );
 
-   typedef typename DivExprTrait<T1,T2>::Type  ReturnType;
-   typedef typename ReturnType::RightOperand   ScalarType;
+   using ReturnType = typename SVecScalarDivExprHelper<VT,ST,TF>::Type;
+   using ScalarType = RightOperand_<ReturnType>;
 
    if( IsMultExpr<ReturnType>::value ) {
       return ReturnType( ~vec, ScalarType(1)/ScalarType(scalar) );
@@ -844,13 +877,12 @@ inline const typename EnableIf< IsNumeric<T2>, typename DivExprTrait<T1,T2>::Typ
 // This operator implements a performance optimized treatment of the multiplication of a
 // sparse vector-scalar division expression and a scalar value.
 */
-template< typename VT     // Type of the sparse vector of the left-hand side expression
-        , typename ST1    // Type of the scalar of the left-hand side expression
-        , bool TF         // Transpose flag of the sparse vector
-        , typename ST2 >  // Type of the right-hand side scalar
-inline const typename EnableIf< And< IsNumeric<ST2>, IsInvertible<typename DivTrait<ST2,ST1>::Type > >
-                              , typename MultExprTrait< SVecScalarDivExpr<VT,ST1,TF>, ST2 >::Type >::Type
-   operator*( const SVecScalarDivExpr<VT,ST1,TF>& vec, ST2 scalar )
+template< typename VT   // Type of the sparse vector of the left-hand side expression
+        , typename ST1  // Type of the scalar of the left-hand side expression
+        , bool TF       // Transpose flag of the sparse vector
+        , typename ST2  // Type of the right-hand side scalar
+        , typename = EnableIf_< And< IsNumeric<ST2>, Or< IsInvertible<ST1>, IsInvertible<ST2> > > > >
+inline decltype(auto) operator*( const SVecScalarDivExpr<VT,ST1,TF>& vec, ST2 scalar )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -876,10 +908,9 @@ inline const typename EnableIf< And< IsNumeric<ST2>, IsInvertible<typename DivTr
 template< typename ST1  // Type of the left-hand side scalar
         , typename VT   // Type of the sparse vector of the right-hand side expression
         , typename ST2  // Type of the scalar of the right-hand side expression
-        , bool TF >     // Transpose flag of the sparse vector
-inline const typename EnableIf< And< IsNumeric<ST1>, IsInvertible< typename DivTrait<ST1,ST2>::Type > >
-                              , typename MultExprTrait< ST1, SVecScalarDivExpr<VT,ST2,TF> >::Type >::Type
-   operator*( ST1 scalar, const SVecScalarDivExpr<VT,ST2,TF>& vec )
+        , bool TF       // Transpose flag of the sparse vector
+        , typename = EnableIf_< And< IsNumeric<ST1>, Or< IsInvertible<ST1>, IsInvertible<ST2> > > > >
+inline decltype(auto) operator*( ST1 scalar, const SVecScalarDivExpr<VT,ST2,TF>& vec )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -902,21 +933,20 @@ inline const typename EnableIf< And< IsNumeric<ST1>, IsInvertible< typename DivT
 // This operator implements a performance optimized treatment of the division of a sparse
 // vector-scalar division expression and a scalar value.
 */
-template< typename VT     // Type of the sparse vector of the left-hand side expression
-        , typename ST1    // Type of the scalar of the left-hand side expression
-        , bool TF         // Transpose flag of the sparse vector
-        , typename ST2 >  // Type of the right-hand side scalar
-inline const typename EnableIf< IsNumeric<ST2>
-                              , typename DivExprTrait<VT,typename MultTrait<ST1,ST2>::Type>::Type >::Type
-   operator/( const SVecScalarDivExpr<VT,ST1,TF>& vec, ST2 scalar )
+template< typename VT   // Type of the sparse vector of the left-hand side expression
+        , typename ST1  // Type of the scalar of the left-hand side expression
+        , bool TF       // Transpose flag of the sparse vector
+        , typename ST2  // Type of the right-hand side scalar
+        , typename = EnableIf_< IsNumeric<ST2> > >
+inline decltype(auto) operator/( const SVecScalarDivExpr<VT,ST1,TF>& vec, ST2 scalar )
 {
    BLAZE_FUNCTION_TRACE;
 
    BLAZE_USER_ASSERT( scalar != ST2(0), "Division by zero detected" );
 
-   typedef typename MultTrait<ST1,ST2>::Type         MultType;
-   typedef typename DivExprTrait<VT,MultType>::Type  ReturnType;
-   typedef typename ReturnType::RightOperand         ScalarType;
+   using MultType   = MultTrait_<ST1,ST2>;
+   using ReturnType = typename SVecScalarDivExprHelper<VT,MultType,TF>::Type;
+   using ScalarType = RightOperand_<ReturnType>;
 
    if( IsMultExpr<ReturnType>::value ) {
       return ReturnType( vec.leftOperand(), ScalarType(1)/( vec.rightOperand() * scalar ) );
@@ -940,108 +970,9 @@ inline const typename EnableIf< IsNumeric<ST2>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename VT, typename ST, bool TF >
-struct Size< SVecScalarDivExpr<VT,ST,TF> > : public Size<VT>
+struct Size< SVecScalarDivExpr<VT,ST,TF> >
+   : public Size<VT>
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  SVECSCALARMULTEXPRTRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT, typename ST1, typename ST2 >
-struct SVecScalarMultExprTrait< SVecScalarDivExpr<VT,ST1,false>, ST2 >
-{
- private:
-   //**********************************************************************************************
-   typedef typename DivTrait<ST2,ST1>::Type  ScalarType;
-   //**********************************************************************************************
-
-   //**********************************************************************************************
-   enum { condition = IsInvertible<ScalarType>::value };
-   //**********************************************************************************************
-
-   //**********************************************************************************************
-   typedef typename SVecScalarMultExprTrait<VT,ScalarType>::Type              T1;
-   typedef SVecScalarMultExpr< SVecScalarDivExpr<VT,ST1,false>, ST2, false >  T2;
-   //**********************************************************************************************
-
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsSparseVector<VT>::value && IsColumnVector<VT>::value &&
-                                IsNumeric<ST1>::value && IsNumeric<ST2>::value
-                              , typename SelectType<condition,T1,T2>::Type
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  TSVECSCALARMULTEXPRTRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT, typename ST1, typename ST2 >
-struct TSVecScalarMultExprTrait< SVecScalarDivExpr<VT,ST1,true>, ST2 >
-{
- private:
-   //**********************************************************************************************
-   typedef typename DivTrait<ST2,ST1>::Type  ScalarType;
-   //**********************************************************************************************
-
-   //**********************************************************************************************
-   enum { condition = IsInvertible<ScalarType>::value };
-   //**********************************************************************************************
-
-   //**********************************************************************************************
-   typedef typename SVecScalarMultExprTrait<VT,ScalarType>::Type            T1;
-   typedef SVecScalarMultExpr< SVecScalarDivExpr<VT,ST1,true>, ST2, true >  T2;
-   //**********************************************************************************************
-
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsSparseVector<VT>::value && IsRowVector<VT>::value &&
-                                IsNumeric<ST1>::value && IsNumeric<ST2>::value
-                              , typename SelectType<condition,T1,T2>::Type
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  SUBVECTOREXPRTRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT, typename ST, bool TF, bool AF >
-struct SubvectorExprTrait< SVecScalarDivExpr<VT,ST,TF>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename DivExprTrait< typename SubvectorExprTrait<const VT,AF>::Type, ST >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

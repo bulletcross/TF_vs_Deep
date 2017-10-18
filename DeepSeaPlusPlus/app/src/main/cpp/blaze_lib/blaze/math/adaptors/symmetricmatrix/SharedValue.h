@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/symmetricmatrix/SharedValue.h
 //  \brief Header file for the SharedValue class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,8 +40,7 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/shared_ptr.hpp>
-#include <blaze/math/shims/Move.h>
+#include <memory>
 #include <blaze/util/constraints/Const.h>
 #include <blaze/util/constraints/Pointer.h>
 #include <blaze/util/constraints/Reference.h>
@@ -69,11 +68,11 @@ class SharedValue
 {
  public:
    //**Type definitions****************************************************************************
-   typedef Type         ValueType;       //!< Type of the shared value.
-   typedef Type&        Reference;       //!< Reference to the shared value.
-   typedef const Type&  ConstReference;  //!< Reference-to-const to the shared value.
-   typedef Type*        Pointer;         //!< Pointer to the shared value.
-   typedef const Type*  ConstPointer;    //!< Pointer-to-const to the shared value.
+   using ValueType      = Type;         //!< Type of the shared value.
+   using Reference      = Type&;        //!< Reference to the shared value.
+   using ConstReference = const Type&;  //!< Reference-to-const to the shared value.
+   using Pointer        = Type*;        //!< Pointer to the shared value.
+   using ConstPointer   = const Type*;  //!< Pointer-to-const to the shared value.
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -100,7 +99,7 @@ class SharedValue
    //**Utility functions***************************************************************************
    /*!\name Utility functions */
    //@{
-   inline Pointer base() const;
+   inline Pointer base() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -108,7 +107,7 @@ class SharedValue
    //**Member variables****************************************************************************
    /*!\name Member variables */
    //@{
-   mutable boost::shared_ptr<Type> value_;  //!< The shared value.
+   mutable std::shared_ptr<Type> value_;  //!< The shared value.
    //@}
    //**********************************************************************************************
 
@@ -215,7 +214,7 @@ inline typename SharedValue<Type>::ConstReference SharedValue<Type>::operator*()
 // \return Pointer to the shared value.
 */
 template< typename Type >  // Type of the shared value
-inline typename SharedValue<Type>::Pointer SharedValue<Type>::base() const
+inline typename SharedValue<Type>::Pointer SharedValue<Type>::base() const noexcept
 {
    return value_.get();
 }
@@ -285,7 +284,7 @@ inline bool operator!=( const SharedValue<T1>& lhs, const SharedValue<T2>& rhs )
 //*************************************************************************************************
 /*!\name SharedValue global functions */
 //@{
-template< typename Type >
+template< bool RF, typename Type >
 inline bool isDefault( const SharedValue<Type>& value );
 //@}
 //*************************************************************************************************
@@ -301,12 +300,12 @@ inline bool isDefault( const SharedValue<Type>& value );
 // This function checks whether the given shared value is in default state. In case it is in
 // default state, the function returns \a true, otherwise it returns \a false.
 */
-template< typename Type >
+template< bool RF, typename Type >
 inline bool isDefault( const SharedValue<Type>& value )
 {
    using blaze::isDefault;
 
-   return isDefault( *value );
+   return isDefault<RF>( *value );
 }
 //*************************************************************************************************
 

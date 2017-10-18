@@ -3,7 +3,7 @@
 //  \file blaze/util/mpl/Plus.h
 //  \brief Header file for the Plus class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,7 +40,7 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/util/mpl/IntegralC.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/typetraits/CommonType.h>
 
 
@@ -56,7 +56,7 @@ namespace blaze {
 /*!\brief Compile time integral addition.
 // \ingroup mpl
 //
-// The Plus class template returns the sum of the two given template arguments \a T1 and \a T2.
+// The Plus alias declaration returns the sum of the two given template arguments \a T1 and \a T2.
 // In order for Plus to be able to add the two types, both arguments are required to have a nested
 // member \a value. The result of the addition can be accessed via the nested member \a value, the
 // resulting type is available via the nested type \a ValueType.
@@ -70,8 +70,8 @@ namespace blaze {
 template< typename T1    // Type of the first compile time value
         , typename T2 >  // Type of the second compile time value
 struct Plus
-   : public IntegralC< typename CommonType<typename T1::ValueType,typename T2::ValueType>::Type
-                     , ( T1::value + T2::value ) >
+   : public IntegralConstant< CommonType_< typename T1::ValueType, typename T2::ValueType >
+                            , ( T1::value + T2::value ) >
 {};
 //*************************************************************************************************
 

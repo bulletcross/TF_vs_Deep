@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/Size.h
 //  \brief Header file for the Size type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,8 +40,7 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/util/mpl/SizeT.h>
-#include <blaze/util/Types.h>
+#include <blaze/util/mpl/PtrdiffT.h>
 
 
 namespace blaze {
@@ -58,7 +57,7 @@ namespace blaze {
 //
 // The Size type trait evaluates the size of the given vector type at compile time. In case the
 // given type \a T is a vector type with a fixed size (e.g. StaticVector), the \a value member
-// constant is set to the according size. In all other cases, \a value is set to 0.
+// constant is set to the according size. In all other cases, \a value is set to -1.
 
    \code
    using blaze::StaticVector;
@@ -66,13 +65,14 @@ namespace blaze {
    using blaze::DynamicVector;
 
    blaze::Size< StaticVector<int,3UL> >::value  // Evaluates to 3
-   blaze::Size< HybridVector<int,3UL> >::value  // Evaluates to 0; Only maximum size is fixed!
-   blaze::Size< DynamicVector<int> >::value     // Evaluates to 0; Size not fixed at compile time!
-   blaze::Size< int >::value                    // Evaluates to 0
+   blaze::Size< HybridVector<int,3UL> >::value  // Evaluates to -1; Only maximum size is fixed!
+   blaze::Size< DynamicVector<int> >::value     // Evaluates to -1; Size not fixed at compile time!
+   blaze::Size< int >::value                    // Evaluates to -1
    \endcode
 */
 template< typename T >
-struct Size : public SizeT<0UL>
+struct Size
+   : public PtrdiffT<-1L>
 {};
 //*************************************************************************************************
 
@@ -83,7 +83,8 @@ struct Size : public SizeT<0UL>
 // \ingroup math_type_traits
 */
 template< typename T >
-struct Size< const T > : public SizeT< Size<T>::value >
+struct Size< const T >
+   : public Size<T>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -95,7 +96,8 @@ struct Size< const T > : public SizeT< Size<T>::value >
 // \ingroup math_type_traits
 */
 template< typename T >
-struct Size< volatile T > : public SizeT< Size<T>::value >
+struct Size< volatile T >
+   : public Size<T>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -107,7 +109,8 @@ struct Size< volatile T > : public SizeT< Size<T>::value >
 // \ingroup math_type_traits
 */
 template< typename T >
-struct Size< const volatile T > : public SizeT< Size<T>::value >
+struct Size< const volatile T >
+   : public Size<T>
 {};
 /*! \endcond */
 //*************************************************************************************************

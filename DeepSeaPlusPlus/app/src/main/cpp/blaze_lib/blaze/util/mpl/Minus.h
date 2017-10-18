@@ -3,7 +3,7 @@
 //  \file blaze/util/mpl/Minus.h
 //  \brief Header file for the Minus class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,7 +40,7 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/util/mpl/IntegralC.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/typetraits/CommonType.h>
 
 
@@ -56,9 +56,9 @@ namespace blaze {
 /*!\brief Compile time integral subtraction.
 // \ingroup mpl
 //
-// The Minus class template returns the difference of the two given template arguments \a T1 and
-// \a T2. In order for Minus to be able to subtract the two types, both arguments are required to
-// have a nested member \a value. The result of the subtraction can be accessed via the nested
+// The Minus alias declaration returns the difference of the two given template arguments \a T1
+// and \a T2. In order for Minus to be able to subtract the two types, both arguments are required
+// to have a nested member \a value. The result of the subtraction can be accessed via the nested
 // member \a value, the resulting type is available via the nested type \a ValueType.
 
    \code
@@ -70,8 +70,8 @@ namespace blaze {
 template< typename T1    // Type of the first compile time value
         , typename T2 >  // Type of the second compile time value
 struct Minus
-   : public IntegralC< typename CommonType<typename T1::ValueType,typename T2::ValueType>::Type
-                     , ( T1::value - T2::value ) >
+   : public IntegralConstant< CommonType_< typename T1::ValueType, typename T2::ValueType >
+                            , ( T1::value - T2::value ) >
 {};
 //*************************************************************************************************
 

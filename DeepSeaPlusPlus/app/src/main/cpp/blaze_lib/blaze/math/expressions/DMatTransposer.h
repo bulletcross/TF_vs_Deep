@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/DMatTransposer.h
 //  \brief Header file for the dense matrix transposer
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,12 +40,15 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/ColumnMajorMatrix.h>
 #include <blaze/math/constraints/Computation.h>
 #include <blaze/math/constraints/DenseMatrix.h>
 #include <blaze/math/constraints/RowMajorMatrix.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/DenseMatrix.h>
-#include <blaze/math/intrinsics/IntrinsicTrait.h>
+#include <blaze/math/shims/Reset.h>
+#include <blaze/math/simd/SIMDTrait.h>
 #include <blaze/math/traits/SubmatrixTrait.h>
 #include <blaze/math/typetraits/HasMutableDataAccess.h>
 #include <blaze/math/typetraits/IsAligned.h>
@@ -54,10 +57,9 @@
 #include <blaze/system/Inline.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/IsNumeric.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -76,43 +78,39 @@ namespace blaze {
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
+class DMatTransposer
+   : public DenseMatrix< DMatTransposer<MT,SO>, SO >
 {
- private:
-   //**Type definitions****************************************************************************
-   typedef IntrinsicTrait<typename MT::ElementType>  IT;  //!< Intrinsic trait for the vector element type.
-   //**********************************************************************************************
-
  public:
    //**Type definitions****************************************************************************
-   typedef DMatTransposer<MT,SO>        This;            //!< Type of this DMatTransposer instance.
-   typedef typename MT::TransposeType   ResultType;      //!< Result type for expression template evaluations.
-   typedef typename MT::OppositeType    OppositeType;    //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename MT::ResultType      TransposeType;   //!< Transpose type for expression template evaluations.
-   typedef typename MT::ElementType     ElementType;     //!< Type of the matrix elements.
-   typedef typename IT::Type            IntrinsicType;   //!< Intrinsic type of the matrix elements.
-   typedef typename MT::ReturnType      ReturnType;      //!< Return type for expression template evaluations.
-   typedef const This&                  CompositeType;   //!< Data type for composite expression templates.
-   typedef typename MT::Reference       Reference;       //!< Reference to a non-constant matrix value.
-   typedef typename MT::ConstReference  ConstReference;  //!< Reference to a constant matrix value.
-   typedef typename MT::Pointer         Pointer;         //!< Pointer to a non-constant matrix value.
-   typedef typename MT::ConstPointer    ConstPointer;    //!< Pointer to a constant matrix value.
-   typedef typename MT::Iterator        Iterator;        //!< Iterator over non-constant elements.
-   typedef typename MT::ConstIterator   ConstIterator;   //!< Iterator over constant elements.
+   using This           = DMatTransposer<MT,SO>;    //!< Type of this DMatTransposer instance.
+   using ResultType     = TransposeType_<MT>;       //!< Result type for expression template evaluations.
+   using OppositeType   = OppositeType_<MT>;        //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType  = ResultType_<MT>;          //!< Transpose type for expression template evaluations.
+   using ElementType    = ElementType_<MT>;         //!< Type of the matrix elements.
+   using SIMDType       = SIMDTrait_<ElementType>;  //!< SIMD type of the matrix elements.
+   using ReturnType     = ReturnType_<MT>;          //!< Return type for expression template evaluations.
+   using CompositeType  = const This&;              //!< Data type for composite expression templates.
+   using Reference      = Reference_<MT>;           //!< Reference to a non-constant matrix value.
+   using ConstReference = ConstReference_<MT>;      //!< Reference to a constant matrix value.
+   using Pointer        = Pointer_<MT>;             //!< Pointer to a non-constant matrix value.
+   using ConstPointer   = ConstPointer_<MT>;        //!< Pointer to a constant matrix value.
+   using Iterator       = Iterator_<MT>;            //!< Iterator over non-constant elements.
+   using ConstIterator  = ConstIterator_<MT>;       //!< Iterator over constant elements.
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
-   //! Compilation flag for intrinsic optimization.
-   /*! The \a vectorizable compilation flag indicates whether expressions the matrix is involved
-       in can be optimized via intrinsics. In case the dense matrix operand is vectorizable, the
-       \a vectorizable compilation flag is set to \a true, otherwise it is set to \a false. */
-   enum { vectorizable = MT::vectorizable };
+   //! Compilation flag for SIMD optimization.
+   /*! The \a simdEnabled compilation flag indicates whether expressions the matrix is involved
+       in can be optimized via SIMD operations. In case the dense matrix operand is vectorizable,
+       the \a simdEnabled compilation flag is set to \a true, otherwise it is set to \a false. */
+   enum : bool { simdEnabled = MT::simdEnabled };
 
    //! Compilation flag for SMP assignments.
    /*! The \a smpAssignable compilation flag indicates whether the matrix can be used in SMP
        (shared memory parallel) assignments (both on the left-hand and right-hand side of the
        assignment). */
-   enum { smpAssignable = MT::smpAssignable };
+   enum : bool { smpAssignable = MT::smpAssignable };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -120,7 +118,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \param dm The dense matrix operand.
    */
-   explicit inline DMatTransposer( MT& dm )
+   explicit inline DMatTransposer( MT& dm ) noexcept
       : dm_( dm )  // The dense matrix operand
    {}
    //**********************************************************************************************
@@ -196,7 +194,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return Pointer to the internal element storage.
    */
-   inline Pointer data() {
+   inline Pointer data() noexcept {
       return dm_.data();
    }
    //**********************************************************************************************
@@ -206,7 +204,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return Pointer to the internal element storage.
    */
-   inline ConstPointer data() const {
+   inline ConstPointer data() const noexcept {
       return dm_.data();
    }
    //**********************************************************************************************
@@ -315,7 +313,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    // \return Reference to this DMatTransposer.
    */
    template< typename Other >  // Data type of the right-hand side scalar
-   inline typename EnableIf< IsNumeric<Other>, DMatTransposer >::Type& operator*=( Other rhs )
+   inline EnableIf_< IsNumeric<Other>, DMatTransposer >& operator*=( Other rhs )
    {
       (~dm_) *= rhs;
       return *this;
@@ -329,10 +327,10 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    // \param rhs The right-hand side scalar value for the division.
    // \return Reference to this DMatTransposer.
    //
-   // \note: A division by zero is only checked by an user assert.
+   // \note A division by zero is only checked by an user assert.
    */
    template< typename Other >  // Data type of the right-hand side scalar
-   inline typename EnableIf< IsNumeric<Other>, DMatTransposer >::Type& operator/=( Other rhs )
+   inline EnableIf_< IsNumeric<Other>, DMatTransposer >& operator/=( Other rhs )
    {
       BLAZE_USER_ASSERT( rhs != Other(0), "Division by zero detected" );
 
@@ -346,7 +344,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return The number of rows of the matrix.
    */
-   inline size_t rows() const {
+   inline size_t rows() const noexcept {
       return dm_.columns();
    }
    //**********************************************************************************************
@@ -356,7 +354,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return The number of columns of the matrix.
    */
-   inline size_t columns() const {
+   inline size_t columns() const noexcept {
       return dm_.rows();
    }
    //**********************************************************************************************
@@ -366,7 +364,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return The spacing between the beginning of two rows.
    */
-   inline size_t spacing() const {
+   inline size_t spacing() const noexcept {
       return dm_.spacing();
    }
    //**********************************************************************************************
@@ -386,7 +384,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return \a true in case the matrix's invariants are intact, \a false otherwise.
    */
-   inline bool isIntact() const {
+   inline bool isIntact() const noexcept {
       using blaze::isIntact;
       return isIntact( dm_ );
    }
@@ -399,7 +397,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    // \return \a true in case the alias corresponds to this matrix, \a false if not.
    */
    template< typename Other >  // Data type of the foreign expression
-   inline bool canAlias( const Other* alias ) const
+   inline bool canAlias( const Other* alias ) const noexcept
    {
       return dm_.canAlias( alias );
    }
@@ -412,7 +410,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    // \return \a true in case the alias corresponds to this matrix, \a false if not.
    */
    template< typename Other >  // Data type of the foreign expression
-   inline bool isAliased( const Other* alias ) const
+   inline bool isAliased( const Other* alias ) const noexcept
    {
       return dm_.isAliased( alias );
    }
@@ -423,7 +421,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return \a true in case the matrix is aligned, \a false if not.
    */
-   inline bool isAligned() const
+   inline bool isAligned() const noexcept
    {
       return dm_.isAligned();
    }
@@ -434,130 +432,130 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
    //
    // \return \a true in case the matrix can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const
+   inline bool canSMPAssign() const noexcept
    {
       return dm_.canSMPAssign();
    }
    //**********************************************************************************************
 
    //**Load function*******************************************************************************
-   /*!\brief Load of an intrinsic element of the matrix.
+   /*!\brief Load of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \return The loaded intrinsic element.
+   // \return The loaded SIMD element.
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType load( size_t i, size_t j ) const
+   BLAZE_ALWAYS_INLINE SIMDType load( size_t i, size_t j ) const noexcept
    {
       return dm_.load( j, i );
    }
    //**********************************************************************************************
 
    //**Loada function******************************************************************************
-   /*!\brief Aligned load of an intrinsic element of the matrix.
+   /*!\brief Aligned load of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \return The loaded intrinsic element.
+   // \return The loaded SIMD element.
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType loada( size_t i, size_t j ) const
+   BLAZE_ALWAYS_INLINE SIMDType loada( size_t i, size_t j ) const noexcept
    {
       return dm_.loada( j, i );
    }
    //**********************************************************************************************
 
    //**Loadu function******************************************************************************
-   /*!\brief Unaligned load of an intrinsic element of the matrix.
+   /*!\brief Unaligned load of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \return The loaded intrinsic element.
+   // \return The loaded SIMD element.
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType loadu( size_t i, size_t j ) const
+   BLAZE_ALWAYS_INLINE SIMDType loadu( size_t i, size_t j ) const noexcept
    {
       return dm_.loadu( j, i );
    }
    //**********************************************************************************************
 
    //**Store function******************************************************************************
-   /*!\brief Store of an intrinsic element of the matrix.
+   /*!\brief Store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void store( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void store( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.store( j, i, value );
    }
    //**********************************************************************************************
 
    //**Storea function******************************************************************************
-   /*!\brief Aligned store of an intrinsic element of the matrix.
+   /*!\brief Aligned store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void storea( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void storea( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.storea( j, i, value );
    }
    //**********************************************************************************************
 
    //**Storeu function*****************************************************************************
-   /*!\brief Unaligned store of an intrinsic element of the matrix.
+   /*!\brief Unaligned store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void storeu( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void storeu( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.storeu( j, i, value );
    }
    //**********************************************************************************************
 
    //**Stream function*****************************************************************************
-   /*!\brief Aligned, non-temporal store of an intrinsic element of the matrix.
+   /*!\brief Aligned, non-temporal store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void stream( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void stream( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.stream( j, i, value );
    }
@@ -619,9 +617,10 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
+      constexpr size_t block( BLOCK_SIZE );
+
       const size_t m( rows() );
       const size_t n( columns() );
-      const size_t block( BLOCK_SIZE );
 
       for( size_t ii=0UL; ii<m; ii+=block ) {
          const size_t iend( ( m < ii+block )?( m ):( ii+block ) );
@@ -656,7 +655,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t i=0UL; i<(~rhs).rows(); ++i )
          for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element )
@@ -683,7 +682,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t j=0UL; j<(~rhs).columns(); ++j )
          for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element )
@@ -748,9 +747,10 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
+      constexpr size_t block( BLOCK_SIZE );
+
       const size_t m( rows() );
       const size_t n( columns() );
-      const size_t block( BLOCK_SIZE );
 
       for( size_t ii=0UL; ii<m; ii+=block ) {
          const size_t iend( ( m < ii+block )?( m ):( ii+block ) );
@@ -785,7 +785,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t i=0UL; i<(~rhs).rows(); ++i )
          for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element )
@@ -812,7 +812,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t j=0UL; j<(~rhs).columns(); ++j )
          for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element )
@@ -877,9 +877,10 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
+      constexpr size_t block( BLOCK_SIZE );
+
       const size_t m( rows() );
       const size_t n( columns() );
-      const size_t block( BLOCK_SIZE );
 
       for( size_t ii=0UL; ii<m; ii+=block ) {
          const size_t iend( ( m < ii+block )?( m ):( ii+block ) );
@@ -914,7 +915,7 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t i=0UL; i<(~rhs).rows(); ++i )
          for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element )
@@ -941,11 +942,169 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t j=0UL; j<(~rhs).columns(); ++j )
          for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element )
             dm_(j,element->index()) -= element->value();
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of row-major dense matrices******************************
+   /*!\brief Implementation of the transpose Schur product assignment of a row-major dense matrix.
+   //
+   // \param rhs The right-hand side dense matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side dense matrix
+   inline void schurAssign( const DenseMatrix<MT2,SO>& rhs )
+   {
+      BLAZE_CONSTRAINT_MUST_BE_ROW_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      const size_t m( rows() );
+      const size_t n( columns() );
+
+      const size_t jpos( n & size_t(-2) );
+      BLAZE_INTERNAL_ASSERT( ( n - ( n % 2UL ) ) == jpos, "Invalid end calculation" );
+
+      for( size_t i=0UL; i<m; ++i ) {
+         for( size_t j=0UL; j<jpos; j+=2UL ) {
+            dm_(j    ,i) *= (~rhs)(i,j    );
+            dm_(j+1UL,i) *= (~rhs)(i,j+1UL);
+
+         }
+         if( jpos < n ) {
+            dm_(jpos,i) *= (~rhs)(i,jpos);
+         }
+      }
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of column-major dense matrices***************************
+   /*!\brief Implementation of the transpose Schur product assignment of a column-major dense matrix.
+   //
+   // \param rhs The right-hand side dense matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side dense matrix
+   inline void schurAssign( const DenseMatrix<MT2,!SO>& rhs )
+   {
+      BLAZE_CONSTRAINT_MUST_BE_COLUMN_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      constexpr size_t block( BLOCK_SIZE );
+
+      const size_t m( rows() );
+      const size_t n( columns() );
+
+      for( size_t ii=0UL; ii<m; ii+=block ) {
+         const size_t iend( ( m < ii+block )?( m ):( ii+block ) );
+         for( size_t jj=0UL; jj<n; jj+=block ) {
+            const size_t jend( ( n < jj+block )?( n ):( jj+block ) );
+            for( size_t i=ii; i<iend; ++i ) {
+               for( size_t j=jj; j<jend; ++j ) {
+                  dm_(j,i) *= (~rhs)(i,j);
+               }
+            }
+         }
+      }
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of row-major sparse matrices*****************************
+   /*!\brief Implementation of the transpose Schur product assignment of a row-major sparse matrix.
+   //
+   // \param rhs The right-hand side sparse matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side sparse matrix
+   inline void schurAssign( const SparseMatrix<MT2,SO>& rhs )
+   {
+      using blaze::reset;
+
+      BLAZE_CONSTRAINT_MUST_BE_ROW_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      using RhsConstIterator = ConstIterator_<MT2>;
+
+      for( size_t i=0UL; i<(~rhs).rows(); ++i )
+      {
+         size_t j( 0UL );
+
+         for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element ) {
+            for( ; j<element->index(); ++j )
+               reset( dm_(j,i) );
+            dm_(j,i) *= element->value();
+            ++j;
+         }
+
+         for( ; j<(~rhs).columns(); ++j ) {
+            reset( dm_(j,i) );
+         }
+      }
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of column-major sparse matrices**************************
+   /*!\brief Implementation of the transpose Schur product assignment of a column-major sparse matrix.
+   //
+   // \param rhs The right-hand side sparse matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side sparse matrix
+   inline void schurAssign( const SparseMatrix<MT2,!SO>& rhs )
+   {
+      using blaze::reset;
+
+      BLAZE_CONSTRAINT_MUST_BE_COLUMN_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      using RhsConstIterator = ConstIterator_<MT2>;
+
+      for( size_t j=0UL; j<(~rhs).columns(); ++j )
+      {
+         size_t i( 0UL );
+
+         for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element ) {
+            for( ; i<element->index(); ++i )
+               reset( dm_(j,i) );
+            dm_(j,i) *= element->value();
+            ++i;
+         }
+
+         for( ; i<(~rhs).rows(); ++i ) {
+            reset( dm_(j,i) );
+         }
+      }
    }
    //**********************************************************************************************
 
@@ -990,43 +1149,39 @@ class DMatTransposer : public DenseMatrix< DMatTransposer<MT,SO>, SO >
 // row-major matrices.
 */
 template< typename MT >  // Type of the dense matrix
-class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, true >
+class DMatTransposer<MT,true>
+   : public DenseMatrix< DMatTransposer<MT,true>, true >
 {
- private:
-   //**Type definitions****************************************************************************
-   typedef IntrinsicTrait<typename MT::ElementType>  IT;  //!< Intrinsic trait for the vector element type.
-   //**********************************************************************************************
-
  public:
    //**Type definitions****************************************************************************
-   typedef DMatTransposer<MT,true>      This;            //!< Type of this DMatTransposer instance.
-   typedef typename MT::TransposeType   ResultType;      //!< Result type for expression template evaluations.
-   typedef typename MT::OppositeType    OppositeType;    //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename MT::ResultType      TransposeType;   //!< Transpose type for expression template evaluations.
-   typedef typename MT::ElementType     ElementType;     //!< Type of the matrix elements.
-   typedef typename IT::Type            IntrinsicType;   //!< Intrinsic type of the matrix elements.
-   typedef typename MT::ReturnType      ReturnType;      //!< Return type for expression template evaluations.
-   typedef const This&                  CompositeType;   //!< Data type for composite expression templates.
-   typedef typename MT::Reference       Reference;       //!< Reference to a non-constant matrix value.
-   typedef typename MT::ConstReference  ConstReference;  //!< Reference to a constant matrix value.
-   typedef typename MT::Pointer         Pointer;         //!< Pointer to a non-constant matrix value.
-   typedef typename MT::ConstPointer    ConstPointer;    //!< Pointer to a constant matrix value.
-   typedef typename MT::Iterator        Iterator;        //!< Iterator over non-constant elements.
-   typedef typename MT::ConstIterator   ConstIterator;   //!< Iterator over constant elements.
+   using This           = DMatTransposer<MT,true>;  //!< Type of this DMatTransposer instance.
+   using ResultType     = TransposeType_<MT>;       //!< Result type for expression template evaluations.
+   using OppositeType   = OppositeType_<MT>;        //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType  = ResultType_<MT>;          //!< Transpose type for expression template evaluations.
+   using ElementType    = ElementType_<MT>;         //!< Type of the matrix elements.
+   using SIMDType       = SIMDTrait_<ElementType>;  //!< SIMD type of the matrix elements.
+   using ReturnType     = ReturnType_<MT>;          //!< Return type for expression template evaluations.
+   using CompositeType  = const This&;              //!< Data type for composite expression templates.
+   using Reference      = Reference_<MT>;           //!< Reference to a non-constant matrix value.
+   using ConstReference = ConstReference_<MT>;      //!< Reference to a constant matrix value.
+   using Pointer        = Pointer_<MT>;             //!< Pointer to a non-constant matrix value.
+   using ConstPointer   = ConstPointer_<MT>;        //!< Pointer to a constant matrix value.
+   using Iterator       = Iterator_<MT>;            //!< Iterator over non-constant elements.
+   using ConstIterator  = ConstIterator_<MT>;       //!< Iterator over constant elements.
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
-   //! Compilation flag for intrinsic optimization.
-   /*! The \a vectorizable compilation flag indicates whether expressions the matrix is involved
-       in can be optimized via intrinsics. In case the dense matrix operand is vectorizable, the
-       \a vectorizable compilation flag is set to \a true, otherwise it is set to \a false. */
-   enum { vectorizable = MT::vectorizable };
+   //! Compilation flag for SIMD optimization.
+   /*! The \a simdEnabled compilation flag indicates whether expressions the matrix is involved
+       in can be optimized via SIMD operations. In case the dense matrix operand is vectorizable,
+       the \a simdEnabled compilation flag is set to \a true, otherwise it is set to \a false. */
+   enum : bool { simdEnabled = MT::simdEnabled };
 
    //! Compilation flag for SMP assignments.
    /*! The \a smpAssignable compilation flag indicates whether the matrix can be used in SMP
        (shared memory parallel) assignments (both on the left-hand and right-hand side of the
        assignment). */
-   enum { smpAssignable = MT::smpAssignable };
+   enum : bool { smpAssignable = MT::smpAssignable };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -1034,7 +1189,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \param dm The dense matrix operand.
    */
-   explicit inline DMatTransposer( MT& dm )
+   explicit inline DMatTransposer( MT& dm ) noexcept
       : dm_( dm )  // The dense matrix operand
    {}
    //**********************************************************************************************
@@ -1110,7 +1265,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return Pointer to the internal element storage.
    */
-   inline Pointer data() {
+   inline Pointer data() noexcept {
       return dm_.data();
    }
    //**********************************************************************************************
@@ -1120,7 +1275,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return Pointer to the internal element storage.
    */
-   inline ConstPointer data() const {
+   inline ConstPointer data() const noexcept {
       return dm_.data();
    }
    //**********************************************************************************************
@@ -1199,7 +1354,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    // \return Reference to this DMatTransposer.
    */
    template< typename Other >  // Data type of the right-hand side scalar
-   inline typename EnableIf< IsNumeric<Other>, DMatTransposer >::Type& operator*=( Other rhs )
+   inline EnableIf_< IsNumeric<Other>, DMatTransposer >& operator*=( Other rhs )
    {
       (~dm_) *= rhs;
       return *this;
@@ -1213,10 +1368,10 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    // \param rhs The right-hand side scalar value for the division.
    // \return Reference to this DMatTransposer.
    //
-   // \note: A division by zero is only checked by an user assert.
+   // \note A division by zero is only checked by an user assert.
    */
    template< typename Other >  // Data type of the right-hand side scalar
-   inline typename EnableIf< IsNumeric<Other>, DMatTransposer >::Type& operator/=( Other rhs )
+   inline EnableIf_< IsNumeric<Other>, DMatTransposer >& operator/=( Other rhs )
    {
       BLAZE_USER_ASSERT( rhs != Other(0), "Division by zero detected" );
 
@@ -1230,7 +1385,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return The number of rows of the matrix.
    */
-   inline size_t rows() const {
+   inline size_t rows() const noexcept {
       return dm_.columns();
    }
    //**********************************************************************************************
@@ -1240,7 +1395,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return The number of columns of the matrix.
    */
-   inline size_t columns() const {
+   inline size_t columns() const noexcept {
       return dm_.rows();
    }
    //**********************************************************************************************
@@ -1250,7 +1405,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return The spacing between the beginning of two columns.
    */
-   inline size_t spacing() const {
+   inline size_t spacing() const noexcept {
       return dm_.spacing();
    }
    //**********************************************************************************************
@@ -1270,7 +1425,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return \a true in case the matrix's invariants are intact, \a false otherwise.
    */
-   inline bool isIntact() const {
+   inline bool isIntact() const noexcept {
       using blaze::isIntact;
       return isIntact( dm_ );
    }
@@ -1283,7 +1438,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    // \return \a true in case the alias corresponds to this matrix, \a false if not.
    */
    template< typename Other >  // Data type of the foreign expression
-   inline bool canAlias( const Other* alias ) const
+   inline bool canAlias( const Other* alias ) const noexcept
    {
       return dm_.canAlias( alias );
    }
@@ -1296,7 +1451,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    // \return \a true in case the alias corresponds to this matrix, \a false if not.
    */
    template< typename Other >  // Data type of the foreign expression
-   inline bool isAliased( const Other* alias ) const
+   inline bool isAliased( const Other* alias ) const noexcept
    {
       return dm_.isAliased( alias );
    }
@@ -1307,7 +1462,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return \a true in case the matrix is aligned, \a false if not.
    */
-   inline bool isAligned() const
+   inline bool isAligned() const noexcept
    {
       return dm_.isAligned();
    }
@@ -1318,130 +1473,130 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
    //
    // \return \a true in case the matrix can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const
+   inline bool canSMPAssign() const noexcept
    {
       return dm_.canSMPAssign();
    }
    //**********************************************************************************************
 
    //**Load function*******************************************************************************
-   /*!\brief Load of an intrinsic element of the matrix.
+   /*!\brief Load of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \return The loaded intrinsic element.
+   // \return The loaded SIMD element.
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType load( size_t i, size_t j ) const
+   BLAZE_ALWAYS_INLINE SIMDType load( size_t i, size_t j ) const noexcept
    {
       return dm_.load( j, i );
    }
    //**********************************************************************************************
 
    //**Loada function*******************************************************************************
-   /*!\brief Aligned load of an intrinsic element of the matrix.
+   /*!\brief Aligned load of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \return The loaded intrinsic element.
+   // \return The loaded SIMD element.
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType loada( size_t i, size_t j ) const
+   BLAZE_ALWAYS_INLINE SIMDType loada( size_t i, size_t j ) const noexcept
    {
       return dm_.loada( j, i );
    }
    //**********************************************************************************************
 
    //**Loadu function******************************************************************************
-   /*!\brief Unaligned load of an intrinsic element of the matrix.
+   /*!\brief Unaligned load of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \return The loaded intrinsic element.
+   // \return The loaded SIMD element.
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE IntrinsicType loadu( size_t i, size_t j ) const
+   BLAZE_ALWAYS_INLINE SIMDType loadu( size_t i, size_t j ) const noexcept
    {
       return dm_.loadu( j, i );
    }
    //**********************************************************************************************
 
    //**Store function******************************************************************************
-   /*!\brief Store of an intrinsic element of the matrix.
+   /*!\brief Store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void store( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void store( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.store( j, i, value );
    }
    //**********************************************************************************************
 
    //**Storea function******************************************************************************
-   /*!\brief Aligned store of an intrinsic element of the matrix.
+   /*!\brief Aligned store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void storea( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void storea( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.storea( j, i, value );
    }
    //**********************************************************************************************
 
    //**Storeu function*****************************************************************************
-   /*!\brief Unaligned store of an intrinsic element of the matrix.
+   /*!\brief Unaligned store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void storeu( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void storeu( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.storeu( j, i, value );
    }
    //**********************************************************************************************
 
    //**Stream function*****************************************************************************
-   /*!\brief Aligned, non-temporal store of an intrinsic element of the matrix.
+   /*!\brief Aligned, non-temporal store of a SIMD element of the matrix.
    //
    // \param i Access index for the row. The index has to be in the range [0..M-1].
    // \param j Access index for the column. The index has to be in the range [0..N-1].
-   // \param value The intrinsic element to be stored.
+   // \param value The SIMD element to be stored.
    // \return void
    //
    // This function must \b NOT be called explicitly! It is used internally for the performance
    // optimized evaluation of expression templates. Calling this function explicitly might result
    // in erroneous results and/or in compilation errors.
    */
-   BLAZE_ALWAYS_INLINE void stream( size_t i, size_t j, const IntrinsicType& value )
+   BLAZE_ALWAYS_INLINE void stream( size_t i, size_t j, const SIMDType& value ) noexcept
    {
       dm_.stream( j, i, value );
    }
@@ -1503,9 +1658,10 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
+      constexpr size_t block( BLOCK_SIZE );
+
       const size_t m( rows() );
       const size_t n( columns() );
-      const size_t block( BLOCK_SIZE );
 
       for( size_t jj=0UL; jj<n; jj+=block ) {
          const size_t jend( ( n < jj+block )?( n ):( jj+block ) );
@@ -1540,7 +1696,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t j=0UL; j<(~rhs).columns(); ++j )
          for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element )
@@ -1567,7 +1723,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t i=0UL; i<(~rhs).rows(); ++i )
          for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element )
@@ -1631,9 +1787,10 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
+      constexpr size_t block( BLOCK_SIZE );
+
       const size_t m( rows() );
       const size_t n( columns() );
-      const size_t block( BLOCK_SIZE );
 
       for( size_t jj=0UL; jj<n; jj+=block ) {
          const size_t jend( ( n < jj+block )?( n ):( jj+block ) );
@@ -1668,7 +1825,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t j=0UL; j<(~rhs).columns(); ++j )
          for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element )
@@ -1695,7 +1852,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t i=0UL; i<(~rhs).rows(); ++i )
          for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element )
@@ -1759,9 +1916,10 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
+      constexpr size_t block( BLOCK_SIZE );
+
       const size_t m( rows() );
       const size_t n( columns() );
-      const size_t block( BLOCK_SIZE );
 
       for( size_t jj=0UL; jj<n; jj+=block ) {
          const size_t jend( ( n < jj+block )?( n ):( jj+block ) );
@@ -1796,7 +1954,7 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t j=0UL; j<(~rhs).columns(); ++j )
          for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element )
@@ -1823,11 +1981,168 @@ class DMatTransposer<MT,true> : public DenseMatrix< DMatTransposer<MT,true>, tru
       BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
       BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
 
-      typedef typename MT2::ConstIterator  RhsConstIterator;
+      using RhsConstIterator = ConstIterator_<MT2>;
 
       for( size_t i=0UL; i<(~rhs).rows(); ++i )
          for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element )
             dm_(element->index(),i) -= element->value();
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of column-major dense matrices***************************
+   /*!\brief Implementation of the transpose Schur product assignment of a column-major dense matrix.
+   //
+   // \param rhs The right-hand side dense matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side dense matrix
+   inline void schurAssign( const DenseMatrix<MT2,true>& rhs )
+   {
+      BLAZE_CONSTRAINT_MUST_BE_COLUMN_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      const size_t m( rows() );
+      const size_t n( columns() );
+
+      const size_t ipos( m & size_t(-2) );
+      BLAZE_INTERNAL_ASSERT( ( m - ( m % 2UL ) ) == ipos, "Invalid end calculation" );
+
+      for( size_t j=0UL; j<n; ++j ) {
+         for( size_t i=0UL; i<ipos; i+=2UL ) {
+            dm_(j,i    ) *= (~rhs)(i    ,j);
+            dm_(j,i+1UL) *= (~rhs)(i+1UL,j);
+         }
+         if( ipos < m ) {
+            dm_(j,ipos) *= (~rhs)(ipos,j);
+         }
+      }
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of row-major dense matrices******************************
+   /*!\brief Implementation of the transpose Schur product assignment of a row-major dense matrix.
+   //
+   // \param rhs The right-hand side dense matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side dense matrix
+   inline void schurAssign( const DenseMatrix<MT2,false>& rhs )
+   {
+      BLAZE_CONSTRAINT_MUST_BE_ROW_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      constexpr size_t block( BLOCK_SIZE );
+
+      const size_t m( rows() );
+      const size_t n( columns() );
+
+      for( size_t jj=0UL; jj<n; jj+=block ) {
+         const size_t jend( ( n < jj+block )?( n ):( jj+block ) );
+         for( size_t ii=0UL; ii<m; ii+=block ) {
+            const size_t iend( ( m < ii+block )?( m ):( ii+block ) );
+            for( size_t j=jj; j<jend; ++j ) {
+               for( size_t i=ii; i<iend; ++i ) {
+                  dm_(j,i) *= (~rhs)(i,j);
+               }
+            }
+         }
+      }
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of column-major sparse matrices**************************
+   /*!\brief Implementation of the transpose Schur product assignment of a column-major sparse matrix.
+   //
+   // \param rhs The right-hand side sparse matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side sparse matrix
+   inline void schurAssign( const SparseMatrix<MT2,true>& rhs )
+   {
+      using blaze::reset;
+
+      BLAZE_CONSTRAINT_MUST_BE_COLUMN_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      using RhsConstIterator = ConstIterator_<MT2>;
+
+      for( size_t j=0UL; j<(~rhs).columns(); ++j )
+      {
+         size_t i( 0UL );
+
+         for( RhsConstIterator element=(~rhs).begin(j); element!=(~rhs).end(j); ++element ) {
+            for( ; i<element->index(); ++i )
+               reset( dm_(j,i) );
+            dm_(j,i) *= element->value();
+            ++i;
+         }
+
+         for( ; i<(~rhs).rows(); ++i ) {
+            reset( dm_(j,i) );
+         }
+      }
+   }
+   //**********************************************************************************************
+
+   //**Transpose Schur product assignment of row-major sparse matrices*****************************
+   /*!\brief Implementation of the transpose Schur product assignment of a row-major sparse matrix.
+   //
+   // \param rhs The right-hand side sparse matrix for the Schur product.
+   // \return void
+   //
+   // This function must \b NOT be called explicitly! It is used internally for the performance
+   // optimized evaluation of expression templates. Calling this function explicitly might result
+   // in erroneous results and/or in compilation errors. Instead of using this function use the
+   // assignment operator.
+   */
+   template< typename MT2 >  // Type of the right-hand side sparse matrix
+   inline void schurAssign( const SparseMatrix<MT2,false>& rhs )
+   {
+      using blaze::reset;
+
+      BLAZE_CONSTRAINT_MUST_BE_ROW_MAJOR_MATRIX_TYPE( MT2 );
+
+      BLAZE_INTERNAL_ASSERT( dm_.columns() == (~rhs).rows(), "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( dm_.rows() == (~rhs).columns(), "Invalid number of columns" );
+
+      using RhsConstIterator = ConstIterator_<MT2>;
+
+      for( size_t i=0UL; i<(~rhs).rows(); ++i )
+      {
+         size_t j( 0UL );
+
+         for( RhsConstIterator element=(~rhs).begin(i); element!=(~rhs).end(i); ++element ) {
+            for( ; j<element->index(); ++j )
+               reset( dm_(j,i) );
+            dm_(j,i) *= element->value();
+            ++j;
+         }
+
+         for( ; j<(~rhs).columns(); ++j ) {
+            reset( dm_(j,i) );
+         }
+      }
    }
    //**********************************************************************************************
 
@@ -1892,7 +2207,7 @@ inline void reset( DMatTransposer<MT,SO>& m )
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline bool isIntact( const DMatTransposer<MT,SO>& m )
+inline bool isIntact( const DMatTransposer<MT,SO>& m ) noexcept
 {
    return m.isIntact();
 }
@@ -1912,7 +2227,7 @@ inline bool isIntact( const DMatTransposer<MT,SO>& m )
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
 struct HasMutableDataAccess< DMatTransposer<MT,SO> >
-   : public IsTrue< HasMutableDataAccess<MT>::value >
+   : public BoolConstant< HasMutableDataAccess<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1929,7 +2244,8 @@ struct HasMutableDataAccess< DMatTransposer<MT,SO> >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsAligned< DMatTransposer<MT,SO> > : public IsTrue< IsAligned<MT>::value >
+struct IsAligned< DMatTransposer<MT,SO> >
+   : public BoolConstant< IsAligned<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1946,7 +2262,8 @@ struct IsAligned< DMatTransposer<MT,SO> > : public IsTrue< IsAligned<MT>::value 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsPadded< DMatTransposer<MT,SO> > : public IsTrue< IsPadded<MT>::value >
+struct IsPadded< DMatTransposer<MT,SO> >
+   : public BoolConstant< IsPadded<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1965,7 +2282,7 @@ struct IsPadded< DMatTransposer<MT,SO> > : public IsTrue< IsPadded<MT>::value >
 template< typename MT, bool SO >
 struct SubmatrixTrait< DMatTransposer<MT,SO> >
 {
-   typedef typename SubmatrixTrait< typename DMatTransposer<MT,SO>::ResultType >::Type  Type;
+   using Type = SubmatrixTrait_< ResultType_< DMatTransposer<MT,SO> > >;
 };
 /*! \endcond */
 //*************************************************************************************************

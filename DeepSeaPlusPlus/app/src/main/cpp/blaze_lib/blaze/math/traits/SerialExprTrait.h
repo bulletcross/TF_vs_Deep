@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/SerialExprTrait.h
 //  \brief Header file for the SerialExprTrait class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,27 +40,12 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/traits/DMatSerialExprTrait.h>
-#include <blaze/math/traits/DVecSerialExprTrait.h>
-#include <blaze/math/traits/SMatSerialExprTrait.h>
-#include <blaze/math/traits/SVecSerialExprTrait.h>
-#include <blaze/math/traits/TDMatSerialExprTrait.h>
-#include <blaze/math/traits/TDVecSerialExprTrait.h>
-#include <blaze/math/traits/TSMatSerialExprTrait.h>
-#include <blaze/math/traits/TSVecSerialExprTrait.h>
-#include <blaze/math/typetraits/IsDenseMatrix.h>
-#include <blaze/math/typetraits/IsDenseVector.h>
+#include <utility>
 #include <blaze/math/typetraits/IsMatrix.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
-#include <blaze/math/typetraits/IsRowVector.h>
 #include <blaze/math/typetraits/IsVector.h>
 #include <blaze/util/InvalidType.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/typetraits/IsConst.h>
-#include <blaze/util/typetraits/IsReference.h>
-#include <blaze/util/typetraits/IsVolatile.h>
-#include <blaze/util/typetraits/RemoveCV.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 
 
@@ -88,50 +73,44 @@ struct SerialExprTrait
  private:
    //**struct Failure******************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   struct Failure { typedef INVALID_TYPE  Type; };
+   struct Failure { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
-   //**********************************************************************************************
+   //**struct Result*******************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< IsMatrix<T>
-                      , typename If< IsDenseMatrix<T>
-                                   , typename If< IsRowMajorMatrix<T>
-                                                , DMatSerialExprTrait<T>
-                                                , TDMatSerialExprTrait<T>
-                                                >::Type
-                                   , typename If< IsRowMajorMatrix<T>
-                                                , SMatSerialExprTrait<T>
-                                                , TSMatSerialExprTrait<T>
-                                                >::Type
-                                   >::Type
-                      , typename If< IsVector<T>
-                                   , typename If< IsDenseVector<T>
-                                                , typename If< IsRowVector<T>
-                                                             , TDVecSerialExprTrait<T>
-                                                             , DVecSerialExprTrait<T>
-                                                             >::Type
-                                                , typename If< IsRowVector<T>
-                                                             , TSVecSerialExprTrait<T>
-                                                             , SVecSerialExprTrait<T>
-                                                             >::Type
-                                                >::Type
-                                   , Failure
-                                   >::Type
-                      >::Type  Tmp;
-
-   typedef typename RemoveReference< typename RemoveCV<T>::Type >::Type  Type1;
+   struct Result { using Type = decltype( serial( std::declval<T>() ) ); };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsConst<T>, IsVolatile<T>, IsReference<T> >
-                      , SerialExprTrait<Type1>, Tmp >::Type::Type  Type;
+   using Type = typename If_< Or< IsVector< RemoveReference_<T> >, IsMatrix< RemoveReference_<T> > >
+                            , Result
+                            , Failure
+                            >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the SerialExprTrait class template.
+// \ingroup math_traits
+//
+// The SerialExprTrait_ alias declaration provides a convenient shortcut to access the nested \a Type
+// of the SerialExprTrait class template. For instance, given the type \a T the following two type
+// definitions are identical:
+
+   \code
+   using Type1 = typename SerialExprTrait<T>::Type;
+   using Type2 = SerialExprTrait_<T>;
+   \endcode
+*/
+template< typename T >  // Type of the serial evaluation operand
+using SerialExprTrait_ = typename SerialExprTrait<T>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

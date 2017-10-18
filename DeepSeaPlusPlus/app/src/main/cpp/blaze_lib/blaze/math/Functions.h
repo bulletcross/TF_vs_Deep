@@ -3,7 +3,7 @@
 //  \file blaze/math/Functions.h
 //  \brief Header file for mathematical functions
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,12 +41,12 @@
 //*************************************************************************************************
 
 #include <cmath>
-#include <blaze/math/traits/MathTrait.h>
 #include <blaze/system/Inline.h>
 #include <blaze/util/constraints/Builtin.h>
-#include <blaze/util/constraints/FloatingPoint.h>
 #include <blaze/util/constraints/Integral.h>
 #include <blaze/util/Types.h>
+#include <blaze/util/typetraits/CommonType.h>
+#include <blaze/util/typetraits/IsBuiltin.h>
 #include <blaze/util/typetraits/IsFloatingPoint.h>
 #include <blaze/util/typetraits/IsSigned.h>
 
@@ -63,35 +63,21 @@ namespace blaze {
 /*!\name Mathematical utility functions */
 //@{
 template< typename T >
-inline int sign( T a );
+inline constexpr int sign( T a ) noexcept;
 
 template< typename T >
-inline size_t digits( T a );
+inline size_t digits( T a ) noexcept;
 
 template< typename T1, typename T2 >
-BLAZE_ALWAYS_INLINE const typename MathTrait<T1,T2>::HighType
-   min( const T1& a, const T2& b );
-
-template< typename T1, typename T2, typename T3 >
-BLAZE_ALWAYS_INLINE const typename MathTrait< typename MathTrait<T1,T2>::HighType, T3 >::HighType
-   min( const T1& a, const T2& b, const T3& c );
+BLAZE_ALWAYS_INLINE constexpr auto nextMultiple( T1 value, T2 factor ) noexcept;
 
 template< typename T1, typename T2 >
-BLAZE_ALWAYS_INLINE const typename MathTrait<T1,T2>::HighType
-   max( const T1& a, const T2& b );
-
-template< typename T1, typename T2, typename T3 >
-BLAZE_ALWAYS_INLINE const typename MathTrait< typename MathTrait<T1,T2>::HighType, T3 >::HighType
-   max( const T1& a, const T2& b, const T3& c );
-
-template< typename T >
-BLAZE_ALWAYS_INLINE T round( T a );
-
-template< typename T >
-BLAZE_ALWAYS_INLINE T nextMultiple( T value, T factor );
+BLAZE_ALWAYS_INLINE constexpr bool less( const T1& a, const T2& b )
+   noexcept( IsBuiltin< CommonType_<T1,T2> >::value );
 
 template< typename T1, typename T2 >
-BLAZE_ALWAYS_INLINE bool lessThan( T1 a, T2 b );
+BLAZE_ALWAYS_INLINE constexpr bool greater( const T1& a, const T2& b )
+   noexcept( IsBuiltin< CommonType_<T1,T2> >::value );
 //@}
 //*************************************************************************************************
 
@@ -101,20 +87,19 @@ BLAZE_ALWAYS_INLINE bool lessThan( T1 a, T2 b );
 // \ingroup math
 //
 // \param a The given value.
-// \return 1 if the value is greater than zero, 0 if it is zero, and -1 if it is smaller than zero.
+// \return 1 if the value is greater than zero, 0 if it is zero, and -1 if it is less than zero.
 //
 // The sign function only works for built-in data types. The attempt to use any user-defined class
 // type will result in a compile time error.
 */
 template< typename T >
-inline int sign( T a )
+inline constexpr int sign( T a ) noexcept
 {
    BLAZE_CONSTRAINT_MUST_BE_BUILTIN_TYPE( T );
 
-   if( IsSigned<T>::value || IsFloatingPoint<T>::value )
-      return ( T(0) < a ) - ( a < T(0) );
-   else
-      return ( T(0) < a );
+   return ( IsSigned<T>::value || IsFloatingPoint<T>::value )
+          ?( T(0) < a ) - ( a < T(0) )
+          :( T(0) < a );
 }
 //*************************************************************************************************
 
@@ -138,7 +123,7 @@ inline int sign( T a )
 // other type will result in a compile time error.
 */
 template< typename T >
-inline size_t digits( T a )
+inline size_t digits( T a ) noexcept
 {
    BLAZE_CONSTRAINT_MUST_BE_INTEGRAL_TYPE( T );
 
@@ -155,202 +140,6 @@ inline size_t digits( T a )
 
 
 //*************************************************************************************************
-/*!\brief Minimum function for two arguments.
-// \ingroup math
-//
-// \param a First value.
-// \param b Second value.
-// \return The minimum of the two values.
-//
-// This function returns the minimum of the two given data values. The return type of the
-// function is determined by the data types of the given arguments (for further detail see
-// the MathTrait class description).
-*/
-template< typename T1, typename T2 >
-BLAZE_ALWAYS_INLINE const typename MathTrait<T1,T2>::HighType min( const T1& a, const T2& b )
-{
-   // The return type of the function is only a copy of the one of the arguments for two reasons:
-   //  - in case the data types T1 and T2 are equal, a reference return type could result in a
-   //    bug if combined with literals
-   //  - in case the two data types are unequal, the result of the comparison could be converted
-   //    to the more significant data type, which results in a local temporary value
-   // The copy operation might cause a performance decrease for class types, which is probably
-   // avoided if the function is inlined.
-   return ( a < b )?( a ):( b );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Minimum function for three arguments.
-// \ingroup math
-//
-// \param a First value.
-// \param b Second value.
-// \param c Third value
-// \return The minimum of the three values.
-//
-// This function returns the minimum of the three given data values. The return type of the
-// function is determined by the data types of the given arguments (for further detail see
-// the MathTrait class description).
-*/
-template< typename T1, typename T2, typename T3 >
-BLAZE_ALWAYS_INLINE const typename MathTrait< typename MathTrait<T1,T2>::HighType, T3 >::HighType
-   min( const T1& a, const T2& b, const T3& c )
-{
-   // The return type of the function is only a copy of the one of the arguments for two reasons:
-   //  - in case the data types T1, T2, and T3 are equal, a reference return type could result in
-   //    a bug if combined with literals
-   //  - in case the three data types are unequal, the result of the comparison could be converted
-   //    to the more significant data type, which results in a local temporary value
-   // The copy operation might cause a performance decrease for class types, which is probably
-   // avoided if the function is inlined.
-   return ( a < b )?( ( a < c )?( a ):( c ) ):( ( b < c )?( b ):( c ) );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Maximum function for two arguments.
-// \ingroup math
-//
-// \param a First value.
-// \param b Second value.
-// \return The maximum of the two values.
-//
-// This function returns the maximum of the two given data values. The return type of the
-// function is determined by the data types of the given arguments (for further detail see
-// the MathTrait class description).
-*/
-template< typename T1, typename T2 >
-BLAZE_ALWAYS_INLINE const typename MathTrait<T1,T2>::HighType max( const T1& a, const T2& b )
-{
-   // The return type of the function is only a copy of the one of the arguments for two reasons:
-   //  - in case the data types T1 and T2 are equal, a reference return type could result in a
-   //    bug if combined with literals
-   //  - in case the two data types are unequal, the result of the comparison could be converted
-   //    to the more significant data type, which results in a local temporary value
-   // The copy operation might cause a performance decrease for class types, which is probably
-   // avoided if the function is inlined.
-   return ( a < b )?( b ):( a );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Maximum function for three arguments.
-// \ingroup math
-//
-// \param a First value.
-// \param b Second value.
-// \param c Third value.
-// \return The maximum of the three values.
-//
-// This function returns the maximum of the three given data values. The return type of the
-// function is determined by the data types of the given arguments (for further detail see
-// the MathTrait class description).
-*/
-template< typename T1, typename T2, typename T3 >
-BLAZE_ALWAYS_INLINE const typename MathTrait< typename MathTrait<T1,T2>::HighType, T3 >::HighType
-   max( const T1& a, const T2& b, const T3& c )
-{
-   // The return type of the function is only a copy of the one of the arguments for two reasons:
-   //  - in case the data types T1, T2, and T3 are equal, a reference return type could result in
-   //    a bug if combined with literals
-   //  - in case the three data types are unequal, the result of the comparison could be converted
-   //    to the more significant data type, which results in a local temporary value
-   // The copy operation might cause a performance decrease for class types, which is probably
-   // avoided if the function is inlined.
-   return ( a < b )?( ( b < c )?( c ):( b ) ):( ( a < c )?( c ):( a ) );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Rounds the given input value.
-// \ingroup math
-//
-// \param a Value to be rounded.
-// \return The rounded value.
-//
-// This function rounds the given input value. In case the first digit after the comma
-// is smaller than five the value is rounded down. Otherwise it is rounded up. Note that
-// this function only works for integral and floating point types. The attempt to use the
-// function for any other type will result in a compile time error.
-*/
-template< typename T >
-BLAZE_ALWAYS_INLINE T round( T a )
-{
-   BLAZE_CONSTRAINT_MUST_BE_INTEGRAL_TYPE( T );
-   return a;
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Rounds the given single precision floating point value.
-// \ingroup math
-//
-// \param a Value to be rounded.
-// \return The rounded value.
-//
-// This function rounds the given single precision floating point value. In case the first
-// digit after the comma is smaller than five the value is rounded down. Otherwise it is
-// rounded up.
-*/
-template<>
-BLAZE_ALWAYS_INLINE float round( float a )
-{
-   return std::floor( a + 0.5F );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Rounds the given double precision floating point value.
-// \ingroup math
-//
-// \param a Value to be rounded.
-// \return The rounded value.
-//
-// This function rounds the given double precision floating point value. In case the first
-// digit after the comma is smaller than five the value is rounded down. Otherwise it is
-// rounded up.
-*/
-template<>
-BLAZE_ALWAYS_INLINE double round<double>( double a )
-{
-   return std::floor( a + 0.5 );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Rounds the given long double precision floating point value.
-// \ingroup math
-//
-// \param a Value to be rounded.
-// \return The rounded value.
-//
-// This function rounds the given long double precision floating point value. In case the
-// first digit after the comma is smaller than five the value is rounded down. Otherwise
-// it is rounded up.
-*/
-template<>
-BLAZE_ALWAYS_INLINE long double round<long double>( long double a )
-{
-   return std::floor( a + 0.5L );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Rounds up an integral value to the next multiple of a given factor.
 // \ingroup math
 //
@@ -358,37 +147,33 @@ BLAZE_ALWAYS_INLINE long double round<long double>( long double a )
 // \param factor The factor of the multiple \f$[1..\infty)\f$.
 // \return The multiple of the given factor.
 //
-// This function rounds up the given integral value to the next multiple of the given factor.
-// In case the integral value is already a multiple of the given factor, the value itself is
-// returned. Note that both \a value and \a factor are expected to be positive integrals. In
-// case any of them is negative, the function returns 0. Note that the attempt to use the
-// function with non-integral types results in a compilation error!
+// This function rounds up the given integral value to the next multiple of the given integral
+// factor. In case the integral value is already a multiple of the given factor, the value itself
+// is returned. Note that the attempt to use the function with non-integral types results in a
+// compilation error!
 */
-template< typename T >
-BLAZE_ALWAYS_INLINE T nextMultiple( T value, T factor )
+template< typename T1, typename T2 >
+BLAZE_ALWAYS_INLINE constexpr auto nextMultiple( T1 value, T2 factor ) noexcept
 {
-   BLAZE_CONSTRAINT_MUST_BE_INTEGRAL_TYPE( T );
-
-   if( value > T(0) && factor > T(0) )
-      return value + ( factor - ( value % factor ) ) % factor;
-   else return T(0);
+   return ( value + ( factor - ( value % factor ) ) % factor );
 }
 //*************************************************************************************************
 
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Less-than comparison for integral data types.
+/*!\brief Default less-than comparison for any data type.
 // \ingroup math
 //
 // \param a First value.
 // \param b Second value.
-// \return \a true if the first value is smaller than the second, \a false if not.
+// \return \a true if the first value is less than the second, \a false if not.
 //
-// Less-than function for the comparison of two integral values.
+// Default implementation of a less-than comparison of two data values.
 */
 template< typename T >
-BLAZE_ALWAYS_INLINE bool lessThan_backend( T a, T b )
+BLAZE_ALWAYS_INLINE constexpr bool less_backend( const T& a, const T& b )
+   noexcept( IsBuiltin<T>::value )
 {
    return a < b;
 }
@@ -403,15 +188,14 @@ BLAZE_ALWAYS_INLINE bool lessThan_backend( T a, T b )
 //
 // \param a First value.
 // \param b Second value.
-// \return \a true if the first value is smaller than the second, \a false if not.
+// \return \a true if the first value is less than the second, \a false if not.
 //
 // Less-than function for the comparison of two single precision floating point numbers. Due
 // to the limited machine accuracy, a direct comparison of two floating point numbers should
 // be avoided. This functions offers the possibility to compare two floating-point values with
 // a certain accuracy margin.
 */
-template<>
-BLAZE_ALWAYS_INLINE bool lessThan_backend<float>( float a, float b )
+BLAZE_ALWAYS_INLINE constexpr bool less_backend( float a, float b ) noexcept
 {
    return ( b - a ) > 1E-8F;
 }
@@ -426,15 +210,14 @@ BLAZE_ALWAYS_INLINE bool lessThan_backend<float>( float a, float b )
 //
 // \param a First value.
 // \param b Second value.
-// \return \a true if the first value is smaller than the second, \a false if not.
+// \return \a true if the first value is less than the second, \a false if not.
 //
 // Less-than function for the comparison of two double precision floating point numbers. Due
 // to the limited machine accuracy, a direct comparison of two floating point numbers should
 // be avoided. This functions offers the possibility to compare two floating-point values with
 // a certain accuracy margin.
 */
-template<>
-BLAZE_ALWAYS_INLINE bool lessThan_backend<double>( double a, double b )
+BLAZE_ALWAYS_INLINE constexpr bool less_backend( double a, double b ) noexcept
 {
    return ( b - a ) > 1E-8;
 }
@@ -449,15 +232,14 @@ BLAZE_ALWAYS_INLINE bool lessThan_backend<double>( double a, double b )
 //
 // \param a First value.
 // \param b Second value.
-// \return \a true if the first value is smaller than the second, \a false if not.
+// \return \a true if the first value is less than the second, \a false if not.
 //
 // Less-than function for the comparison of two long double precision floating point numbers. Due
 // to the limited machine accuracy, a direct comparison of two floating point numbers should be
 // avoided. This functions offers the possibility to compare two floating-point values with a
 // certain accuracy margin.
 */
-template<>
-BLAZE_ALWAYS_INLINE bool lessThan_backend<long double>( long double a, long double b )
+BLAZE_ALWAYS_INLINE constexpr bool less_backend( long double a, long double b ) noexcept
 {
    return ( b - a ) > 1E-10;
 }
@@ -471,17 +253,125 @@ BLAZE_ALWAYS_INLINE bool lessThan_backend<long double>( long double a, long doub
 //
 // \param a First value.
 // \param b Second value.
-// \return \a true if the first value is smaller than the second, \a false if not.
+// \return \a true if the first value is less than the second, \a false if not.
 //
 // Generic less-than comparison between to numeric values. Depending on the types of the
 // two arguments, a special comparison for floating point values is selected that takes
 // the limited machine accuracy into account.
 */
 template< typename T1, typename T2 >
-BLAZE_ALWAYS_INLINE bool lessThan( T1 a, T2 b )
+BLAZE_ALWAYS_INLINE constexpr bool less( const T1& a, const T2& b )
+   noexcept( IsBuiltin< CommonType_<T1,T2> >::value )
 {
-   typedef typename MathTrait<T1,T2>::HighType  High;
-   return lessThan_backend<High>( a, b );
+   return less_backend< CommonType_<T1,T2> >( a, b );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Default greater-than comparison for any data type.
+// \ingroup math
+//
+// \param a First value.
+// \param b Second value.
+// \return \a true if the first value is greater than the second, \a false if not.
+//
+// Default implementation of a greater-than comparison of two data values.
+*/
+template< typename T >
+BLAZE_ALWAYS_INLINE constexpr bool greater_backend( const T& a, const T& b )
+   noexcept( IsBuiltin<T>::value )
+{
+   return a > b;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Greater-than comparison for single precision floating point values.
+// \ingroup math
+//
+// \param a First value.
+// \param b Second value.
+// \return \a true if the first value is greater than the second, \a false if not.
+//
+// Greater-than function for the comparison of two single precision floating point numbers. Due
+// to the limited machine accuracy, a direct comparison of two floating point numbers should
+// be avoided. This functions offers the possibility to compare two floating-point values with
+// a certain accuracy margin.
+*/
+BLAZE_ALWAYS_INLINE constexpr bool greater_backend( float a, float b ) noexcept
+{
+   return ( b - a ) > 1E-8F;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Greater-than comparison for double precision floating point values.
+// \ingroup math
+//
+// \param a First value.
+// \param b Second value.
+// \return \a true if the first value is greater than the second, \a false if not.
+//
+// Greater-than function for the comparison of two double precision floating point numbers. Due
+// to the limited machine accuracy, a direct comparison of two floating point numbers should
+// be avoided. This functions offers the possibility to compare two floating-point values with
+// a certain accuracy margin.
+*/
+BLAZE_ALWAYS_INLINE constexpr bool greater_backend( double a, double b ) noexcept
+{
+   return ( b - a ) > 1E-8;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Greater-than comparison for long double precision floating point values.
+// \ingroup math
+//
+// \param a First value.
+// \param b Second value.
+// \return \a true if the first value is greater than the second, \a false if not.
+//
+// Greater-than function for the comparison of two long double precision floating point numbers.
+// Due to the limited machine accuracy, a direct comparison of two floating point numbers should
+// be avoided. This functions offers the possibility to compare two floating-point values with a
+// certain accuracy margin.
+*/
+BLAZE_ALWAYS_INLINE constexpr bool greater_backend( long double a, long double b ) noexcept
+{
+   return ( b - a ) > 1E-10;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Generic greater-than comparison.
+// \ingroup math
+//
+// \param a First value.
+// \param b Second value.
+// \return \a true if the first value is greater than the second, \a false if not.
+//
+// Generic greater-than comparison between to numeric values. Depending on the types of the
+// two arguments, a special comparison for floating point values is selected that takes
+// the limited machine accuracy into account.
+*/
+template< typename T1, typename T2 >
+BLAZE_ALWAYS_INLINE constexpr bool greater( const T1& a, const T2& b )
+   noexcept( IsBuiltin< CommonType_<T1,T2> >::value )
+{
+   return greater_backend< CommonType_<T1,T2> >( a, b );
 }
 //*************************************************************************************************
 

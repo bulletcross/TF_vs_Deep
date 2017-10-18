@@ -3,7 +3,7 @@
 //  \file blaze/math/blas/trmm.h
 //  \brief Header file for BLAS triangular matrix/matrix multiplication functions (trmm)
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,18 +40,19 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/cast.hpp>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/Aliases.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Computation.h>
 #include <blaze/math/constraints/ConstDataAccess.h>
 #include <blaze/math/constraints/MutableDataAccess.h>
 #include <blaze/math/expressions/DenseMatrix.h>
 #include <blaze/math/typetraits/IsRowMajorMatrix.h>
-#include <blaze/math/typetraits/IsSymmetric.h>
 #include <blaze/system/BLAS.h>
 #include <blaze/system/Inline.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/Complex.h>
+#include <blaze/util/NumericCast.h>
+#include <blaze/util/StaticAssert.h>
 
 
 namespace blaze {
@@ -100,7 +101,7 @@ BLAZE_ALWAYS_INLINE void trmm( DenseMatrix<MT1,SO1>& B, const DenseMatrix<MT2,SO
 //        precision matrices (\f$ B=\alpha*A*B \f$ or \f$ B=\alpha*B*A \f$).
 // \ingroup blas
 //
-// \param order Specifies the storage order of matrix \a A (\a CblasColMajor or \a CblasColMajor).
+// \param order Specifies the storage order of matrix \a A (\a CblasRowMajor or \a CblasColMajor).
 // \param side \a CblasLeft to compute \f$ B=\alpha*A*B \f$, \a CblasRight to compute \f$ B=\alpha*B*A \f$.
 // \param uplo \a CblasLower to use the lower triangle from \a A, \a CblasUpper to use the upper triangle.
 // \param transA Specifies whether to transpose matrix \a A (\a CblasNoTrans or \a CblasTrans).
@@ -133,7 +134,7 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
 //        precision matrices (\f$ B=\alpha*A*B \f$ or \f$ B=\alpha*B*A \f$).
 // \ingroup blas
 //
-// \param order Specifies the storage order of matrix \a A (\a CblasColMajor or \a CblasColMajor).
+// \param order Specifies the storage order of matrix \a A (\a CblasRowMajor or \a CblasColMajor).
 // \param side \a CblasLeft to compute \f$ B=\alpha*A*B \f$, \a CblasRight to compute \f$ B=\alpha*B*A \f$.
 // \param uplo \a CblasLower to use the lower triangle from \a A, \a CblasUpper to use the upper triangle.
 // \param transA Specifies whether to transpose matrix \a A (\a CblasNoTrans or \a CblasTrans).
@@ -166,7 +167,7 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
 //        precision complex matrices (\f$ B=\alpha*A*B \f$ or \f$ B=\alpha*B*A \f$).
 // \ingroup blas
 //
-// \param order Specifies the storage order of matrix \a A (\a CblasColMajor or \a CblasColMajor).
+// \param order Specifies the storage order of matrix \a A (\a CblasRowMajor or \a CblasColMajor).
 // \param side \a CblasLeft to compute \f$ B=\alpha*A*B \f$, \a CblasRight to compute \f$ B=\alpha*B*A \f$.
 // \param uplo \a CblasLower to use the lower triangle from \a A, \a CblasUpper to use the upper triangle.
 // \param transA Specifies whether to transpose matrix \a A (\a CblasNoTrans or \a CblasTrans).
@@ -188,7 +189,10 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
                                complex<float> alpha, const complex<float>* A, int lda,
                                complex<float>* B, int ldb )
 {
-   cblas_ctrmm( order, side, uplo, transA, diag, m, n, &alpha, A, lda, B, ldb );
+   BLAZE_STATIC_ASSERT( sizeof( complex<float> ) == 2UL*sizeof( float ) );
+
+   cblas_ctrmm( order, side, uplo, transA, diag, m, n, reinterpret_cast<const float*>( &alpha ),
+                reinterpret_cast<const float*>( A ), lda, reinterpret_cast<float*>( B ), ldb );
 }
 #endif
 //*************************************************************************************************
@@ -200,7 +204,7 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
 //        precision complex matrices (\f$ B=\alpha*A*B \f$ or \f$ B=\alpha*B*A \f$).
 // \ingroup blas
 //
-// \param order Specifies the storage order of matrix \a A (\a CblasColMajor or \a CblasColMajor).
+// \param order Specifies the storage order of matrix \a A (\a CblasRowMajor or \a CblasColMajor).
 // \param side \a CblasLeft to compute \f$ B=\alpha*A*B \f$, \a CblasRight to compute \f$ B=\alpha*B*A \f$.
 // \param uplo \a CblasLower to use the lower triangle from \a A, \a CblasUpper to use the upper triangle.
 // \param transA Specifies whether to transpose matrix \a A (\a CblasNoTrans or \a CblasTrans).
@@ -222,7 +226,10 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
                                complex<double> alpha, const complex<double>* A, int lda,
                                complex<double>* B, int ldb )
 {
-   cblas_ztrmm( order, side, uplo, transA, diag, m, n, &alpha, A, lda, B, ldb );
+   BLAZE_STATIC_ASSERT( sizeof( complex<double> ) == 2UL*sizeof( double ) );
+
+   cblas_ztrmm( order, side, uplo, transA, diag, m, n, reinterpret_cast<const double*>( &alpha ),
+                reinterpret_cast<const double*>( A ), lda, reinterpret_cast<double*>( B ), ldb );
 }
 #endif
 //*************************************************************************************************
@@ -230,8 +237,8 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
 
 //*************************************************************************************************
 #if BLAZE_BLAS_MODE
-/*!\brief BLAS kernel for a triangular dense matrix/dense matrix multiplication with single
-//        precision matrices (\f$ B=\alpha*A*B \f$ or \f$ B=\alpha*B*A \f$).
+/*!\brief BLAS kernel for a triangular dense matrix/dense matrix multiplication
+//        (\f$ B=\alpha*A*B \f$ or \f$ B=\alpha*B*A \f$).
 // \ingroup blas
 //
 // \param B The target dense matrix.
@@ -242,28 +249,27 @@ BLAZE_ALWAYS_INLINE void trmm( CBLAS_ORDER order, CBLAS_SIDE side, CBLAS_UPLO up
 // \return void
 //
 // This function performs the scaling and multiplication of a triangular matrix by a matrix
-// based on the cblas_strmm() function. Note that the function only works for matrices with
-// \c float element type. The attempt to call the function with matrices of any other element
-// type results in a compile time error. Also, matrix \a A is expected to be a square matrix.
+// based on the BLAS trmm() functions. Note that the function only works for matrices with
+// \c float, \c double, \c complex<float>, and \c complex<double> element type. The attempt to
+// call the function with matrices of any other element type results in a compile time error.
+// Also note that matrix \a A is expected to be a square matrix.
 */
 template< typename MT1   // Type of the left-hand side target matrix
         , bool SO1       // Storage order of the left-hand side target matrix
         , typename MT2   // Type of the left-hand side matrix operand
         , bool SO2       // Storage order of the left-hand side matrix operand
-        , typename ST >  // Type of the scalar factors
+        , typename ST >  // Type of the scalar factor
 BLAZE_ALWAYS_INLINE void trmm( DenseMatrix<MT1,SO1>& B, const DenseMatrix<MT2,SO2>& A,
                                CBLAS_SIDE side, CBLAS_UPLO uplo, ST alpha )
 {
-   using boost::numeric_cast;
-
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT2 );
 
    BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( MT1 );
    BLAZE_CONSTRAINT_MUST_HAVE_CONST_DATA_ACCESS  ( MT2 );
 
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT2::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT2> );
 
    BLAZE_INTERNAL_ASSERT( (~A).rows() == (~A).columns(), "Non-square triangular matrix detected" );
    BLAZE_INTERNAL_ASSERT( side == CblasLeft  || side == CblasRight, "Invalid side argument detected" );

@@ -3,7 +3,7 @@
 //  \file blaze/util/typetraits/IsLongDouble.h
 //  \brief Header file for the IsLongDouble type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -57,31 +57,24 @@ namespace blaze {
 // \ingroup type_traits
 //
 // This type trait tests whether or not the given template parameter is of long double type. In
-// case the type is long double (ignoring the cv-qualifiers), the \a value member enumeration
-// is set to 1, the nested type definition \a Type is \a TrueType, and the class derives from
-// \a TrueType. Otherwise \a value is set to 0, \a Type is \a FalseType, and the class derives
-// from \a FalseType.
+// case the type is long double (ignoring the cv-qualifiers), the \a value member constant is
+// set to \a true, the nested type definition \a Type is \a TrueType, and the class derives
+// from \a TrueType. Otherwise \a value is set to \a false, \a Type is \a FalseType, and the
+// class derives from \a FalseType.
 
    \code
-   blaze::IsLongDouble<long double>::value          // Evaluates to 1
+   blaze::IsLongDouble<long double>::value          // Evaluates to 'true'
    blaze::IsLongDouble<const long double>::Type     // Results in TrueType
    blaze::IsLongDouble<const volatile long double>  // Is derived from TrueType
-   blaze::IsLongDouble<float>::value                // Evaluates to 0
+   blaze::IsLongDouble<float>::value                // Evaluates to 'false'
    blaze::IsLongDouble<const unsigned int>::Type    // Results in FalseType
    blaze::IsLongDouble<volatile const short>        // Is derived from FalseType
    \endcode
 */
 template< typename T >
-struct IsLongDouble : public FalseType
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = 0 };
-   typedef FalseType  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsLongDouble
+   : public FalseType
+{};
 //*************************************************************************************************
 
 
@@ -89,14 +82,9 @@ struct IsLongDouble : public FalseType
 /*! \cond BLAZE_INTERNAL */
 //! Specialization of the IsLongDouble type trait for the plain 'long double' type.
 template<>
-struct IsLongDouble<long double> : public TrueType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 1 };
-   typedef TrueType  Type;
-   //**********************************************************************************************
-};
+struct IsLongDouble<long double>
+   : public TrueType
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -105,14 +93,9 @@ struct IsLongDouble<long double> : public TrueType
 /*! \cond BLAZE_INTERNAL */
 //! Specialization of the IsLongDouble type trait for 'const long double'.
 template<>
-struct IsLongDouble<const long double> : public TrueType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 1 };
-   typedef TrueType  Type;
-   //**********************************************************************************************
-};
+struct IsLongDouble<const long double>
+   : public TrueType
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -121,14 +104,9 @@ struct IsLongDouble<const long double> : public TrueType
 /*! \cond BLAZE_INTERNAL */
 //! Specialization of the IsLongDouble type trait for 'volatile long double'.
 template<>
-struct IsLongDouble<volatile long double> : public TrueType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 1 };
-   typedef TrueType  Type;
-   //**********************************************************************************************
-};
+struct IsLongDouble<volatile long double>
+   : public TrueType
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -137,14 +115,9 @@ struct IsLongDouble<volatile long double> : public TrueType
 /*! \cond BLAZE_INTERNAL */
 //! Specialization of the IsLongDouble type trait for 'const volatile long double'.
 template<>
-struct IsLongDouble<const volatile long double> : public TrueType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 1 };
-   typedef TrueType  Type;
-   //**********************************************************************************************
-};
+struct IsLongDouble<const volatile long double>
+   : public TrueType
+{};
 /*! \endcond */
 //*************************************************************************************************
 

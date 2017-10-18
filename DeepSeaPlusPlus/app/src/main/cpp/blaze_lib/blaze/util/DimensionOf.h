@@ -3,7 +3,7 @@
 //  \file blaze/util/DimensionOf.h
 //  \brief Compile time evaluation of array sizes
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,7 +40,6 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/util/Byte.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/Unused.h>
 
@@ -63,7 +62,7 @@ namespace blaze {
 */
 template< unsigned int N >
 struct Array {
-   byte array[N];
+   byte_t array[N];
 };
 /*! \endcond */
 //*************************************************************************************************

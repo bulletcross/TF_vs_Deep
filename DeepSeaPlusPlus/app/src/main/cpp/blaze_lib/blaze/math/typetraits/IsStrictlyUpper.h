@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsStrictlyUpper.h
 //  \brief Header file for the IsStrictlyUpper type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -59,20 +59,20 @@ namespace blaze {
 // This type trait tests whether or not the given template parameter is a strictly upper
 // triangular matrix type (i.e. a matrix type that is guaranteed to be strictly upper
 // triangular at compile time). In case the type is a strictly upper triangular matrix
-// type, the \a value member enumeration is set to 1, the nested type definition \a Type
-// is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to
-// 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// type, the \a value member constant is set to \a true, the nested type definition
+// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is
+// set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    using blaze::rowMajor;
 
-   typedef blaze::StaticMatrix<double,3UL,3UL,rowMajor>  StaticMatrixType;
-   typedef blaze::DynamicMatrix<float,rowMajor>          DynamicMatrixType;
-   typedef blaze::CompressedMatrix<int,rowMajor>         CompressedMatrixType;
+   using StaticMatrixType     = blaze::StaticMatrix<double,3UL,3UL,rowMajor>;
+   using DynamicMatrixType    = blaze::DynamicMatrix<float,rowMajor>;
+   using CompressedMatrixType = blaze::CompressedMatrix<int,rowMajor>;
 
-   typedef blaze::StrictlyUpperMatrix<StaticMatrixType>      StrictlyUpperStaticType;
-   typedef blaze::StrictlyUpperMatrix<DynamicMatrixType>     StrictlyUpperDynamicType;
-   typedef blaze::StrictlyUpperMatrix<CompressedMatrixType>  StrictlyUpperCompressedType;
+   using StrictlyUpperStaticType     = blaze::StrictlyUpperMatrix<StaticMatrixType>;
+   using StrictlyUpperDynamicType    = blaze::StrictlyUpperMatrix<DynamicMatrixType>;
+   using StrictlyUpperCompressedType = blaze::StrictlyUpperMatrix<CompressedMatrixType>;
 
    blaze::IsStrictlyUpper< StrictlyUpperStaticType >::value        // Evaluates to 1
    blaze::IsStrictlyUpper< const StrictlyUpperDynamicType >::Type  // Results in TrueType
@@ -83,16 +83,9 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-struct IsStrictlyUpper : public FalseType
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = 0 };
-   typedef FalseType  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsStrictlyUpper
+   : public FalseType
+{};
 //*************************************************************************************************
 
 
@@ -102,14 +95,9 @@ struct IsStrictlyUpper : public FalseType
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsStrictlyUpper< const T > : public IsStrictlyUpper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsStrictlyUpper<T>::value };
-   typedef typename IsStrictlyUpper<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsStrictlyUpper< const T >
+   : public IsStrictlyUpper<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -120,14 +108,9 @@ struct IsStrictlyUpper< const T > : public IsStrictlyUpper<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsStrictlyUpper< volatile T > : public IsStrictlyUpper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsStrictlyUpper<T>::value };
-   typedef typename IsStrictlyUpper<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsStrictlyUpper< volatile T >
+   : public IsStrictlyUpper<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -138,14 +121,9 @@ struct IsStrictlyUpper< volatile T > : public IsStrictlyUpper<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsStrictlyUpper< const volatile T > : public IsStrictlyUpper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsStrictlyUpper<T>::value };
-   typedef typename IsStrictlyUpper<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsStrictlyUpper< const volatile T >
+   : public IsStrictlyUpper<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 

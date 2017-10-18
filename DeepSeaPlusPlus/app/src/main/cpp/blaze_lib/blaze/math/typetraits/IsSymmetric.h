@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsSymmetric.h
 //  \brief Header file for the IsSymmetric type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -58,20 +58,20 @@ namespace blaze {
 //
 // This type trait tests whether or not the given template parameter is a symmetric matrix type
 // (i.e. a matrix type that is guaranteed to be symmetric at compile time). In case the type is
-// a symmetric matrix type, the \a value member enumeration is set to 1, the nested type definition
-// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to 0,
-// \a Type is \a FalseType, and the class derives from \a FalseType.
+// a symmetric matrix type, the \a value member constant is set to \a true, the nested type
+// definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value
+// is set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    using blaze::rowMajor;
 
-   typedef blaze::StaticMatrix<double,rowMajor>   StaticMatrixType;
-   typedef blaze::DynamicMatrix<float,rowMajor>   DynamicMatrixType;
-   typedef blaze::CompressedMatrix<int,rowMajor>  CompressedMatrixType;
+   using StaticMatrixType     = blaze::StaticMatrix<double,rowMajor>;
+   using DynamicMatrixType    = blaze::DynamicMatrix<float,rowMajor>;
+   using CompressedMatrixType = blaze::CompressedMatrix<int,rowMajor>;
 
-   typedef blaze::SymmetricMatrix<StaticMatrixType>      SymmetricStaticType;
-   typedef blaze::SymmetricMatrix<DynamicMatrixType>     SymmetricDynamicType;
-   typedef blaze::SymmetricMatrix<CompressedMatrixType>  SymmetricCompressedType;
+   using SymmetricStaticType     = blaze::SymmetricMatrix<StaticMatrixType>;
+   using SymmetricDynamicType    = blaze::SymmetricMatrix<DynamicMatrixType>;
+   using SymmetricCompressedType = blaze::SymmetricMatrix<CompressedMatrixType>;
 
    blaze::IsSymmetric< SymmetricStaticType >::value        // Evaluates to 1
    blaze::IsSymmetric< const SymmetricDynamicType >::Type  // Results in TrueType
@@ -82,16 +82,9 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-struct IsSymmetric : public FalseType
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = 0 };
-   typedef FalseType  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsSymmetric
+   : public FalseType
+{};
 //*************************************************************************************************
 
 
@@ -101,14 +94,9 @@ struct IsSymmetric : public FalseType
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsSymmetric< const T > : public IsSymmetric<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsSymmetric<T>::value };
-   typedef typename IsSymmetric<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsSymmetric< const T >
+   : public IsSymmetric<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -119,14 +107,9 @@ struct IsSymmetric< const T > : public IsSymmetric<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsSymmetric< volatile T > : public IsSymmetric<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsSymmetric<T>::value };
-   typedef typename IsSymmetric<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsSymmetric< volatile T >
+   : public IsSymmetric<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -137,14 +120,9 @@ struct IsSymmetric< volatile T > : public IsSymmetric<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsSymmetric< const volatile T > : public IsSymmetric<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsSymmetric<T>::value };
-   typedef typename IsSymmetric<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsSymmetric< const volatile T >
+   : public IsSymmetric<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 

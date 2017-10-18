@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsVecVecMultExpr.h
 //  \brief Header file for the IsVecVecMultExpr type trait class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,11 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/is_base_of.hpp>
+#include <utility>
 #include <blaze/math/expressions/VecVecMultExpr.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -63,9 +63,17 @@ namespace blaze {
 template< typename T >
 struct IsVecVecMultExprHelper
 {
+ private:
    //**********************************************************************************************
-   enum { value = boost::is_base_of<VecVecMultExpr,T>::value && !boost::is_base_of<T,VecVecMultExpr>::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   template< typename VT >
+   static TrueType test( const VecVecMultExpr<VT>& );
+
+   static FalseType test( ... );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -79,23 +87,16 @@ struct IsVecVecMultExprHelper
 //
 // This type trait class tests whether or not the given type \a Type is a vector/vector
 // multiplication expression template. In order to qualify as a valid vector multiplication
-// expression template, the given type has to derive (publicly or privately) from the
-// VecVecMultExpr base class. In case the given type is a valid vector multiplication
-// expression template, the \a value member enumeration is set to 1, the nested type
-// definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise
-// \a value is set to 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// expression template, the given type has to derive publicly from the VecVecMultExpr base class.
+// In case the given type is a valid vector multiplication expression template, the \a value
+// member constant is set to \a true, the nested type definition \a Type is \a TrueType, and
+// the class derives from \a TrueType. Otherwise \a value is set to \a false, \a Type is
+// \a FalseType, and the class derives from \a FalseType.
 */
 template< typename T >
-struct IsVecVecMultExpr : public IsVecVecMultExprHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsVecVecMultExprHelper<T>::value };
-   typedef typename IsVecVecMultExprHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsVecVecMultExpr
+   : public IsVecVecMultExprHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

@@ -3,7 +3,7 @@
 //  \file blaze/util/TypeTraits.h
 //  \brief Header file for all type traits
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -46,7 +46,10 @@
 #include <blaze/util/typetraits/AddReference.h>
 #include <blaze/util/typetraits/AddVolatile.h>
 #include <blaze/util/typetraits/AlignmentOf.h>
+#include <blaze/util/typetraits/All.h>
+#include <blaze/util/typetraits/Any.h>
 #include <blaze/util/typetraits/CommonType.h>
+#include <blaze/util/typetraits/Decay.h>
 #include <blaze/util/typetraits/Extent.h>
 #include <blaze/util/typetraits/GetMemberType.h>
 #include <blaze/util/typetraits/HasMember.h>
@@ -54,6 +57,7 @@
 #include <blaze/util/typetraits/HaveSameSize.h>
 #include <blaze/util/typetraits/IsArithmetic.h>
 #include <blaze/util/typetraits/IsArray.h>
+#include <blaze/util/typetraits/IsAssignable.h>
 #include <blaze/util/typetraits/IsBaseOf.h>
 #include <blaze/util/typetraits/IsBoolean.h>
 #include <blaze/util/typetraits/IsBuiltin.h>
@@ -63,20 +67,25 @@
 #include <blaze/util/typetraits/IsComplexDouble.h>
 #include <blaze/util/typetraits/IsComplexFloat.h>
 #include <blaze/util/typetraits/IsConst.h>
+#include <blaze/util/typetraits/IsConstructible.h>
 #include <blaze/util/typetraits/IsConvertible.h>
+#include <blaze/util/typetraits/IsDestructible.h>
 #include <blaze/util/typetraits/IsDouble.h>
 #include <blaze/util/typetraits/IsEmpty.h>
+#include <blaze/util/typetraits/IsEnum.h>
 #include <blaze/util/typetraits/IsFloat.h>
 #include <blaze/util/typetraits/IsFloatingPoint.h>
 #include <blaze/util/typetraits/IsInteger.h>
 #include <blaze/util/typetraits/IsIntegral.h>
 #include <blaze/util/typetraits/IsLong.h>
 #include <blaze/util/typetraits/IsLongDouble.h>
+#include <blaze/util/typetraits/IsLValueReference.h>
 #include <blaze/util/typetraits/IsNumeric.h>
 #include <blaze/util/typetraits/IsObject.h>
 #include <blaze/util/typetraits/IsPod.h>
 #include <blaze/util/typetraits/IsPointer.h>
 #include <blaze/util/typetraits/IsReference.h>
+#include <blaze/util/typetraits/IsRValueReference.h>
 #include <blaze/util/typetraits/IsSame.h>
 #include <blaze/util/typetraits/IsShort.h>
 #include <blaze/util/typetraits/IsSigned.h>
@@ -96,5 +105,6 @@
 #include <blaze/util/typetraits/RemovePointer.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 #include <blaze/util/typetraits/RemoveVolatile.h>
+#include <blaze/util/typetraits/Void.h>
 
 #endif

@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/UnderlyingBuiltin.h
 //  \brief Header file for the UnderlyingBuiltin type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -61,10 +61,10 @@ namespace blaze {
 // heart of a given data type. Examples:
 
    \code
-   typedef double                                    Type1;  // Built-in data type
-   typedef complex<float>                            Type2;  // Complex data type
-   typedef StaticVector<int,3UL>                     Type3;  // Vector with built-in element type
-   typedef CompressedVector< DynamicVector<float> >  Type4;  // Vector with vector element type
+   using Type1 = double;                                    // Built-in data type
+   using Type2 = complex<float>;                            // Complex data type
+   using Type3 = StaticVector<int,3UL>;                     // Vector with built-in element type
+   using Type4 = CompressedVector< DynamicVector<float> >;  // Vector with vector element type
 
    blaze::UnderlyingBuiltin< Type1 >::Type  // corresponds to double
    blaze::UnderlyingBuiltin< Type2 >::Type  // corresponds to float
@@ -83,37 +83,54 @@ struct UnderlyingBuiltin
    //**struct Builtin******************************************************************************
    /*! \cond BLAZE_INTERNAL */
    template< typename T2 >
-   struct Builtin { typedef T2  Type; };
+   struct Builtin { using Type = T2; };
    /*! \endcond */
    //**********************************************************************************************
 
    //**struct Complex******************************************************************************
    /*! \cond BLAZE_INTERNAL */
    template< typename T2 >
-   struct Complex { typedef typename UnderlyingBuiltin<typename T2::value_type>::Type  Type; };
+   struct Complex { using Type = typename UnderlyingBuiltin<typename T2::value_type>::Type; };
    /*! \endcond */
    //**********************************************************************************************
 
    //**struct Other********************************************************************************
    /*! \cond BLAZE_INTERNAL */
    template< typename T2 >
-   struct Other { typedef typename UnderlyingBuiltin<typename T2::ElementType>::Type  Type; };
+   struct Other { using Type = typename UnderlyingBuiltin<typename T2::ElementType>::Type; };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< IsBuiltin<T>
-                      , Builtin<T>
-                      , typename If< IsComplex<T>
-                                   , Complex<T>
-                                   , Other<T>
-                                   >::Type
-                      >::Type::Type  Type;
+   using Type = typename If_< IsBuiltin<T>
+                            , Builtin<T>
+                            , If_< IsComplex<T>
+                                 , Complex<T>
+                                 , Other<T> >
+                            >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the UnderlyingBuiltin type trait.
+// \ingroup type_traits
+//
+// The UnderlyingBuiltin_ alias declaration provides a convenient shortcut to access the
+// nested \a Type of the UnderlyingBuiltin class template. For instance, given the type \a T
+// the following two type definitions are identical:
+
+   \code
+   using Type1 = typename UnderlyingBuiltin<T>::Type;
+   using Type2 = UnderlyingBuiltin_<T>;
+   \endcode
+*/
+template< typename T >
+using UnderlyingBuiltin_ = typename UnderlyingBuiltin<T>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

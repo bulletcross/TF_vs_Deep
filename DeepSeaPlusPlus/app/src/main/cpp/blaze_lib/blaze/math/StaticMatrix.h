@@ -3,7 +3,7 @@
 //  \file blaze/math/StaticMatrix.h
 //  \brief Header file for the complete StaticMatrix implementation
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -43,11 +43,11 @@
 #include <blaze/math/dense/StaticMatrix.h>
 #include <blaze/math/DenseMatrix.h>
 #include <blaze/math/HybridMatrix.h>
+#include <blaze/math/IdentityMatrix.h>
 #include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/Real.h>
 #include <blaze/math/StaticVector.h>
 #include <blaze/math/typetraits/UnderlyingBuiltin.h>
-#include <blaze/system/Precision.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/constraints/Numeric.h>
 #include <blaze/util/Random.h>
@@ -292,7 +292,7 @@ void makeHermitian( StaticMatrix<Type,M,N,SO>& matrix )
    BLAZE_STATIC_ASSERT( M == N );
    BLAZE_CONSTRAINT_MUST_BE_NUMERIC_TYPE( Type );
 
-   typedef typename UnderlyingBuiltin<Type>::Type  BT;
+   using BT = UnderlyingBuiltin_<Type>;
 
    for( size_t i=0UL; i<N; ++i ) {
       for( size_t j=0UL; j<i; ++j ) {
@@ -330,7 +330,7 @@ void makeHermitian( StaticMatrix<Type,M,N,SO>& matrix, const Arg& min, const Arg
    BLAZE_STATIC_ASSERT( M == N );
    BLAZE_CONSTRAINT_MUST_BE_NUMERIC_TYPE( Type );
 
-   typedef typename UnderlyingBuiltin<Type>::Type  BT;
+   using BT = UnderlyingBuiltin_<Type>;
 
    for( size_t i=0UL; i<N; ++i ) {
       for( size_t j=0UL; j<i; ++j ) {
@@ -375,134 +375,6 @@ void makePositiveDefinite( StaticMatrix<Type,M,N,SO>& matrix )
    BLAZE_INTERNAL_ASSERT( isHermitian( matrix ), "Non-symmetric matrix detected" );
 }
 /*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  TYPE DEFINITIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*!\brief 2x2 single precision matrix.
-// \ingroup static_matrix_2x2
-*/
-typedef StaticMatrix<float,2UL,2UL,false>  Mat2x2f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 2x2 double precision matrix.
-// \ingroup static_matrix_2x2
-*/
-typedef StaticMatrix<double,2UL,2UL,false>  Mat2x2d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 2x2 matrix with system-specific precision.
-// \ingroup static_matrix_2x2
-*/
-typedef StaticMatrix<real_t,2UL,2UL,false>  Mat2x2;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 3x3 single precision matrix.
-// \ingroup static_matrix_3x3
-*/
-typedef StaticMatrix<float,3UL,3UL,false>  Mat3x3f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 3x3 double precision matrix.
-// \ingroup static_matrix_3x3
-*/
-typedef StaticMatrix<double,3UL,3UL,false>  Mat3x3d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 3x3 matrix with system-specific precision.
-// \ingroup static_matrix_3x3
-*/
-typedef StaticMatrix<real_t,3UL,3UL,false>  Mat3x3;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 4x4 single precision matrix.
-// \ingroup static_matrix_4x4
-*/
-typedef StaticMatrix<float,4UL,4UL,false>  Mat4x4f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 4x4 double precision matrix.
-// \ingroup static_matrix_4x4
-*/
-typedef StaticMatrix<double,4UL,4UL,false>  Mat4x4d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 4x4 matrix with system-specific precision.
-// \ingroup static_matrix_4x4
-*/
-typedef StaticMatrix<real_t,4UL,4UL,false>  Mat4x4;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 5x5 single precision matrix.
-// \ingroup static_matrix_5x5
-*/
-typedef StaticMatrix<float,5UL,5UL,false>  Mat5x5f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 5x5 double precision matrix.
-// \ingroup static_matrix_5x5
-*/
-typedef StaticMatrix<double,5UL,5UL,false>  Mat5x5d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 5x5 matrix with system-specific precision.
-// \ingroup static_matrix_5x5
-*/
-typedef StaticMatrix<real_t,5UL,5UL,false>  Mat5x5;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 6x6 single precision matrix.
-// \ingroup static_matrix_6x6
-*/
-typedef StaticMatrix<float,6UL,6UL,false>  Mat6x6f;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 6x6 double precision matrix.
-// \ingroup static_matrix_6x6
-*/
-typedef StaticMatrix<double,6UL,6UL,false>  Mat6x6d;
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief 6x6 matrix with system-specific precision.
-// \ingroup static_matrix_6x6
-*/
-typedef StaticMatrix<real_t,6UL,6UL,false>  Mat6x6;
 //*************************************************************************************************
 
 } // namespace blaze

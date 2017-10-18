@@ -3,7 +3,7 @@
 //  \file blaze/util/typetraits/GetMemberType.h
 //  \brief Header file for the GetMemberType type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -65,11 +65,11 @@ namespace blaze {
 
    \code
    struct MyType1 {
-      typedef float  ElementType;
+      using ElementType = float;
    };
 
    struct MyType2 {
-      typedef double  ElementType;
+      using ElementType = double;
    };
 
    struct MyType3 {};
@@ -98,16 +98,16 @@ template< typename Type1233 >                                                   
 struct TYPE_TRAIT_NAME                                                                          \
 {                                                                                               \
  private:                                                                                       \
-   struct SUCCESS { typedef typename Type1233::MEMBER_NAME  Type; };                            \
-   struct FAILURE { typedef FALLBACK_TYPE  Type; };                                             \
+   struct SUCCESS { using Type = typename Type1233::MEMBER_NAME; };                             \
+   struct FAILURE { using Type = FALLBACK_TYPE; };                                              \
                                                                                                 \
    BLAZE_CREATE_HAS_TYPE_MEMBER_TYPE_TRAIT( LOCAL_TYPE_TRAIT, MEMBER_NAME );                    \
                                                                                                 \
  public:                                                                                        \
-   typedef typename blaze::If< LOCAL_TYPE_TRAIT<Type1233>                                       \
-                             , SUCCESS                                                          \
-                             , FAILURE                                                          \
-                             >::Type::Type  Type;                                               \
+   using Type = typename blaze::If< LOCAL_TYPE_TRAIT<Type1233>                                  \
+                                  , SUCCESS                                                     \
+                                  , FAILURE                                                     \
+                                  >::Type::Type;                                                \
 };
 //*************************************************************************************************
 

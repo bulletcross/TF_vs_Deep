@@ -3,7 +3,7 @@
 //  \file blaze/util/Time.h
 //  \brief Header file for time functions
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -132,7 +132,7 @@ inline double getWcTime()
    return ( static_cast<double>( timeptr.time ) + static_cast<double>( timeptr.millitm )/1E3 );
 #else
    struct timeval tp;
-   gettimeofday( &tp, NULL );
+   gettimeofday( &tp, nullptr );
    return ( static_cast<double>( tp.tv_sec ) + static_cast<double>( tp.tv_usec )/1E6 );
 #endif
 }

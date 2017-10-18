@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsSparseVector.h
 //  \brief Header file for the IsSparseVector type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,10 +40,9 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/is_base_of.hpp>
+#include <utility>
 #include <blaze/math/expressions/SparseVector.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
 #include <blaze/util/typetraits/RemoveCV.h>
 
@@ -66,14 +65,15 @@ struct IsSparseVectorHelper
 {
  private:
    //**********************************************************************************************
-   typedef typename RemoveCV<T>::Type  T2;
+   template< typename VT, bool TF >
+   static TrueType test( const SparseVector<VT,TF>& );
+
+   static FalseType test( ... );
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
-   enum { value = boost::is_base_of< SparseVector<T2,false>, T2 >::value ||
-                  boost::is_base_of< SparseVector<T2,true >, T2 >::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -85,10 +85,10 @@ struct IsSparseVectorHelper
 // \ingroup math_type_traits
 //
 // This type trait tests whether or not the given template parameter is a sparse, N-dimensional
-// vector type. In case the type is a sparse vector type, the \a value member enumeration is
-// set to 1, the nested type definition \a Type is \a TrueType, and the class derives from
-// \a TrueType. Otherwise \a value is set to 0, \a Type is \a FalseType, and the class derives
-// from \a FalseType.
+// vector type. In case the type is a sparse vector type, the \a value member constant is set
+// to \a true, the nested type definition \a Type is \a TrueType, and the class derives from
+// \a TrueType. Otherwise \a value is set to \a false, \a Type is \a FalseType, and the class
+// derives from \a FalseType.
 
    \code
    blaze::IsSparseVector< CompressedVector<double,false> >::value     // Evaluates to 1
@@ -100,16 +100,9 @@ struct IsSparseVectorHelper
    \endcode
 */
 template< typename T >
-struct IsSparseVector : public IsSparseVectorHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsSparseVectorHelper<T>::value };
-   typedef typename IsSparseVectorHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsSparseVector
+   : public IsSparseVectorHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

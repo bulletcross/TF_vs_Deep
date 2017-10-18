@@ -3,7 +3,7 @@
 //  \file blaze/math/blas/gemv.h
 //  \brief Header file for BLAS general matrix/vector multiplication functions (gemv)
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,18 +40,19 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/cast.hpp>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/Aliases.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Computation.h>
 #include <blaze/math/constraints/ConstDataAccess.h>
 #include <blaze/math/constraints/MutableDataAccess.h>
 #include <blaze/math/expressions/DenseMatrix.h>
 #include <blaze/math/expressions/DenseVector.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/system/BLAS.h>
 #include <blaze/system/Inline.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/Complex.h>
+#include <blaze/util/NumericCast.h>
+#include <blaze/util/StaticAssert.h>
 
 
 namespace blaze {
@@ -192,7 +193,11 @@ BLAZE_ALWAYS_INLINE void gemv( CBLAS_ORDER order, CBLAS_TRANSPOSE transA, int m,
                                const complex<float>* x, int incX, complex<float> beta,
                                complex<float>* y, int incY )
 {
-   cblas_cgemv( order, transA, m, n, &alpha, A, lda, x, incX, &beta, y, incY );
+   BLAZE_STATIC_ASSERT( sizeof( complex<float> ) == 2UL*sizeof( float ) );
+
+   cblas_cgemv( order, transA, m, n, reinterpret_cast<const float*>( &alpha ),
+                reinterpret_cast<const float*>( A ), lda, reinterpret_cast<const float*>( x ),
+                incX, reinterpret_cast<const float*>( &beta ), reinterpret_cast<float*>( y ), incY );
 }
 #endif
 //*************************************************************************************************
@@ -226,7 +231,11 @@ BLAZE_ALWAYS_INLINE void gemv( CBLAS_ORDER order, CBLAS_TRANSPOSE transA, int m,
                                const complex<double>* x, int incX, complex<double> beta,
                                complex<double>* y, int incY )
 {
-   cblas_zgemv( order, transA, m, n, &alpha, A, lda, x, incX, &beta, y, incY );
+   BLAZE_STATIC_ASSERT( sizeof( complex<double> ) == 2UL*sizeof( double ) );
+
+   cblas_zgemv( order, transA, m, n, reinterpret_cast<const double*>( &alpha ),
+                reinterpret_cast<const double*>( A ), lda, reinterpret_cast<const double*>( x ),
+                incX, reinterpret_cast<const double*>( &beta ), reinterpret_cast<double*>( y ), incY );
 }
 #endif
 //*************************************************************************************************
@@ -258,8 +267,6 @@ template< typename VT1   // Type of the left-hand side target vector
 BLAZE_ALWAYS_INLINE void gemv( DenseVector<VT1,false>& y, const DenseMatrix<MT1,SO>& A,
                                const DenseVector<VT2,false>& x, ST alpha, ST beta )
 {
-   using boost::numeric_cast;
-
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( VT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( VT2 );
@@ -268,9 +275,9 @@ BLAZE_ALWAYS_INLINE void gemv( DenseVector<VT1,false>& y, const DenseMatrix<MT1,
    BLAZE_CONSTRAINT_MUST_HAVE_CONST_DATA_ACCESS  ( MT1 );
    BLAZE_CONSTRAINT_MUST_HAVE_CONST_DATA_ACCESS  ( VT2 );
 
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename VT1::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename VT2::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<VT1> );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<VT2> );
 
    const int m  ( numeric_cast<int>( (~A).rows() )    );
    const int n  ( numeric_cast<int>( (~A).columns() ) );
@@ -309,8 +316,6 @@ template< typename VT1   // Type of the left-hand side target vector
 BLAZE_ALWAYS_INLINE void gemv( DenseVector<VT1,true>& y, const DenseVector<VT2,true>& x,
                                const DenseMatrix<MT1,SO>& A, ST alpha, ST beta )
 {
-   using boost::numeric_cast;
-
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( VT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( VT2 );
@@ -319,9 +324,9 @@ BLAZE_ALWAYS_INLINE void gemv( DenseVector<VT1,true>& y, const DenseVector<VT2,t
    BLAZE_CONSTRAINT_MUST_HAVE_CONST_DATA_ACCESS  ( VT2 );
    BLAZE_CONSTRAINT_MUST_HAVE_CONST_DATA_ACCESS  ( MT1 );
 
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename VT1::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename VT2::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<VT1> );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<VT2> );
 
    const int m  ( numeric_cast<int>( (~A).rows() )    );
    const int n  ( numeric_cast<int>( (~A).columns() ) );

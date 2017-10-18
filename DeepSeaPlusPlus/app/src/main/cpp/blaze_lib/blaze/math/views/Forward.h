@@ -3,7 +3,7 @@
 //  \file blaze/math/views/Forward.h
 //  \brief Header file for all forward declarations for views
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -36,6 +36,18 @@
 #define _BLAZE_MATH_VIEWS_FORWARD_H_
 
 
+//*************************************************************************************************
+// Includes
+//*************************************************************************************************
+
+#include <blaze/math/expressions/Forward.h>
+#include <blaze/math/views/column/BaseTemplate.h>
+#include <blaze/math/views/row/BaseTemplate.h>
+#include <blaze/math/views/submatrix/BaseTemplate.h>
+#include <blaze/math/views/subvector/BaseTemplate.h>
+#include <blaze/util/Types.h>
+
+
 namespace blaze {
 
 //=================================================================================================
@@ -44,14 +56,41 @@ namespace blaze {
 //
 //=================================================================================================
 
-template< typename, bool, bool > class DenseColumn;
-template< typename, bool, bool > class DenseRow;
-template< typename, bool, bool > class DenseSubmatrix;
-template< typename, bool, bool > class DenseSubvector;
-template< typename, bool, bool > class SparseColumn;
-template< typename, bool, bool > class SparseRow;
-template< typename, bool, bool > class SparseSubmatrix;
-template< typename, bool, bool > class SparseSubvector;
+template< bool AF, typename VT, bool TF >
+Subvector<VT,AF> subvector( Vector<VT,TF>& vector, size_t index, size_t size );
+
+template< bool AF, typename VT, bool TF >
+const Subvector<const VT,AF> subvector( const Vector<VT,TF>& vector, size_t index, size_t size );
+
+template< bool AF, typename VT, bool TF >
+Subvector<VT,AF> subvector( Vector<VT,TF>&& vector, size_t index, size_t size );
+
+template< bool AF, typename MT, bool SO >
+Submatrix<MT,AF> submatrix( Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n );
+
+template< bool AF, typename MT, bool SO >
+const Submatrix<const MT,AF> submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n );
+
+template< bool AF, typename MT, bool SO >
+Submatrix<MT,AF> submatrix( Matrix<MT,SO>&& matrix, size_t row, size_t column, size_t m, size_t n );
+
+template< typename MT, bool SO >
+Row<MT> row( Matrix<MT,SO>& matrix, size_t index );
+
+template< typename MT, bool SO >
+const Row<const MT> row( const Matrix<MT,SO>& matrix, size_t index );
+
+template< typename MT, bool SO >
+Row<MT> row( Matrix<MT,SO>&& matrix, size_t index );
+
+template< typename MT, bool SO >
+Column<MT> column( Matrix<MT,SO>& matrix, size_t index );
+
+template< typename MT, bool SO >
+const Column<const MT> column( const Matrix<MT,SO>& matrix, size_t index );
+
+template< typename MT, bool SO >
+Column<MT> column( Matrix<MT,SO>&& matrix, size_t index );
 
 } // namespace blaze
 

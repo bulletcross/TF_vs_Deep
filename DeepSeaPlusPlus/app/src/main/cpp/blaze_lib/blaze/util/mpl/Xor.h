@@ -3,7 +3,7 @@
 //  \file blaze/util/mpl/Xor.h
 //  \brief Header file for the Xor class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -55,13 +55,13 @@ namespace blaze {
 /*!\brief Compile time logical xor evaluation.
 // \ingroup mpl
 //
-// The Xor class template performs at compile time a logical xor evaluation of the two given
+// The Xor alias declaration performs at compile time a logical xor evaluation of the two given
 // compile time conditions:
 
    \code
    using namespace blaze;
 
-   typedef int  Type;
+   using Type = int;
 
    Xor< IsSigned<Type>  , IsUnsigned<Type>      >::value  // Evaluates to 1
    Xor< IsIntegral<Type>, IsFloatingPoint<Type> >::value  // Evaluates to 1
@@ -71,7 +71,8 @@ namespace blaze {
 */
 template< typename T1    // Type of the first operand
         , typename T2 >  // Type of the second operand
-struct Xor : public Bool< ( T1::value ^ T2::value ) >
+struct Xor
+   : public Bool< ( T1::value ^ T2::value ) >
 {};
 //*************************************************************************************************
 

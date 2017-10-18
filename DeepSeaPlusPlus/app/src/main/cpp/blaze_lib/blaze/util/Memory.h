@@ -3,7 +3,7 @@
 //  \file blaze/util/Memory.h
 //  \brief Header file for memory allocation and deallocation functionality
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,17 +40,15 @@
 // Includes
 //*************************************************************************************************
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR) || defined(__MINGW32__)
 #  include <malloc.h>
 #endif
 #include <cstdlib>
 #include <new>
 #include <blaze/util/Assert.h>
-#include <blaze/util/Byte.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
 #include <blaze/util/Exception.h>
-#include <blaze/util/Null.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/AlignmentOf.h>
 #include <blaze/util/typetraits/IsBuiltin.h>
@@ -78,20 +76,23 @@ namespace blaze {
 // restrictions. For that purpose it uses the according system-specific memory allocation
 // functions.
 */
-inline byte* allocate_backend( size_t size, size_t alignment )
+inline byte_t* allocate_backend( size_t size, size_t alignment )
 {
-   void* raw( NULL );
+   void* raw( nullptr );
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)
    raw = _aligned_malloc( size, alignment );
-   if( raw == NULL ) {
+   if( raw == nullptr ) {
+#elif defined(__MINGW32__)
+   raw = __mingw_aligned_malloc( size, alignment );
+   if( raw == nullptr ) {
 #else
    if( posix_memalign( &raw, alignment, size ) ) {
 #endif
       BLAZE_THROW_BAD_ALLOC;
    }
 
-   return reinterpret_cast<byte*>( raw );
+   return reinterpret_cast<byte_t*>( raw );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -108,10 +109,12 @@ inline byte* allocate_backend( size_t size, size_t alignment )
 // This function deallocates the given memory that was previously allocated via the allocate()
 // function. For that purpose it uses the according system-specific memory deallocation functions.
 */
-inline void deallocate_backend( const void* address )
+inline void deallocate_backend( const void* address ) noexcept
 {
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)
    _aligned_free( const_cast<void*>( address ) );
+#elif defined(__MINGW32__)
+   __mingw_aligned_free( const_cast<void*>( address ) );
 #else
    free( const_cast<void*>( address ) );
 #endif
@@ -149,7 +152,7 @@ inline void deallocate_backend( const void* address )
    \endcode
 */
 template< typename T >
-typename EnableIf< IsBuiltin<T>, T* >::Type allocate( size_t size )
+EnableIf_< IsBuiltin<T>, T* > allocate( size_t size )
 {
    const size_t alignment( AlignmentOf<T>::value );
 
@@ -178,7 +181,7 @@ typename EnableIf< IsBuiltin<T>, T* >::Type allocate( size_t size )
 // constructed are destroyed in reverse order and the allocated memory is deallocated again.
 */
 template< typename T >
-typename DisableIf< IsBuiltin<T>, T* >::Type allocate( size_t size )
+DisableIf_< IsBuiltin<T>, T* > allocate( size_t size )
 {
    const size_t alignment ( AlignmentOf<T>::value );
    const size_t headersize( ( sizeof(size_t) < alignment ) ? ( alignment ) : ( sizeof( size_t ) ) );
@@ -188,7 +191,7 @@ typename DisableIf< IsBuiltin<T>, T* >::Type allocate( size_t size )
 
    if( alignment >= 8UL )
    {
-      byte* const raw( allocate_backend( size*sizeof(T)+headersize, alignment ) );
+      byte_t* const raw( allocate_backend( size*sizeof(T)+headersize, alignment ) );
 
       *reinterpret_cast<size_t*>( raw ) = size;
 
@@ -224,9 +227,9 @@ typename DisableIf< IsBuiltin<T>, T* >::Type allocate( size_t size )
 // function.
 */
 template< typename T >
-typename EnableIf< IsBuiltin<T> >::Type deallocate( T* address )
+EnableIf_< IsBuiltin<T> > deallocate( T* address ) noexcept
 {
-   if( address == NULL )
+   if( address == nullptr )
       return;
 
    const size_t alignment( AlignmentOf<T>::value );
@@ -250,9 +253,9 @@ typename EnableIf< IsBuiltin<T> >::Type deallocate( T* address )
 // function.
 */
 template< typename T >
-typename DisableIf< IsBuiltin<T> >::Type deallocate( T* address )
+DisableIf_< IsBuiltin<T> > deallocate( T* address )
 {
-   if( address == NULL )
+   if( address == nullptr )
       return;
 
    const size_t alignment ( AlignmentOf<T>::value );
@@ -263,7 +266,7 @@ typename DisableIf< IsBuiltin<T> >::Type deallocate( T* address )
 
    if( alignment >= 8UL )
    {
-      const byte* const raw = reinterpret_cast<byte*>( address ) - headersize;
+      const byte_t* const raw = reinterpret_cast<byte_t*>( address ) - headersize;
 
       const size_t size( *reinterpret_cast<const size_t*>( raw ) );
       for( size_t i=0UL; i<size; ++i )

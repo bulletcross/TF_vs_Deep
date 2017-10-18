@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/lowermatrix/Sparse.h
 //  \brief LowerMatrix specialization for sparse matrices
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,23 +40,25 @@
 // Includes
 //*************************************************************************************************
 
-#include <algorithm>
+#include <utility>
 #include <vector>
 #include <blaze/math/adaptors/Forward.h>
 #include <blaze/math/adaptors/lowermatrix/BaseTemplate.h>
 #include <blaze/math/adaptors/lowermatrix/LowerProxy.h>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
 #include <blaze/math/constraints/Resizable.h>
 #include <blaze/math/constraints/SparseMatrix.h>
+#include <blaze/math/constraints/Static.h>
 #include <blaze/math/constraints/StorageOrder.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/Upper.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/SparseMatrix.h>
 #include <blaze/math/shims/Clear.h>
 #include <blaze/math/shims/IsDefault.h>
-#include <blaze/math/shims/Move.h>
 #include <blaze/math/sparse/SparseMatrix.h>
 #include <blaze/math/typetraits/Columns.h>
 #include <blaze/math/typetraits/IsComputation.h>
@@ -70,7 +72,6 @@
 #include <blaze/util/constraints/Volatile.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/StaticAssert.h>
 #include <blaze/util/typetraits/IsNumeric.h>
 #include <blaze/util/Types.h>
@@ -99,39 +100,51 @@ class LowerMatrix<MT,SO,false>
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT::OppositeType   OT;  //!< Opposite type of the sparse matrix.
-   typedef typename MT::TransposeType  TT;  //!< Transpose type of the sparse matrix.
-   typedef typename MT::ElementType    ET;  //!< Element type of the sparse matrix.
+   using OT = OppositeType_<MT>;   //!< Opposite type of the sparse matrix.
+   using TT = TransposeType_<MT>;  //!< Transpose type of the sparse matrix.
+   using ET = ElementType_<MT>;    //!< Element type of the sparse matrix.
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef LowerMatrix<MT,SO,false>     This;            //!< Type of this LowerMatrix instance.
-   typedef This                         ResultType;      //!< Result type for expression template evaluations.
-   typedef LowerMatrix<OT,!SO,false>    OppositeType;    //!< Result type with opposite storage order for expression template evaluations.
-   typedef UpperMatrix<TT,!SO,false>    TransposeType;   //!< Transpose type for expression template evaluations.
-   typedef ET                           ElementType;     //!< Type of the matrix elements.
-   typedef typename MT::ReturnType      ReturnType;      //!< Return type for expression template evaluations.
-   typedef const This&                  CompositeType;   //!< Data type for composite expression templates.
-   typedef LowerProxy<MT>               Reference;       //!< Reference to a non-constant matrix value.
-   typedef typename MT::ConstReference  ConstReference;  //!< Reference to a constant matrix value.
-   typedef typename MT::Iterator        Iterator;        //!< Iterator over non-constant elements.
-   typedef typename MT::ConstIterator   ConstIterator;   //!< Iterator over constant elements.
+   using This           = LowerMatrix<MT,SO,false>;   //!< Type of this LowerMatrix instance.
+   using BaseType       = SparseMatrix<This,SO>;      //!< Base type of this LowerMatrix instance.
+   using ResultType     = This;                       //!< Result type for expression template evaluations.
+   using OppositeType   = LowerMatrix<OT,!SO,false>;  //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType  = UpperMatrix<TT,!SO,false>;  //!< Transpose type for expression template evaluations.
+   using ElementType    = ET;                         //!< Type of the matrix elements.
+   using ReturnType     = ReturnType_<MT>;            //!< Return type for expression template evaluations.
+   using CompositeType  = const This&;                //!< Data type for composite expression templates.
+   using Reference      = LowerProxy<MT>;             //!< Reference to a non-constant matrix value.
+   using ConstReference = ConstReference_<MT>;        //!< Reference to a constant matrix value.
+   using Iterator       = Iterator_<MT>;              //!< Iterator over non-constant elements.
+   using ConstIterator  = ConstIterator_<MT>;         //!< Iterator over constant elements.
    //**********************************************************************************************
 
    //**Rebind struct definition********************************************************************
    /*!\brief Rebind mechanism to obtain a LowerMatrix with different data/element type.
    */
-   template< typename ET >  // Data type of the other matrix
+   template< typename NewType >  // Data type of the other matrix
    struct Rebind {
       //! The type of the other LowerMatrix.
-      typedef LowerMatrix< typename MT::template Rebind<ET>::Other >  Other;
+      using Other = LowerMatrix< typename MT::template Rebind<NewType>::Other >;
+   };
+   //**********************************************************************************************
+
+   //**Resize struct definition********************************************************************
+   /*!\brief Resize mechanism to obtain a LowerMatrix with different fixed dimensions.
+   */
+   template< size_t NewM    // Number of rows of the other matrix
+           , size_t NewN >  // Number of columns of the other matrix
+   struct Resize {
+      //! The type of the other LowerMatrix.
+      using Other = LowerMatrix< typename MT::template Resize<NewM,NewN>::Other >;
    };
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = 0 };
+   enum : bool { smpAssignable = false };
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -142,8 +155,11 @@ class LowerMatrix<MT,SO,false>
    explicit inline LowerMatrix( size_t n, size_t nonzeros );
    explicit inline LowerMatrix( size_t n, const std::vector<size_t>& nonzeros );
 
-                                      inline LowerMatrix( const LowerMatrix& m );
-   template< typename MT2, bool SO2 > inline LowerMatrix( const Matrix<MT2,SO2>& m );
+   inline LowerMatrix( const LowerMatrix& m );
+   inline LowerMatrix( LowerMatrix&& m ) noexcept;
+
+   template< typename MT2, bool SO2 >
+   inline LowerMatrix( const Matrix<MT2,SO2>& m );
    //@}
    //**********************************************************************************************
 
@@ -171,72 +187,87 @@ class LowerMatrix<MT,SO,false>
    /*!\name Assignment operators */
    //@{
    inline LowerMatrix& operator=( const LowerMatrix& rhs );
+   inline LowerMatrix& operator=( LowerMatrix&& rhs ) noexcept;
 
    template< typename MT2, bool SO2 >
-   inline typename DisableIf< IsComputation<MT2>, LowerMatrix& >::Type
-      operator=( const Matrix<MT2,SO2>& rhs );
+   inline DisableIf_< IsComputation<MT2>, LowerMatrix& > operator=( const Matrix<MT2,SO2>& rhs );
 
    template< typename MT2, bool SO2 >
-   inline typename EnableIf< IsComputation<MT2>, LowerMatrix& >::Type
-      operator=( const Matrix<MT2,SO2>& rhs );
+   inline EnableIf_< IsComputation<MT2>, LowerMatrix& > operator=( const Matrix<MT2,SO2>& rhs );
 
    template< typename MT2, bool SO2 >
-   inline typename DisableIf< IsComputation<MT2>, LowerMatrix& >::Type
-      operator+=( const Matrix<MT2,SO2>& rhs );
+   inline DisableIf_< IsComputation<MT2>, LowerMatrix& > operator+=( const Matrix<MT2,SO2>& rhs );
 
    template< typename MT2, bool SO2 >
-   inline typename EnableIf< IsComputation<MT2>, LowerMatrix& >::Type
-      operator+=( const Matrix<MT2,SO2>& rhs );
+   inline EnableIf_< IsComputation<MT2>, LowerMatrix& > operator+=( const Matrix<MT2,SO2>& rhs );
 
    template< typename MT2, bool SO2 >
-   inline typename DisableIf< IsComputation<MT2>, LowerMatrix& >::Type
-      operator-=( const Matrix<MT2,SO2>& rhs );
+   inline DisableIf_< IsComputation<MT2>, LowerMatrix& > operator-=( const Matrix<MT2,SO2>& rhs );
 
    template< typename MT2, bool SO2 >
-   inline typename EnableIf< IsComputation<MT2>, LowerMatrix& >::Type
-      operator-=( const Matrix<MT2,SO2>& rhs );
+   inline EnableIf_< IsComputation<MT2>, LowerMatrix& > operator-=( const Matrix<MT2,SO2>& rhs );
+
+   template< typename MT2, bool SO2 >
+   inline LowerMatrix& operator%=( const Matrix<MT2,SO2>& rhs );
 
    template< typename MT2, bool SO2 >
    inline LowerMatrix& operator*=( const Matrix<MT2,SO2>& rhs );
 
    template< typename Other >
-   inline typename EnableIf< IsNumeric<Other>, LowerMatrix >::Type&
-      operator*=( Other rhs );
+   inline EnableIf_< IsNumeric<Other>, LowerMatrix >& operator*=( Other rhs );
 
    template< typename Other >
-   inline typename EnableIf< IsNumeric<Other>, LowerMatrix >::Type&
-      operator/=( Other rhs );
+   inline EnableIf_< IsNumeric<Other>, LowerMatrix >& operator/=( Other rhs );
    //@}
    //**********************************************************************************************
 
    //**Utility functions***************************************************************************
    /*!\name Utility functions */
    //@{
-                              inline size_t       rows() const;
-                              inline size_t       columns() const;
-                              inline size_t       capacity() const;
-                              inline size_t       capacity( size_t i ) const;
-                              inline size_t       nonZeros() const;
-                              inline size_t       nonZeros( size_t i ) const;
-                              inline void         reset();
-                              inline void         reset( size_t i );
-                              inline void         clear();
-                              inline Iterator     set( size_t i, size_t j, const ElementType& value );
-                              inline Iterator     insert( size_t i, size_t j, const ElementType& value );
-                              inline void         erase( size_t i, size_t j );
-                              inline Iterator     erase( size_t i, Iterator pos );
-                              inline Iterator     erase( size_t i, Iterator first, Iterator last );
-                              inline void         resize ( size_t n, bool preserve=true );
-                              inline void         reserve( size_t nonzeros );
-                              inline void         reserve( size_t i, size_t nonzeros );
-                              inline void         trim();
-                              inline void         trim( size_t i );
-   template< typename Other > inline LowerMatrix& scale( const Other& scalar );
-   template< typename Other > inline LowerMatrix& scaleDiagonal( Other scale );
-                              inline void         swap( LowerMatrix& m ) /* throw() */;
+   inline size_t rows() const noexcept;
+   inline size_t columns() const noexcept;
+   inline size_t capacity() const noexcept;
+   inline size_t capacity( size_t i ) const noexcept;
+   inline size_t nonZeros() const;
+   inline size_t nonZeros( size_t i ) const;
+   inline void   reset();
+   inline void   reset( size_t i );
+   inline void   clear();
+   inline void   resize ( size_t n, bool preserve=true );
+   inline void   reserve( size_t nonzeros );
+   inline void   reserve( size_t i, size_t nonzeros );
+   inline void   trim();
+   inline void   trim( size_t i );
+   inline void   shrinkToFit();
+   inline void   swap( LowerMatrix& m ) noexcept;
 
-   static inline size_t maxNonZeros();
-   static inline size_t maxNonZeros( size_t n );
+   static inline constexpr size_t maxNonZeros() noexcept;
+   static inline constexpr size_t maxNonZeros( size_t n ) noexcept;
+   //@}
+   //**********************************************************************************************
+
+   //**Insertion functions*************************************************************************
+   /*!\name Insertion functions */
+   //@{
+   inline Iterator set     ( size_t i, size_t j, const ElementType& value );
+   inline Iterator insert  ( size_t i, size_t j, const ElementType& value );
+   inline void     append  ( size_t i, size_t j, const ElementType& value, bool check=false );
+   inline void     finalize( size_t i );
+   //@}
+   //**********************************************************************************************
+
+   //**Erase functions*****************************************************************************
+   /*!\name Erase functions */
+   //@{
+   inline void     erase( size_t i, size_t j );
+   inline Iterator erase( size_t i, Iterator pos );
+   inline Iterator erase( size_t i, Iterator first, Iterator last );
+
+   template< typename Pred >
+   inline void erase( Pred predicate );
+
+   template< typename Pred >
+   inline void erase( size_t i, Iterator first, Iterator last, Pred predicate );
    //@}
    //**********************************************************************************************
 
@@ -252,28 +283,28 @@ class LowerMatrix<MT,SO,false>
    //@}
    //**********************************************************************************************
 
-   //**Low-level utility functions*****************************************************************
-   /*!\name Low-level utility functions */
+   //**Numeric functions***************************************************************************
+   /*!\name Numeric functions */
    //@{
-   inline void append  ( size_t i, size_t j, const ElementType& value, bool check=false );
-   inline void finalize( size_t i );
+   template< typename Other > inline LowerMatrix& scale( const Other& scalar );
+   template< typename Other > inline LowerMatrix& scaleDiagonal( const Other& scale );
    //@}
    //**********************************************************************************************
 
    //**Debugging functions*************************************************************************
    /*!\name Debugging functions */
    //@{
-   inline bool isIntact() const;
+   inline bool isIntact() const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Expression template evaluation functions****************************************************
    /*!\name Expression template evaluation functions */
    //@{
-   template< typename Other > inline bool canAlias ( const Other* alias ) const;
-   template< typename Other > inline bool isAliased( const Other* alias ) const;
+   template< typename Other > inline bool canAlias ( const Other* alias ) const noexcept;
+   template< typename Other > inline bool isAliased( const Other* alias ) const noexcept;
 
-   inline bool canSMPAssign() const;
+   inline bool canSMPAssign() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -293,7 +324,7 @@ class LowerMatrix<MT,SO,false>
    //**********************************************************************************************
 
    //**Friend declarations*************************************************************************
-   template< typename MT2, bool SO2, bool DF2 >
+   template< bool RF, typename MT2, bool SO2, bool DF2 >
    friend bool isDefault( const LowerMatrix<MT2,SO2,DF2>& m );
 
    template< typename MT2, bool SO2, bool DF2 >
@@ -356,7 +387,7 @@ template< typename MT  // Type of the adapted sparse matrix
 inline LowerMatrix<MT,SO,false>::LowerMatrix( size_t n )
    : matrix_( n, n )  // The adapted sparse matrix
 {
-   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE( MT );
+   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE_TYPE( MT );
 
    BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
 }
@@ -378,7 +409,7 @@ template< typename MT  // Type of the adapted sparse matrix
 inline LowerMatrix<MT,SO,false>::LowerMatrix( size_t n, size_t nonzeros )
    : matrix_( n, n, nonzeros )  // The adapted sparse matrix
 {
-   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE( MT );
+   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE_TYPE( MT );
 
    BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
 }
@@ -402,7 +433,7 @@ template< typename MT  // Type of the adapted sparse matrix
 inline LowerMatrix<MT,SO,false>::LowerMatrix( size_t n, const std::vector<size_t>& nonzeros )
    : matrix_( n, n, nonzeros )  // The adapted sparse matrix
 {
-   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE( MT );
+   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE_TYPE( MT );
 
    BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
 }
@@ -420,6 +451,24 @@ template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
 inline LowerMatrix<MT,SO,false>::LowerMatrix( const LowerMatrix& m )
    : matrix_( m.matrix_ )  // The adapted sparse matrix
+{
+   BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Broken invariant detected" );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief The move constructor for LowerMatrix.
+//
+// \param m The lower matrix to be moved into this instance.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline LowerMatrix<MT,SO,false>::LowerMatrix( LowerMatrix&& m ) noexcept
+   : matrix_( std::move( m.matrix_ ) )  // The adapted sparse matrix
 {
    BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
    BLAZE_INTERNAL_ASSERT( isIntact(), "Broken invariant detected" );
@@ -769,6 +818,29 @@ inline LowerMatrix<MT,SO,false>&
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
+/*!\brief Move assignment operator for LowerMatrix.
+//
+// \param rhs The matrix to be moved into this instance.
+// \return Reference to the assigned matrix.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline LowerMatrix<MT,SO,false>&
+   LowerMatrix<MT,SO,false>::operator=( LowerMatrix&& rhs ) noexcept
+{
+   matrix_ = std::move( rhs.matrix_ );
+
+   BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Broken invariant detected" );
+
+   return *this;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
 /*!\brief Assignment operator for general matrices.
 //
 // \param rhs The general matrix to be copied.
@@ -784,14 +856,14 @@ template< typename MT   // Type of the adapted sparse matrix
         , bool SO >     // Storage order of the adapted sparse matrix
 template< typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename DisableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
+inline DisableIf_< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >
    LowerMatrix<MT,SO,false>::operator=( const Matrix<MT2,SO2>& rhs )
 {
    if( !IsLower<MT2>::value && !isLower( ~rhs ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
    }
 
-   matrix_ = ~rhs;
+   matrix_ = decllow( ~rhs );
 
    if( !IsLower<MT2>::value )
       resetUpper();
@@ -822,7 +894,7 @@ template< typename MT   // Type of the adapted sparse matrix
         , bool SO >     // Storage order of the adapted sparse matrix
 template< typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
+inline EnableIf_< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >
    LowerMatrix<MT,SO,false>::operator=( const Matrix<MT2,SO2>& rhs )
 {
    if( !IsSquare<MT2>::value && !isSquare( ~rhs ) ) {
@@ -839,7 +911,7 @@ inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
          BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
       }
 
-      move( matrix_, tmp );
+      matrix_ = std::move( tmp );
    }
 
    if( !IsLower<MT2>::value )
@@ -871,14 +943,14 @@ template< typename MT   // Type of the adapted sparse matrix
         , bool SO >     // Storage order of the adapted sparse matrix
 template< typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename DisableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
+inline DisableIf_< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >
    LowerMatrix<MT,SO,false>::operator+=( const Matrix<MT2,SO2>& rhs )
 {
    if( !IsLower<MT2>::value && !isLower( ~rhs ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
    }
 
-   matrix_ += ~rhs;
+   matrix_ += decllow( ~rhs );
 
    if( !IsLower<MT2>::value )
       resetUpper();
@@ -909,7 +981,7 @@ template< typename MT   // Type of the adapted sparse matrix
         , bool SO >     // Storage order of the adapted sparse matrix
 template< typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
+inline EnableIf_< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >
    LowerMatrix<MT,SO,false>::operator+=( const Matrix<MT2,SO2>& rhs )
 {
    if( !IsSquare<MT2>::value && !isSquare( ~rhs ) ) {
@@ -920,13 +992,13 @@ inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
       matrix_ += ~rhs;
    }
    else {
-      typename MT2::ResultType tmp( ~rhs );
+      const ResultType_<MT2> tmp( ~rhs );
 
       if( !isLower( tmp ) ) {
          BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
       }
 
-      matrix_ += tmp;
+      matrix_ += decllow( tmp );
    }
 
    if( !IsLower<MT2>::value )
@@ -958,14 +1030,14 @@ template< typename MT   // Type of the adapted sparse matrix
         , bool SO >     // Storage order of the adapted sparse matrix
 template< typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename DisableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
+inline DisableIf_< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >
    LowerMatrix<MT,SO,false>::operator-=( const Matrix<MT2,SO2>& rhs )
 {
    if( !IsLower<MT2>::value && !isLower( ~rhs ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
    }
 
-   matrix_ -= ~rhs;
+   matrix_ -= decllow( ~rhs );
 
    if( !IsLower<MT2>::value )
       resetUpper();
@@ -996,7 +1068,7 @@ template< typename MT   // Type of the adapted sparse matrix
         , bool SO >     // Storage order of the adapted sparse matrix
 template< typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
+inline EnableIf_< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >
    LowerMatrix<MT,SO,false>::operator-=( const Matrix<MT2,SO2>& rhs )
 {
    if( !IsSquare<MT2>::value && !isSquare( ~rhs ) ) {
@@ -1007,14 +1079,50 @@ inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
       matrix_ -= ~rhs;
    }
    else {
-      typename MT2::ResultType tmp( ~rhs );
+      const ResultType_<MT2> tmp( ~rhs );
 
       if( !isLower( tmp ) ) {
          BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
       }
 
-      matrix_ -= tmp;
+      matrix_ -= decllow( tmp );
    }
+
+   if( !IsLower<MT2>::value )
+      resetUpper();
+
+   BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Broken invariant detected" );
+
+   return *this;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Schur product assignment operator for the multiplication of a matrix (\f$ A\circ=B \f$).
+//
+// \param rhs The right-hand side matrix for the Schur product.
+// \return Reference to the matrix.
+// \exception std::invalid_argument Invalid assignment to lower matrix.
+//
+// In case the current sizes of the two matrices don't match, a \a std::invalid_argument exception
+// is thrown.
+*/
+template< typename MT   // Type of the adapted sparse matrix
+        , bool SO >     // Storage order of the adapted sparse matrix
+template< typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline LowerMatrix<MT,SO,false>&
+   LowerMatrix<MT,SO,false>::operator%=( const Matrix<MT2,SO2>& rhs )
+{
+   if( !IsSquare<MT2>::value && !isSquare( ~rhs ) ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
+   }
+
+   matrix_ %= ~rhs;
 
    if( !IsLower<MT2>::value )
       resetUpper();
@@ -1034,7 +1142,7 @@ inline typename EnableIf< IsComputation<MT2>, LowerMatrix<MT,SO,false>& >::Type
 //
 // \param rhs The right-hand side matrix for the multiplication.
 // \return Reference to the matrix.
-// \exception std::invalid_argument Matrix sizes do not match.
+// \exception std::invalid_argument Invalid assignment to lower matrix.
 //
 // In case the current sizes of the two matrices don't match, a \a std::invalid_argument exception
 // is thrown. Also note that the result of the multiplication operation must be a lower matrix.
@@ -1057,7 +1165,7 @@ inline LowerMatrix<MT,SO,false>&
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to lower matrix" );
    }
 
-   move( matrix_, tmp );
+   matrix_ = std::move( tmp );
 
    if( !IsLower<MT2>::value )
       resetUpper();
@@ -1082,7 +1190,7 @@ inline LowerMatrix<MT,SO,false>&
 template< typename MT       // Type of the adapted sparse matrix
         , bool SO >         // Storage order of the adapted sparse matrix
 template< typename Other >  // Data type of the right-hand side scalar
-inline typename EnableIf< IsNumeric<Other>, LowerMatrix<MT,SO,false> >::Type&
+inline EnableIf_< IsNumeric<Other>, LowerMatrix<MT,SO,false> >&
    LowerMatrix<MT,SO,false>::operator*=( Other rhs )
 {
    matrix_ *= rhs;
@@ -1102,7 +1210,7 @@ inline typename EnableIf< IsNumeric<Other>, LowerMatrix<MT,SO,false> >::Type&
 template< typename MT       // Type of the adapted sparse matrix
         , bool SO >         // Storage order of the adapted sparse matrix
 template< typename Other >  // Data type of the right-hand side scalar
-inline typename EnableIf< IsNumeric<Other>, LowerMatrix<MT,SO,false> >::Type&
+inline EnableIf_< IsNumeric<Other>, LowerMatrix<MT,SO,false> >&
    LowerMatrix<MT,SO,false>::operator/=( Other rhs )
 {
    BLAZE_USER_ASSERT( rhs != Other(0), "Division by zero detected" );
@@ -1130,7 +1238,7 @@ inline typename EnableIf< IsNumeric<Other>, LowerMatrix<MT,SO,false> >::Type&
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline size_t LowerMatrix<MT,SO,false>::rows() const
+inline size_t LowerMatrix<MT,SO,false>::rows() const noexcept
 {
    return matrix_.rows();
 }
@@ -1146,7 +1254,7 @@ inline size_t LowerMatrix<MT,SO,false>::rows() const
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline size_t LowerMatrix<MT,SO,false>::columns() const
+inline size_t LowerMatrix<MT,SO,false>::columns() const noexcept
 {
    return matrix_.columns();
 }
@@ -1162,7 +1270,7 @@ inline size_t LowerMatrix<MT,SO,false>::columns() const
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline size_t LowerMatrix<MT,SO,false>::capacity() const
+inline size_t LowerMatrix<MT,SO,false>::capacity() const noexcept
 {
    return matrix_.capacity();
 }
@@ -1184,7 +1292,7 @@ inline size_t LowerMatrix<MT,SO,false>::capacity() const
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline size_t LowerMatrix<MT,SO,false>::capacity( size_t i ) const
+inline size_t LowerMatrix<MT,SO,false>::capacity( size_t i ) const noexcept
 {
    return matrix_.capacity(i);
 }
@@ -1291,136 +1399,6 @@ inline void LowerMatrix<MT,SO,false>::clear()
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Setting elements of the lower matrix.
-//
-// \param i The row index of the new element. The index has to be in the range \f$[0..N-1]\f$.
-// \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
-// \param value The value of the element to be set.
-// \return Iterator to the set element.
-// \exception std::invalid_argument Invalid access to upper matrix element.
-//
-// This function sets the value of an element of the lower matrix. In case the lower matrix
-// already contains an element with row index \a i and column index \a j its value is modified,
-// else a new element with the given \a value is inserted. The attempt to set an element in the
-// upper part of the matrix (i.e. above the diagonal) will result in a \a std::invalid_argument
-// exception.
-*/
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline typename LowerMatrix<MT,SO,false>::Iterator
-   LowerMatrix<MT,SO,false>::set( size_t i, size_t j, const ElementType& value )
-{
-   if( i < j ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to upper matrix element" );
-   }
-
-   return matrix_.set( i, j, value );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Inserting elements into the lower matrix.
-//
-// \param i The row index of the new element. The index has to be in the range \f$[0..N-1]\f$.
-// \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
-// \param value The value of the element to be inserted.
-// \return Iterator to the newly inserted element.
-// \exception std::invalid_argument Invalid sparse matrix access index.
-// \exception std::invalid_argument Invalid access to upper matrix element.
-//
-// This function inserts a new element into the lower matrix. However, duplicate elements are
-// not allowed. In case the lower matrix already contains an element with row index \a i and
-// column index \a j, a \a std::invalid_argument exception is thrown. Also, the attempt to
-// insert an element in the upper part of the matrix (i.e. above the diagonal) will result in
-// a \a std::invalid_argument exception.
-*/
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline typename LowerMatrix<MT,SO,false>::Iterator
-   LowerMatrix<MT,SO,false>::insert( size_t i, size_t j, const ElementType& value )
-{
-   if( i < j ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to upper matrix element" );
-   }
-
-   return matrix_.insert( i, j, value );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Erasing elements from the lower matrix.
-//
-// \param i The row index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
-// \param j The column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
-// \return void
-//
-// This function erases an element from the lower matrix.
-*/
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline void LowerMatrix<MT,SO,false>::erase( size_t i, size_t j )
-{
-   matrix_.erase( i, j );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Erasing elements from the lower matrix.
-//
-// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
-// \param pos Iterator to the element to be erased.
-// \return Iterator to the element after the erased element.
-//
-// This function erases an element from the lower matrix. In case the lower matrix adapts a
-// \a rowMajor sparse matrix the function erases an element from row \a i, in case it adapts
-// a \a columnMajor sparse matrix the function erases an element from column \a i.
-*/
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline typename LowerMatrix<MT,SO,false>::Iterator
-   LowerMatrix<MT,SO,false>::erase( size_t i, Iterator pos )
-{
-   return matrix_.erase( i, pos );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Erasing a range of elements from the lower matrix.
-//
-// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
-// \param first Iterator to first element to be erased.
-// \param last Iterator just past the last element to be erased.
-// \return Iterator to the element after the erased element.
-//
-// This function erases a range of element from the lower matrix. In case the lower matrix adapts
-// a \a rowMajor sparse matrix the function erases a range of elements from row \a i, in case it
-// adapts a \a columnMajor matrix the function erases a range of elements from column \a i.
-*/
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline typename LowerMatrix<MT,SO,false>::Iterator
-   LowerMatrix<MT,SO,false>::erase( size_t i, Iterator first, Iterator last )
-{
-   return matrix_.erase( i, first, last );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
 /*!\brief Changing the size of the lower matrix.
 //
 // \param n The new number of rows and columns of the matrix.
@@ -1438,7 +1416,7 @@ template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
 void LowerMatrix<MT,SO,false>::resize( size_t n, bool preserve )
 {
-   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE( MT );
+   BLAZE_CONSTRAINT_MUST_BE_RESIZABLE_TYPE( MT );
 
    BLAZE_INTERNAL_ASSERT( isSquare( matrix_ ), "Non-square lower matrix detected" );
 
@@ -1538,39 +1516,19 @@ inline void LowerMatrix<MT,SO,false>::trim( size_t i )
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Scaling of the matrix by the scalar value \a scalar (\f$ A=B*s \f$).
+/*!\brief Requesting the removal of unused capacity.
 //
-// \param scalar The scalar value for the matrix scaling.
-// \return Reference to the matrix.
-*/
-template< typename MT       // Type of the adapted sparse matrix
-        , bool SO >         // Storage order of the adapted sparse matrix
-template< typename Other >  // Data type of the scalar value
-inline LowerMatrix<MT,SO,false>&
-   LowerMatrix<MT,SO,false>::scale( const Other& scalar )
-{
-   matrix_.scale( scalar );
-   return *this;
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Scaling the diagonal of the lower matrix by the scalar value \a scalar.
+// \return void
 //
-// \param scalar The scalar value for the diagonal scaling.
-// \return Reference to the lower matrix.
+// This function minimizes the capacity of the matrix by removing unused capacity. Please note
+// that in case a reallocation occurs, all iterators (including end() iterators), all pointers
+// and references to elements of this matrix are invalidated.
 */
-template< typename MT       // Type of the adapted sparse matrix
-        , bool SO >         // Storage order of the adapted sparse matrix
-template< typename Other >  // Data type of the scalar value
-inline LowerMatrix<MT,SO,false>&
-   LowerMatrix<MT,SO,false>::scaleDiagonal( Other scalar )
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline void LowerMatrix<MT,SO,false>::shrinkToFit()
 {
-   matrix_.scaleDiagonal( scalar );
-   return *this;
+   matrix_.shrinkToFit();
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -1582,11 +1540,10 @@ inline LowerMatrix<MT,SO,false>&
 //
 // \param m The matrix to be swapped.
 // \return void
-// \exception no-throw guarantee.
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline void LowerMatrix<MT,SO,false>::swap( LowerMatrix& m ) /* throw() */
+inline void LowerMatrix<MT,SO,false>::swap( LowerMatrix& m ) noexcept
 {
    using std::swap;
 
@@ -1609,9 +1566,9 @@ inline void LowerMatrix<MT,SO,false>::swap( LowerMatrix& m ) /* throw() */
 */
 template< typename MT  // Type of the adapted dense matrix
         , bool SO >    // Storage order of the adapted dense matrix
-inline size_t LowerMatrix<MT,SO,false>::maxNonZeros()
+inline constexpr size_t LowerMatrix<MT,SO,false>::maxNonZeros() noexcept
 {
-   BLAZE_CONSTRAINT_MUST_NOT_BE_RESIZABLE( MT );
+   BLAZE_CONSTRAINT_MUST_BE_STATIC_TYPE( MT );
 
    return maxNonZeros( Rows<MT>::value );
 }
@@ -1631,7 +1588,7 @@ inline size_t LowerMatrix<MT,SO,false>::maxNonZeros()
 */
 template< typename MT  // Type of the adapted dense matrix
         , bool SO >    // Storage order of the adapted dense matrix
-inline size_t LowerMatrix<MT,SO,false>::maxNonZeros( size_t n )
+inline constexpr size_t LowerMatrix<MT,SO,false>::maxNonZeros( size_t n ) noexcept
 {
    return ( ( n + 1UL ) * n ) / 2UL;
 }
@@ -1657,6 +1614,316 @@ inline void LowerMatrix<MT,SO,false>::resetUpper()
       for( size_t i=0UL; i<rows(); ++i )
          matrix_.erase( i, matrix_.upperBound( i, i ), matrix_.end( i ) );
    }
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  INSERTION FUNCTIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Setting elements of the lower matrix.
+//
+// \param i The row index of the new element. The index has to be in the range \f$[0..N-1]\f$.
+// \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
+// \param value The value of the element to be set.
+// \return Iterator to the set element.
+// \exception std::invalid_argument Invalid access to upper matrix element.
+//
+// This function sets the value of an element of the lower matrix. In case the lower matrix
+// already contains an element with row index \a i and column index \a j its value is modified,
+// else a new element with the given \a value is inserted. The attempt to set an element in the
+// upper part of the matrix (i.e. above the diagonal) will result in a \a std::invalid_argument
+// exception.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline typename LowerMatrix<MT,SO,false>::Iterator
+   LowerMatrix<MT,SO,false>::set( size_t i, size_t j, const ElementType& value )
+{
+   if( i < j ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to upper matrix element" );
+   }
+
+   return matrix_.set( i, j, value );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Inserting elements into the lower matrix.
+//
+// \param i The row index of the new element. The index has to be in the range \f$[0..N-1]\f$.
+// \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
+// \param value The value of the element to be inserted.
+// \return Iterator to the newly inserted element.
+// \exception std::invalid_argument Invalid sparse matrix access index.
+// \exception std::invalid_argument Invalid access to upper matrix element.
+//
+// This function inserts a new element into the lower matrix. However, duplicate elements are
+// not allowed. In case the lower matrix already contains an element with row index \a i and
+// column index \a j, a \a std::invalid_argument exception is thrown. Also, the attempt to
+// insert an element in the upper part of the matrix (i.e. above the diagonal) will result in
+// a \a std::invalid_argument exception.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline typename LowerMatrix<MT,SO,false>::Iterator
+   LowerMatrix<MT,SO,false>::insert( size_t i, size_t j, const ElementType& value )
+{
+   if( i < j ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to upper matrix element" );
+   }
+
+   return matrix_.insert( i, j, value );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Appending elements to the specified row/column of the lower matrix.
+//
+// \param i The row index of the new element. The index has to be in the range \f$[0..N-1]\f$.
+// \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
+// \param value The value of the element to be appended.
+// \param check \a true if the new value should be checked for default values, \a false if not.
+// \return void
+// \exception std::invalid_argument Invalid access to upper matrix element.
+//
+// This function provides a very efficient way to fill a lower sparse matrix with elements. It
+// appends a new element to the end of the specified row/column without any additional memory
+// allocation. Therefore it is strictly necessary to keep the following preconditions in mind:
+//
+//  - the index of the new element must be strictly larger than the largest index of non-zero
+//    elements in the specified row/column of the sparse matrix
+//  - the current number of non-zero elements in the matrix must be smaller than the capacity
+//    of the matrix
+//
+// Ignoring these preconditions might result in undefined behavior! The optional \a check
+// parameter specifies whether the new value should be tested for a default value. If the new
+// value is a default value (for instance 0 in case of an integral element type) the value is
+// not appended. Per default the values are not tested.
+//
+// In combination with the reserve() and the finalize() function, append() provides the most
+// efficient way to add new elements to a (newly created) sparse matrix:
+
+   \code
+   using blaze::CompressedMatrix;
+   using blaze::LowerMatrix;
+   using blaze::rowMajor;
+
+   LowerMatrix< CompressedMatrix<double,rowMajor> > A( 4 );
+
+   A.reserve( 3 );         // Reserving enough capacity for 3 non-zero elements
+   A.append( 0, 0, 1.0 );  // Appending the value 1 in row 0 with column index 0
+   A.finalize( 0 );        // Finalizing row 0
+   A.append( 1, 0, 2.0 );  // Appending the value 2 in row 1 with column index 0
+   A.finalize( 1 );        // Finalizing row 1
+   A.finalize( 2 );        // Finalizing the empty row 2 to prepare row 3
+   A.append( 3, 2, 3.0 );  // Appending the value 3 in row 3 with column index 2
+   A.finalize( 3 );        // Finalizing row 3
+   \endcode
+
+// Note that although append() does not allocate new memory it still invalidates all iterators
+// returned by the end() functions! Also note that the attempt to append an element within the
+// upper part of the matrix (i.e. above the diagonal) will result in a \a std::invalid_argument
+// exception.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline void LowerMatrix<MT,SO,false>::append( size_t i, size_t j, const ElementType& value, bool check )
+{
+   if( i < j ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to upper matrix element" );
+   }
+
+   matrix_.append( i, j, value, check );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Finalizing the element insertion of a row/column.
+//
+// \param i The index of the row/column to be finalized \f$[0..N-1]\f$.
+// \return void
+//
+// This function is part of the low-level interface to efficiently fill a matrix with elements.
+// After completion of row/column \a i via the append() function, this function can be called to
+// finalize row/column \a i and prepare the next row/column for insertion process via append().
+//
+// \note Although finalize() does not allocate new memory, it still invalidates all iterators
+// returned by the end() functions!
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline void LowerMatrix<MT,SO,false>::finalize( size_t i )
+{
+   matrix_.finalize( i );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ERASE FUNCTIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Erasing elements from the lower matrix.
+//
+// \param i The row index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
+// \param j The column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
+// \return void
+//
+// This function erases an element from the lower matrix.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline void LowerMatrix<MT,SO,false>::erase( size_t i, size_t j )
+{
+   matrix_.erase( i, j );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Erasing elements from the lower matrix.
+//
+// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
+// \param pos Iterator to the element to be erased.
+// \return Iterator to the element after the erased element.
+//
+// This function erases an element from the lower matrix. In case the lower matrix adapts a
+// \a rowMajor sparse matrix the function erases an element from row \a i, in case it adapts
+// a \a columnMajor sparse matrix the function erases an element from column \a i.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline typename LowerMatrix<MT,SO,false>::Iterator
+   LowerMatrix<MT,SO,false>::erase( size_t i, Iterator pos )
+{
+   return matrix_.erase( i, pos );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Erasing a range of elements from the lower matrix.
+//
+// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
+// \param first Iterator to first element to be erased.
+// \param last Iterator just past the last element to be erased.
+// \return Iterator to the element after the erased element.
+//
+// This function erases a range of elements from the lower matrix. In case the lower matrix adapts
+// a \a rowMajor sparse matrix the function erases a range of elements from row \a i, in case it
+// adapts a \a columnMajor matrix the function erases a range of elements from column \a i.
+*/
+template< typename MT  // Type of the adapted sparse matrix
+        , bool SO >    // Storage order of the adapted sparse matrix
+inline typename LowerMatrix<MT,SO,false>::Iterator
+   LowerMatrix<MT,SO,false>::erase( size_t i, Iterator first, Iterator last )
+{
+   return matrix_.erase( i, first, last );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Erasing specific elements from the lower matrix.
+//
+// \param predicate The unary predicate for the element selection.
+// \return void.
+//
+// This function erases specific elements from the lower matrix. The elements are selected by
+// the given unary predicate \a predicate, which is expected to accept a single argument of the
+// type of the elements and to be pure. The following example demonstrates how to remove all
+// elements that are smaller than a certain threshold value:
+
+   \code
+   blaze::LowerMatrix< CompressedMatrix<double,blaze::rowMajor> > A;
+   // ... Resizing and initialization
+
+   A.erase( []( double value ){ return value < 1E-8; } );
+   \endcode
+
+// \note The predicate is required to be pure, i.e. to produce deterministic results for elements
+// with the same value. The attempt to use an impure predicate leads to undefined behavior!
+*/
+template< typename MT      // Type of the adapted sparse matrix
+        , bool SO >        // Storage order of the adapted sparse matrix
+template< typename Pred >  // Type of the unary predicate
+inline void LowerMatrix<MT,SO,false>::erase( Pred predicate )
+{
+   matrix_.erase( predicate );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Broken invariant detected" );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Erasing specific elements from a range of the lower matrix.
+//
+// \param i The row/column index of the elements to be erased. The index has to be in the range \f$[0..M-1]\f$.
+// \param first Iterator to first element of the range.
+// \param last Iterator just past the last element of the range.
+// \param predicate The unary predicate for the element selection.
+// \return void
+//
+// This function erases specific elements from a range of elements of the lower matrix. The
+// elements are selected by the given unary predicate \a predicate, which is expected to accept
+// a single argument of the type of the elements and to be pure. In case the storage order is
+// set to \a rowMajor the function erases a range of elements from row \a i, in case the storage
+// flag is set to \a columnMajor the function erases a range of elements from column \a i. The
+// following example demonstrates how to remove all elements that are smaller than a certain
+// threshold value:
+
+   \code
+   blaze::LowerMatrix< CompressedMatrix<double,blaze::rowMajor> > A;
+   // ... Resizing and initialization
+
+   A.erase( 2UL, A.begin(2UL), A.end(2UL), []( double value ){ return value < 1E-8; } );
+   \endcode
+
+// \note The predicate is required to be pure, i.e. to produce deterministic results for elements
+// with the same value. The attempt to use an impure predicate leads to undefined behavior!
+*/
+template< typename MT      // Type of the adapted sparse matrix
+        , bool SO >        // Storage order of the adapted sparse matrix
+template< typename Pred >  // Type of the unary predicate
+inline void LowerMatrix<MT,SO,false>::erase( size_t i, Iterator first, Iterator last, Pred predicate )
+{
+   matrix_.erase( i, first, last, predicate );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Broken invariant detected" );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -1836,69 +2103,36 @@ inline typename LowerMatrix<MT,SO,false>::ConstIterator
 
 //=================================================================================================
 //
-//  LOW-LEVEL UTILITY FUNCTIONS
+//  NUMERIC FUNCTIONS
 //
 //=================================================================================================
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Appending elements to the specified row/column of the lower matrix.
+/*!\brief Scaling of the matrix by the scalar value \a scalar (\f$ A=B*s \f$).
 //
-// \param i The row index of the new element. The index has to be in the range \f$[0..N-1]\f$.
-// \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
-// \param value The value of the element to be appended.
-// \param check \a true if the new value should be checked for default values, \a false if not.
-// \return void
-// \exception std::invalid_argument Invalid access to upper matrix element.
+// \param scalar The scalar value for the matrix scaling.
+// \return Reference to the matrix.
 //
-// This function provides a very efficient way to fill a lower sparse matrix with elements. It
-// appends a new element to the end of the specified row/column without any additional memory
-// allocation. Therefore it is strictly necessary to keep the following preconditions in mind:
-//
-//  - the index of the new element must be strictly larger than the largest index of non-zero
-//    elements in the specified row/column of the sparse matrix
-//  - the current number of non-zero elements in the matrix must be smaller than the capacity
-//    of the matrix
-//
-// Ignoring these preconditions might result in undefined behavior! The optional \a check
-// parameter specifies whether the new value should be tested for a default value. If the new
-// value is a default value (for instance 0 in case of an integral element type) the value is
-// not appended. Per default the values are not tested.
-//
-// In combination with the reserve() and the finalize() function, append() provides the most
-// efficient way to add new elements to a (newly created) sparse matrix:
+// This function scales the matrix by applying the given scalar value \a scalar to each element
+// of the matrix. For built-in and \c complex data types it has the same effect as using the
+// multiplication assignment operator:
 
    \code
-   using blaze::CompressedMatrix;
-   using blaze::LowerMatrix;
-   using blaze::rowMajor;
-
-   LowerMatrix< CompressedMatrix<double,rowMajor> > A( 4 );
-
-   A.reserve( 3 );         // Reserving enough capacity for 3 non-zero elements
-   A.append( 0, 0, 1.0 );  // Appending the value 1 in row 0 with column index 0
-   A.finalize( 0 );        // Finalizing row 0
-   A.append( 1, 0, 2.0 );  // Appending the value 2 in row 1 with column index 0
-   A.finalize( 1 );        // Finalizing row 1
-   A.finalize( 2 );        // Finalizing the empty row 2 to prepare row 3
-   A.append( 3, 2, 3.0 );  // Appending the value 3 in row 3 with column index 2
-   A.finalize( 3 );        // Finalizing row 3
+   blaze::LowerMatrix< blaze::CompressedMatrix<int> > A;
+   // ... Resizing and initialization
+   A *= 4;        // Scaling of the matrix
+   A.scale( 4 );  // Same effect as above
    \endcode
-
-// Note that although append() does not allocate new memory it still invalidates all iterators
-// returned by the end() functions! Also note that the attempt to append an element within the
-// upper part of the matrix (i.e. above the diagonal) will result in a \a std::invalid_argument
-// exception.
 */
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline void LowerMatrix<MT,SO,false>::append( size_t i, size_t j, const ElementType& value, bool check )
+template< typename MT       // Type of the adapted sparse matrix
+        , bool SO >         // Storage order of the adapted sparse matrix
+template< typename Other >  // Data type of the scalar value
+inline LowerMatrix<MT,SO,false>&
+   LowerMatrix<MT,SO,false>::scale( const Other& scalar )
 {
-   if( i < j ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to upper matrix element" );
-   }
-
-   matrix_.append( i, j, value, check );
+   matrix_.scale( scalar );
+   return *this;
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -1906,23 +2140,22 @@ inline void LowerMatrix<MT,SO,false>::append( size_t i, size_t j, const ElementT
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Finalizing the element insertion of a row/column.
+/*!\brief Scaling the diagonal of the lower matrix by the scalar value \a scalar.
 //
-// \param i The index of the row/column to be finalized \f$[0..N-1]\f$.
-// \return void
+// \param scalar The scalar value for the diagonal scaling.
+// \return Reference to the lower matrix.
 //
-// This function is part of the low-level interface to efficiently fill a matrix with elements.
-// After completion of row/column \a i via the append() function, this function can be called to
-// finalize row/column \a i and prepare the next row/column for insertion process via append().
-//
-// \note: Although finalize() does not allocate new memory, it still invalidates all iterators
-// returned by the end() functions!
+// This function scales the diagonal of the matrix by applying the given scalar value \a scalar
+// to each element of the diagonal.
 */
-template< typename MT  // Type of the adapted sparse matrix
-        , bool SO >    // Storage order of the adapted sparse matrix
-inline void LowerMatrix<MT,SO,false>::finalize( size_t i )
+template< typename MT       // Type of the adapted sparse matrix
+        , bool SO >         // Storage order of the adapted sparse matrix
+template< typename Other >  // Data type of the scalar value
+inline LowerMatrix<MT,SO,false>&
+   LowerMatrix<MT,SO,false>::scaleDiagonal( const Other& scalar )
 {
-   matrix_.finalize( i );
+   matrix_.scaleDiagonal( scalar );
+   return *this;
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -1948,7 +2181,7 @@ inline void LowerMatrix<MT,SO,false>::finalize( size_t i )
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline bool LowerMatrix<MT,SO,false>::isIntact() const
+inline bool LowerMatrix<MT,SO,false>::isIntact() const noexcept
 {
    using blaze::isIntact;
 
@@ -1980,7 +2213,7 @@ inline bool LowerMatrix<MT,SO,false>::isIntact() const
 template< typename MT       // Type of the adapted sparse matrix
         , bool SO >         // Storage order of the adapted sparse matrix
 template< typename Other >  // Data type of the foreign expression
-inline bool LowerMatrix<MT,SO,false>::canAlias( const Other* alias ) const
+inline bool LowerMatrix<MT,SO,false>::canAlias( const Other* alias ) const noexcept
 {
    return matrix_.canAlias( alias );
 }
@@ -2002,7 +2235,7 @@ inline bool LowerMatrix<MT,SO,false>::canAlias( const Other* alias ) const
 template< typename MT       // Type of the adapted sparse matrix
         , bool SO >         // Storage order of the adapted sparse matrix
 template< typename Other >  // Data type of the foreign expression
-inline bool LowerMatrix<MT,SO,false>::isAliased( const Other* alias ) const
+inline bool LowerMatrix<MT,SO,false>::isAliased( const Other* alias ) const noexcept
 {
    return matrix_.isAliased( alias );
 }
@@ -2023,7 +2256,7 @@ inline bool LowerMatrix<MT,SO,false>::isAliased( const Other* alias ) const
 */
 template< typename MT  // Type of the adapted sparse matrix
         , bool SO >    // Storage order of the adapted sparse matrix
-inline bool LowerMatrix<MT,SO,false>::canSMPAssign() const
+inline bool LowerMatrix<MT,SO,false>::canSMPAssign() const noexcept
 {
    return matrix_.canSMPAssign();
 }

@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/TransposeFlag.h
 //  \brief Header file for the TransposeFlag type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,10 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/TransposeFlag.h>
-#include <blaze/math/typetraits/IsRowVector.h>
-#include <blaze/math/typetraits/IsVector.h>
-#include <blaze/util/InvalidType.h>
-#include <blaze/util/mpl/If.h>
+#include <utility>
+#include <blaze/math/expressions/Vector.h>
+#include <blaze/util/IntegralConstant.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -56,6 +55,29 @@ namespace blaze {
 //=================================================================================================
 
 //*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Auxiliary helper struct for the TransposeFlag type trait.
+// \ingroup math_type_traits
+*/
+template< typename T >
+struct TransposeFlagHelper
+{
+ private:
+   //**********************************************************************************************
+   template< typename VT, bool TF >
+   static BoolConstant<TF> test( const Vector<VT,TF>& );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
+   //**********************************************************************************************
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
 /*!\brief Evaluation of the transpose flag of a given matrix type.
 // \ingroup math_type_traits
 //
@@ -65,8 +87,8 @@ namespace blaze {
 // vector type a compilation error is created.
 
    \code
-   typedef blaze::DynamicVector<int,blaze::rowVector>     RowVector;
-   typedef blaze::DynamicVector<int,blaze::columnVector>  ColumnVector;
+   using RowVector    = blaze::DynamicVector<int,blaze::rowVector>;
+   using ColumnVector = blaze::DynamicVector<int,blaze::columnVector>;
 
    blaze::TransposeFlag<RowVector>::value     // Evaluates to blaze::rowVector
    blaze::TransposeFlag<ColumnVector>::value  // Evaluates to blaze::columnVector
@@ -75,23 +97,8 @@ namespace blaze {
 */
 template< typename T >
 struct TransposeFlag
-{
- private:
-   //**struct ValidType****************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   struct ValidType {
-      static const bool value = ( IsRowVector<T>::value ? rowVector : columnVector );
-   };
-   /*! \endcond */
-   //**********************************************************************************************
-
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   static const bool value = If< IsVector<T>, ValidType, INVALID_TYPE >::Type::value;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+   : public TransposeFlagHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

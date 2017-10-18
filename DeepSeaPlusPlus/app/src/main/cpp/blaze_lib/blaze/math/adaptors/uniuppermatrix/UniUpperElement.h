@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/uniuppermatrix/UniUpperElement.h
 //  \brief Header file for the UniUpperElement class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,6 +40,7 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/adaptors/uniuppermatrix/UniUpperValue.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
@@ -47,13 +48,13 @@
 #include <blaze/math/constraints/SparseMatrix.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/Upper.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/sparse/SparseElement.h>
 #include <blaze/util/constraints/Const.h>
 #include <blaze/util/constraints/Numeric.h>
 #include <blaze/util/constraints/Pointer.h>
 #include <blaze/util/constraints/Reference.h>
 #include <blaze/util/constraints/Volatile.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/Types.h>
 
 
@@ -76,7 +77,7 @@ namespace blaze {
 // matrix:
 
    \code
-   typedef blaze::UniUpperMatrix< blaze::CompressedMatrix<int> >  UniUpper;
+   using UniUpper = blaze::UniUpperMatrix< blaze::CompressedMatrix<int> >;
 
    // Creating a 3x3 upper unitriangular sparse matrix
    UniUpper A( 3UL );
@@ -92,21 +93,22 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class UniUpperElement : private SparseElement
+class UniUpperElement
+   : private SparseElement
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT::ElementType  ElementType;   //!< Type of the represented matrix element.
-   typedef typename MT::Iterator     IteratorType;  //!< Type of the underlying sparse matrix iterators.
+   using ElementType  = ElementType_<MT>;  //!< Type of the represented matrix element.
+   using IteratorType = Iterator_<MT>;     //!< Type of the underlying sparse matrix iterators.
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef UniUpperValue<MT>        ValueType;       //!< The value type of the value-index-pair.
-   typedef size_t                   IndexType;       //!< The index type of the value-index-pair.
-   typedef UniUpperValue<MT>        Reference;       //!< Reference return type.
-   typedef const UniUpperValue<MT>  ConstReference;  //!< Reference-to-const return type.
-   typedef UniUpperElement*         Pointer;         //!< Pointer return type.
+   using ValueType      = UniUpperValue<MT>;        //!< The value type of the value-index-pair.
+   using IndexType      = size_t;                   //!< The index type of the value-index-pair.
+   using Reference      = UniUpperValue<MT>;        //!< Reference return type.
+   using ConstReference = const UniUpperValue<MT>;  //!< Reference-to-const return type.
+   using Pointer        = UniUpperElement*;         //!< Pointer return type.
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -130,7 +132,7 @@ class UniUpperElement : private SparseElement
    //**Access operators****************************************************************************
    /*!\name Access operators */
    //@{
-   inline Pointer operator->();
+   inline Pointer operator->() noexcept;
    //@}
    //**********************************************************************************************
 
@@ -321,7 +323,7 @@ inline UniUpperElement<MT>& UniUpperElement<MT>::operator/=( const T& v )
 // \return Reference to the value of the uniupper element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline typename UniUpperElement<MT>::Pointer UniUpperElement<MT>::operator->()
+inline typename UniUpperElement<MT>::Pointer UniUpperElement<MT>::operator->() noexcept
 {
    return this;
 }

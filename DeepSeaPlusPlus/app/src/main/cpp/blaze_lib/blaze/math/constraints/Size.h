@@ -3,7 +3,7 @@
 //  \file blaze/math/constraints/Size.h
 //  \brief Constraint on the data type
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,12 +41,10 @@
 //*************************************************************************************************
 
 #include <blaze/math/typetraits/Size.h>
-#include <blaze/util/constraints/ConstraintTest.h>
 #include <blaze/util/mpl/Equal.h>
 #include <blaze/util/mpl/Not.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/mpl/SizeT.h>
-#include <blaze/util/Suffix.h>
+#include <blaze/util/mpl/PtrdiffT.h>
 
 
 namespace blaze {
@@ -58,22 +56,6 @@ namespace blaze {
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup math_constraints
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CONSTRAINT_MUST_HAVE_EQUAL_SIZE_FAILED;
-template<> struct CONSTRAINT_MUST_HAVE_EQUAL_SIZE_FAILED<true> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Constraint on the data type.
 // \ingroup math_constraints
 //
@@ -83,14 +65,10 @@ template<> struct CONSTRAINT_MUST_HAVE_EQUAL_SIZE_FAILED<true> { enum { value = 
 // is created.
 */
 #define BLAZE_CONSTRAINT_MUST_HAVE_EQUAL_SIZE(T1,T2) \
-   typedef \
-      blaze::CONSTRAINT_TEST< \
-         blaze::CONSTRAINT_MUST_HAVE_EQUAL_SIZE_FAILED< ( \
-            blaze::Or< blaze::Equal< blaze::Size<T1>, blaze::SizeT<0UL> > \
-                     , blaze::Equal< blaze::Size<T2>, blaze::SizeT<0UL> > \
-                     , blaze::Equal< blaze::Size<T1>, blaze::Size<T2> > \
-                     >::value ) >::value > \
-      BLAZE_JOIN( CONSTRAINT_MUST_HAVE_EQUAL_SIZE_TYPEDEF, __LINE__ )
+   static_assert( ::blaze::Or< ::blaze::Equal< ::blaze::Size<T1>, ::blaze::PtrdiffT<-1L> > \
+                             , ::blaze::Equal< ::blaze::Size<T2>, ::blaze::PtrdiffT<-1L> > \
+                             , ::blaze::Equal< ::blaze::Size<T1>, ::blaze::Size<T2> > \
+                             >::value, "Invalid size detected" )
 //*************************************************************************************************
 
 
@@ -103,22 +81,6 @@ template<> struct CONSTRAINT_MUST_HAVE_EQUAL_SIZE_FAILED<true> { enum { value = 
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Compile time constraint.
-// \ingroup math_constraints
-//
-// Helper template class for the compile time constraint enforcement. Based on the compile time
-// constant expression used for the template instantiation, either the undefined basic template
-// or the specialization is selected. If the undefined basic template is selected, a compilation
-// error is created.
-*/
-template< bool > struct CONSTRAINT_MUST_NOT_HAVE_EQUAL_SIZE_FAILED;
-template<> struct CONSTRAINT_MUST_NOT_HAVE_EQUAL_SIZE_FAILED<true> { enum { value = 1 }; };
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Constraint on the data type.
 // \ingroup math_constraints
 //
@@ -128,14 +90,10 @@ template<> struct CONSTRAINT_MUST_NOT_HAVE_EQUAL_SIZE_FAILED<true> { enum { valu
 // created.
 */
 #define BLAZE_CONSTRAINT_MUST_NOT_HAVE_EQUAL_SIZE(T1,T2) \
-   typedef \
-      blaze::CONSTRAINT_TEST< \
-         blaze::CONSTRAINT_MUST_HAVE_EQUAL_SIZE_FAILED< ( \
-            blaze::Or< blaze::Equal< blaze::Size<T1>, blaze::SizeT<0UL> > \
-                     , blaze::Equal< blaze::Size<T2>, blaze::SizeT<0UL> > \
-                     , blaze::Not< blaze::Equal< blaze::Size<T1>, blaze::Size<T2> > > \
-                     >::value ) >::value > \
-      BLAZE_JOIN( CONSTRAINT_MUST_HAVE_EQUAL_SIZE_TYPEDEF, __LINE__ )
+   static_assert( ::blaze::Or< ::blaze::Equal< ::blaze::Size<T1>, ::blaze::PtrdiffT<-1L> > \
+                             , ::blaze::Equal< ::blaze::Size<T2>, ::blaze::PtrdiffT<-1L> > \
+                             , ::blaze::Not< ::blaze::Equal< ::blaze::Size<T1>, ::blaze::Size<T2> > > \
+                             >::value, "Invalid size detected" )
 //*************************************************************************************************
 
 } // namespace blaze

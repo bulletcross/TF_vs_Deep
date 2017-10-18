@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/StorageOrder.h
 //  \brief Header file for the StorageOrder type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,10 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/StorageOrder.h>
-#include <blaze/math/typetraits/IsMatrix.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
-#include <blaze/util/InvalidType.h>
-#include <blaze/util/mpl/If.h>
+#include <utility>
+#include <blaze/math/expressions/Matrix.h>
+#include <blaze/util/IntegralConstant.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -56,6 +55,29 @@ namespace blaze {
 //=================================================================================================
 
 //*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Auxiliary helper struct for the StorageOrder type trait.
+// \ingroup math_type_traits
+*/
+template< typename T >
+struct StorageOrderHelper
+{
+ private:
+   //**********************************************************************************************
+   template< typename MT, bool SO >
+   static BoolConstant<SO> test( const Matrix<MT,SO>& );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
+   //**********************************************************************************************
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
 /*!\brief Evaluation of the storage order of a given matrix type.
 // \ingroup math_type_traits
 //
@@ -65,8 +87,8 @@ namespace blaze {
 // given type is not a matrix type a compilation error is created.
 
    \code
-   typedef blaze::DynamicMatrix<int,blaze::rowMajor>     RowMajorMatrix;
-   typedef blaze::DynamicMatrix<int,blaze::columnMajor>  ColumnMajorMatrix;
+   using RowMajorMatrix    = blaze::DynamicMatrix<int,blaze::rowMajor>;
+   using ColumnMajorMatrix = blaze::DynamicMatrix<int,blaze::columnMajor>;
 
    blaze::StorageOrder<RowMajorMatrix>::value     // Evaluates to blaze::rowMajor
    blaze::StorageOrder<ColumnMajorMatrix>::value  // Evaluates to blaze::columnMajor
@@ -75,23 +97,8 @@ namespace blaze {
 */
 template< typename T >
 struct StorageOrder
-{
- private:
-   //**struct ValidType****************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   struct ValidType {
-      static const bool value = ( IsRowMajorMatrix<T>::value ? rowMajor : columnMajor );
-   };
-   /*! \endcond */
-   //**********************************************************************************************
-
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   static const bool value = If< IsMatrix<T>, ValidType, INVALID_TYPE >::Type::value;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+   : public StorageOrderHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

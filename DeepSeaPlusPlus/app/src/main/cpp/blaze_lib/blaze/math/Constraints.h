@@ -3,7 +3,7 @@
 //  \file blaze/math/Constraints.h
 //  \brief Header file for all mathematical constraints
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,20 +40,26 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/constraints/AbsExpr.h>
 #include <blaze/math/constraints/Adaptor.h>
 #include <blaze/math/constraints/AddExpr.h>
 #include <blaze/math/constraints/Aligned.h>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/constraints/BinaryMapExpr.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Column.h>
 #include <blaze/math/constraints/ColumnMajorMatrix.h>
 #include <blaze/math/constraints/Columns.h>
 #include <blaze/math/constraints/ColumnVector.h>
 #include <blaze/math/constraints/Computation.h>
-#include <blaze/math/constraints/ConjExpr.h>
 #include <blaze/math/constraints/ConstDataAccess.h>
 #include <blaze/math/constraints/CrossExpr.h>
 #include <blaze/math/constraints/Custom.h>
+#include <blaze/math/constraints/Declaration.h>
+#include <blaze/math/constraints/DeclDiagExpr.h>
+#include <blaze/math/constraints/DeclExpr.h>
+#include <blaze/math/constraints/DeclHermExpr.h>
+#include <blaze/math/constraints/DeclLowExpr.h>
+#include <blaze/math/constraints/DeclSymExpr.h>
+#include <blaze/math/constraints/DeclUppExpr.h>
 #include <blaze/math/constraints/DenseMatrix.h>
 #include <blaze/math/constraints/DenseVector.h>
 #include <blaze/math/constraints/Diagonal.h>
@@ -63,18 +69,15 @@
 #include <blaze/math/constraints/General.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Identity.h>
-#include <blaze/math/constraints/ImagExpr.h>
 #include <blaze/math/constraints/Invertible.h>
 #include <blaze/math/constraints/Lower.h>
-#include <blaze/math/constraints/MatAbsExpr.h>
-#include <blaze/math/constraints/MatConjExpr.h>
 #include <blaze/math/constraints/MatEvalExpr.h>
-#include <blaze/math/constraints/MatImagExpr.h>
 #include <blaze/math/constraints/MatInvExpr.h>
+#include <blaze/math/constraints/MatMapExpr.h>
 #include <blaze/math/constraints/MatMatAddExpr.h>
+#include <blaze/math/constraints/MatMatMapExpr.h>
 #include <blaze/math/constraints/MatMatMultExpr.h>
 #include <blaze/math/constraints/MatMatSubExpr.h>
-#include <blaze/math/constraints/MatRealExpr.h>
 #include <blaze/math/constraints/Matrix.h>
 #include <blaze/math/constraints/MatScalarDivExpr.h>
 #include <blaze/math/constraints/MatScalarMultExpr.h>
@@ -83,9 +86,12 @@
 #include <blaze/math/constraints/MatVecMultExpr.h>
 #include <blaze/math/constraints/MultExpr.h>
 #include <blaze/math/constraints/MutableDataAccess.h>
+#include <blaze/math/constraints/NumericMatrix.h>
+#include <blaze/math/constraints/NumericVector.h>
+#include <blaze/math/constraints/Operation.h>
+#include <blaze/math/constraints/OpposedView.h>
 #include <blaze/math/constraints/Padded.h>
 #include <blaze/math/constraints/Proxy.h>
-#include <blaze/math/constraints/RealExpr.h>
 #include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/Resizable.h>
 #include <blaze/math/constraints/Restricted.h>
@@ -93,13 +99,19 @@
 #include <blaze/math/constraints/RowMajorMatrix.h>
 #include <blaze/math/constraints/Rows.h>
 #include <blaze/math/constraints/RowVector.h>
+#include <blaze/math/constraints/SchurExpr.h>
 #include <blaze/math/constraints/SerialExpr.h>
+#include <blaze/math/constraints/Shrinkable.h>
+#include <blaze/math/constraints/SIMDCombinable.h>
+#include <blaze/math/constraints/SIMDEnabled.h>
+#include <blaze/math/constraints/SIMDPack.h>
 #include <blaze/math/constraints/Size.h>
 #include <blaze/math/constraints/SMPAssignable.h>
 #include <blaze/math/constraints/SparseElement.h>
 #include <blaze/math/constraints/SparseMatrix.h>
 #include <blaze/math/constraints/SparseVector.h>
 #include <blaze/math/constraints/Square.h>
+#include <blaze/math/constraints/Static.h>
 #include <blaze/math/constraints/StorageOrder.h>
 #include <blaze/math/constraints/StrictlyLower.h>
 #include <blaze/math/constraints/StrictlyTriangular.h>
@@ -109,18 +121,18 @@
 #include <blaze/math/constraints/Subvector.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/TransExpr.h>
+#include <blaze/math/constraints/Transformation.h>
 #include <blaze/math/constraints/TransposeFlag.h>
 #include <blaze/math/constraints/Triangular.h>
 #include <blaze/math/constraints/TVecMatMultExpr.h>
+#include <blaze/math/constraints/UnaryMapExpr.h>
+#include <blaze/math/constraints/Uniform.h>
 #include <blaze/math/constraints/UniLower.h>
 #include <blaze/math/constraints/UniTriangular.h>
 #include <blaze/math/constraints/UniUpper.h>
 #include <blaze/math/constraints/Upper.h>
-#include <blaze/math/constraints/VecAbsExpr.h>
-#include <blaze/math/constraints/VecConjExpr.h>
 #include <blaze/math/constraints/VecEvalExpr.h>
-#include <blaze/math/constraints/VecImagExpr.h>
-#include <blaze/math/constraints/VecRealExpr.h>
+#include <blaze/math/constraints/VecMapExpr.h>
 #include <blaze/math/constraints/VecScalarDivExpr.h>
 #include <blaze/math/constraints/VecScalarMultExpr.h>
 #include <blaze/math/constraints/VecSerialExpr.h>
@@ -128,6 +140,8 @@
 #include <blaze/math/constraints/VecTransExpr.h>
 #include <blaze/math/constraints/VecTVecMultExpr.h>
 #include <blaze/math/constraints/VecVecAddExpr.h>
+#include <blaze/math/constraints/VecVecDivExpr.h>
+#include <blaze/math/constraints/VecVecMapExpr.h>
 #include <blaze/math/constraints/VecVecMultExpr.h>
 #include <blaze/math/constraints/VecVecSubExpr.h>
 #include <blaze/math/constraints/View.h>

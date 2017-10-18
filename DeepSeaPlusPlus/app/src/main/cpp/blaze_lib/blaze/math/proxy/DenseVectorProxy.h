@@ -3,7 +3,7 @@
 //  \file blaze/math/proxy/DenseVectorProxy.h
 //  \brief Header file for the DenseVectorProxy class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,7 +40,9 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/DenseVector.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/DenseVector.h>
 #include <blaze/math/shims/Clear.h>
 #include <blaze/math/shims/Reset.h>
@@ -49,7 +51,6 @@
 #include <blaze/system/Inline.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/Unused.h>
 
@@ -72,35 +73,37 @@ namespace blaze {
 */
 template< typename PT    // Type of the proxy
         , typename VT >  // Type of the dense vector
-class DenseVectorProxy : public DenseVector< PT, IsRowVector<VT>::value >
+class DenseVectorProxy
+   : public DenseVector< PT, IsRowVector<VT>::value >
 {
  public:
    //**Type definitions****************************************************************************
-   typedef typename VT::ResultType      ResultType;      //!< Result type for expression template evaluations.
-   typedef typename VT::TransposeType   TransposeType;   //!< Transpose type for expression template evaluations.
-   typedef typename VT::ElementType     ElementType;     //!< Type of the vector elements.
-   typedef typename VT::ReturnType      ReturnType;      //!< Return type for expression template evaluations
-   typedef typename VT::CompositeType   CompositeType;   //!< Data type for composite expression templates.
-   typedef typename VT::Reference       Reference;       //!< Reference to a non-constant vector value.
-   typedef typename VT::ConstReference  ConstReference;  //!< Reference to a constant vector value.
-   typedef typename VT::Pointer         Pointer;         //!< Pointer to a non-constant vector value.
-   typedef typename VT::ConstPointer    ConstPointer;    //!< Pointer to a constant vector value.
-   typedef typename VT::Iterator        Iterator;        //!< Iterator over non-constant elements.
-   typedef typename VT::ConstIterator   ConstIterator;   //!< Iterator over constant elements.
+   using ResultType     = ResultType_<VT>;      //!< Result type for expression template evaluations.
+   using TransposeType  = TransposeType_<VT>;   //!< Transpose type for expression template evaluations.
+   using ElementType    = ElementType_<VT>;     //!< Type of the vector elements.
+   using ReturnType     = ReturnType_<VT>;      //!< Return type for expression template evaluations
+   using CompositeType  = CompositeType_<VT>;   //!< Data type for composite expression templates.
+   using Reference      = Reference_<VT>;       //!< Reference to a non-constant vector value.
+   using ConstReference = ConstReference_<VT>;  //!< Reference to a constant vector value.
+   using Pointer        = Pointer_<VT>;         //!< Pointer to a non-constant vector value.
+   using ConstPointer   = ConstPointer_<VT>;    //!< Pointer to a constant vector value.
+   using Iterator       = Iterator_<VT>;        //!< Iterator over non-constant elements.
+   using ConstIterator  = ConstIterator_<VT>;   //!< Iterator over constant elements.
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
-   //! Compilation flag for intrinsic optimization.
-   enum { vectorizable = VT::vectorizable };
+   //! Compilation flag for SIMD optimization.
+   enum : bool { simdEnabled = VT::simdEnabled };
 
    //! Compilation flag for SMP assignments.
-   enum { smpAssignable = VT::smpAssignable };
+   enum : bool { smpAssignable = VT::smpAssignable };
    //**********************************************************************************************
 
    //**Data access functions***********************************************************************
    /*!\name Data access functions */
    //@{
    inline Reference operator[]( size_t index ) const;
+   inline Reference at( size_t index ) const;
 
    inline Pointer       data  () const;
    inline Iterator      begin () const;
@@ -121,7 +124,12 @@ class DenseVectorProxy : public DenseVector< PT, IsRowVector<VT>::value >
    inline void   resize( size_t n, bool preserve=true ) const;
    inline void   extend( size_t n, bool preserve=true ) const;
    inline void   reserve( size_t n ) const;
+   //@}
+   //**********************************************************************************************
 
+   //**Numeric functions***************************************************************************
+   /*!\name Numeric functions */
+   //@{
    template< typename Other > inline void scale( const Other& scalar ) const;
    //@}
    //**********************************************************************************************
@@ -149,6 +157,7 @@ class DenseVectorProxy : public DenseVector< PT, IsRowVector<VT>::value >
 //
 // \param index Access index. The index has to be in the range \f$[0..N-1]\f$.
 // \return Reference to the accessed value.
+// \exception std::invalid_argument Invalid access to restricted element.
 */
 template< typename PT    // Type of the proxy
         , typename VT >  // Type of the dense vector
@@ -165,9 +174,35 @@ inline typename DenseVectorProxy<PT,VT>::Reference
 
 
 //*************************************************************************************************
+/*!\brief Checked access to the vector elements.
+//
+// \param index Access index. The index has to be in the range \f$[0..N-1]\f$.
+// \return Reference to the accessed value.
+// \exception std::invalid_argument Invalid access to restricted element.
+// \exception std::out_of_range Invalid vector access index.
+//
+// In contrast to the subscript operator this function always performs a check of the given
+// access index.
+*/
+template< typename PT    // Type of the proxy
+        , typename VT >  // Type of the dense vector
+inline typename DenseVectorProxy<PT,VT>::Reference
+   DenseVectorProxy<PT,VT>::at( size_t index ) const
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   return (~*this).get().at( index );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
 /*!\brief Low-level data access to vector elements.
 //
 // \return Pointer to the internal element storage.
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function returns a pointer to the internal storage of the dynamic vector.
 */
@@ -188,6 +223,7 @@ inline typename DenseVectorProxy<PT,VT>::Pointer DenseVectorProxy<PT,VT>::data()
 /*!\brief Returns an iterator to the first element of the represented vector.
 //
 // \return Iterator to the first element of the vector.
+// \exception std::invalid_argument Invalid access to restricted element.
 */
 template< typename PT    // Type of the proxy
         , typename VT >  // Type of the dense vector
@@ -220,6 +256,7 @@ inline typename DenseVectorProxy<PT,VT>::ConstIterator DenseVectorProxy<PT,VT>::
 /*!\brief Returns an iterator just past the last element of the represented vector.
 //
 // \return Iterator just past the last element of the vector.
+// \exception std::invalid_argument Invalid access to restricted element.
 */
 template< typename PT    // Type of the proxy
         , typename VT >  // Type of the dense vector
@@ -343,6 +380,7 @@ inline void DenseVectorProxy<PT,VT>::clear() const
 // \param n The new size of the vector.
 // \param preserve \a true if the old values of the vector should be preserved, \a false if not.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function changes the size of the vector. Depending on the type of the vector, during this
 // operation new dynamic memory may be allocated in case the capacity of the vector is too small.
@@ -371,6 +409,7 @@ inline void DenseVectorProxy<PT,VT>::resize( size_t n, bool preserve ) const
 // \param n Number of additional vector elements.
 // \param preserve \a true if the old values of the vector should be preserved, \a false if not.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function extends the size of the vector. Depending on the type of the vector, during this
 // operation new dynamic memory may be allocated in case the capacity of the vector is too small.
@@ -396,6 +435,7 @@ inline void DenseVectorProxy<PT,VT>::extend( size_t n, bool preserve ) const
 //
 // \param n The new minimum capacity of the vector.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function increases the capacity of the vector to at least \a n elements. The current
 // values of the vector elements are preserved.
@@ -418,6 +458,11 @@ inline void DenseVectorProxy<PT,VT>::reserve( size_t n ) const
 //
 // \param scalar The scalar value for the vector scaling.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
+//
+// This function scales the vector by applying the given scalar value \a scalar to each element
+// of the vector. For built-in and \c complex data types it has the same effect as using the
+// multiplication assignment operator.
 */
 template< typename PT       // Type of the proxy
         , typename VT >     // Type of the dense vector
@@ -617,7 +662,7 @@ BLAZE_ALWAYS_INLINE size_t nonZeros( const DenseVectorProxy<PT,VT>& proxy )
 */
 template< typename PT    // Type of the proxy
         , typename VT >  // Type of the dense vector
-BLAZE_ALWAYS_INLINE typename DisableIf< IsResizable<VT> >::Type
+BLAZE_ALWAYS_INLINE DisableIf_< IsResizable<VT> >
    resize_backend( const DenseVectorProxy<PT,VT>& proxy, size_t n, bool preserve )
 {
    UNUSED_PARAMETER( preserve );
@@ -644,7 +689,7 @@ BLAZE_ALWAYS_INLINE typename DisableIf< IsResizable<VT> >::Type
 */
 template< typename PT    // Type of the proxy
         , typename VT >  // Type of the dense vector
-BLAZE_ALWAYS_INLINE typename EnableIf< IsResizable<VT> >::Type
+BLAZE_ALWAYS_INLINE EnableIf_< IsResizable<VT> >
    resize_backend( const DenseVectorProxy<PT,VT>& proxy, size_t n, bool preserve )
 {
    proxy.resize( n, preserve );

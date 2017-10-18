@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/SMatTransExpr.h
 //  \brief Header file for the sparse matrix transpose expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,28 +41,23 @@
 //*************************************************************************************************
 
 #include <iterator>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/RequiresEvaluation.h>
 #include <blaze/math/constraints/SparseMatrix.h>
 #include <blaze/math/constraints/StorageOrder.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/DMatTransposer.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/MatTransExpr.h>
 #include <blaze/math/expressions/SMatTransposer.h>
 #include <blaze/math/expressions/SparseMatrix.h>
-#include <blaze/math/traits/ColumnExprTrait.h>
-#include <blaze/math/traits/RowExprTrait.h>
-#include <blaze/math/traits/SMatTransExprTrait.h>
-#include <blaze/math/traits/SubmatrixExprTrait.h>
-#include <blaze/math/traits/TransExprTrait.h>
-#include <blaze/math/traits/TSMatTransExprTrait.h>
+#include <blaze/math/expressions/Transformation.h>
 #include <blaze/math/typetraits/Columns.h>
-#include <blaze/math/typetraits/IsColumnMajorMatrix.h>
 #include <blaze/math/typetraits/IsComputation.h>
 #include <blaze/math/typetraits/IsExpression.h>
 #include <blaze/math/typetraits/IsHermitian.h>
 #include <blaze/math/typetraits/IsLower.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/math/typetraits/IsStrictlyLower.h>
 #include <blaze/math/typetraits/IsStrictlyUpper.h>
 #include <blaze/math/typetraits/IsSymmetric.h>
@@ -72,16 +67,14 @@
 #include <blaze/math/typetraits/RequiresEvaluation.h>
 #include <blaze/math/typetraits/Rows.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/constraints/Reference.h>
-#include <blaze/util/EmptyType.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/InvalidType.h>
-#include <blaze/util/logging/FunctionTrace.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/mpl/If.h>
 #include <blaze/util/Types.h>
+#include <blaze/util/typetraits/HasMember.h>
 #include <blaze/util/typetraits/RemoveReference.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -101,14 +94,14 @@ namespace blaze {
 */
 template< typename MT  // Type of the sparse matrix
         , bool SO >    // Storage order
-class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
-                    , private MatTransExpr
-                    , private SelectType< IsComputation<MT>::value, Computation, EmptyType >::Type
+class SMatTransExpr
+   : public MatTransExpr< SparseMatrix< SMatTransExpr<MT,SO>, SO > >
+   , private If< IsComputation<MT>, Computation, Transformation >::Type
 {
  private:
    //**Type definitions****************************************************************************
-   typedef typename MT::ResultType     RT;  //!< Result type of the sparse matrix expression.
-   typedef typename MT::CompositeType  CT;  //!< Composite type of the sparse matrix expression.
+   using RT = ResultType_<MT>;     //!< Result type of the sparse matrix expression.
+   using CT = CompositeType_<MT>;  //!< Composite type of the sparse matrix expression.
    //**********************************************************************************************
 
    //**Serial evaluation strategy******************************************************************
@@ -119,13 +112,13 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
        set to 1 and the transposition expression will be evaluated via the \a assign function
        family. Otherwise \a useAssign will be set to 0 and the expression will be evaluated via
        the subscript operator. */
-   enum { useAssign = RequiresEvaluation<MT>::value };
+   enum : bool { useAssign = RequiresEvaluation<MT>::value };
 
    /*! \cond BLAZE_INTERNAL */
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename MT2 >
    struct UseAssign {
-      enum { value = useAssign };
+      enum : bool { value = useAssign };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -139,153 +132,49 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
        strategy is selected. Otherwise \a value is set to 0 and the default strategy is chosen. */
    template< typename MT2 >
    struct UseSMPAssign {
-      enum { value = MT2::smpAssignable && useAssign };
+      enum : bool { value = MT2::smpAssignable && useAssign };
+   };
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**********************************************************************************************
+   /*! \cond BLAZE_INTERNAL */
+   //! Helper structure to acquire the type of constant iterators of the given matrix type.
+   /*! The GetConstIterator struct helps to acquire the constant iterator type of the given
+       matrix type. In case the given matrix has a nested \a ConstIterator type, the nested
+       type definition \a Type is set to that type. Otherwise \a Type is set to INVALID_TYPE. */
+   template< typename MT2 >
+   struct GetConstIterator {
+      BLAZE_CREATE_HAS_TYPE_MEMBER_TYPE_TRAIT( HasConstIterator, ConstIterator );
+      struct Success { using Type = typename MT2::ConstIterator; };
+      struct Failure { using Type = INVALID_TYPE; };
+      using Type = typename If_< HasConstIterator<MT2>, Success, Failure >::Type;
    };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef SMatTransExpr<MT,SO>        This;           //!< Type of this SMatTransExpr instance.
-   typedef typename MT::TransposeType  ResultType;     //!< Result type for expression template evaluations.
-   typedef typename MT::OppositeType   OppositeType;   //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename MT::ResultType     TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename MT::ElementType    ElementType;    //!< Resulting element type.
-   typedef typename MT::ReturnType     ReturnType;     //!< Return type for expression template evaluations.
+   using This          = SMatTransExpr<MT,SO>;       //!< Type of this SMatTransExpr instance.
+   using ResultType    = TransposeType_<MT>;         //!< Result type for expression template evaluations.
+   using OppositeType  = OppositeType_<ResultType>;  //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType = ResultType_<MT>;            //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<MT>;           //!< Resulting element type.
+   using ReturnType    = ReturnType_<MT>;            //!< Return type for expression template evaluations.
 
    //! Data type for composite expression templates.
-   typedef typename SelectType< useAssign, const ResultType, const SMatTransExpr& >::Type  CompositeType;
+   using CompositeType = IfTrue_< useAssign, const ResultType, const SMatTransExpr& >;
+
+   //! Iterator over the elements of the dense matrix.
+   using ConstIterator = typename GetConstIterator<MT>::Type;
 
    //! Composite data type of the sparse matrix expression.
-   typedef typename SelectType< IsExpression<MT>::value, const MT, const MT& >::Type  Operand;
-   //**********************************************************************************************
-
-   //**ConstIterator class definition**************************************************************
-   /*!\brief Iterator over the elements of the sparse matrix transposition expression.
-   */
-   class ConstIterator
-   {
-    public:
-      //**Type definitions*************************************************************************
-      //! Iterator type of the sparse matrix expression.
-      typedef typename RemoveReference<Operand>::Type::ConstIterator  IteratorType;
-
-      typedef std::forward_iterator_tag                                     IteratorCategory;  //!< The iterator category.
-      typedef typename std::iterator_traits<IteratorType>::value_type       ValueType;         //!< Type of the underlying pointers.
-      typedef typename std::iterator_traits<IteratorType>::pointer          PointerType;       //!< Pointer return type.
-      typedef typename std::iterator_traits<IteratorType>::reference        ReferenceType;     //!< Reference return type.
-      typedef typename std::iterator_traits<IteratorType>::difference_type  DifferenceType;    //!< Difference between two iterators.
-
-      // STL iterator requirements
-      typedef IteratorCategory  iterator_category;  //!< The iterator category.
-      typedef ValueType         value_type;         //!< Type of the underlying pointers.
-      typedef PointerType       pointer;            //!< Pointer return type.
-      typedef ReferenceType     reference;          //!< Reference return type.
-      typedef DifferenceType    difference_type;    //!< Difference between two iterators.
-      //*******************************************************************************************
-
-      //**Constructor******************************************************************************
-      /*!\brief Constructor for the ConstIterator class.
-      */
-      inline ConstIterator( IteratorType it )
-         : it_( it )  // Iterator over the elements of the sparse matrix expression
-      {}
-      //*******************************************************************************************
-
-      //**Prefix increment operator****************************************************************
-      /*!\brief Pre-increment operator.
-      //
-      // \return Reference to the incremented expression iterator.
-      */
-      inline ConstIterator& operator++() {
-         ++it_;
-         return *this;
-      }
-      //*******************************************************************************************
-
-      //**Element access operator******************************************************************
-      /*!\brief Direct access to the sparse matrix element at the current iterator position.
-      //
-      // \return The current value of the sparse element.
-      */
-      inline const ValueType operator*() const {
-         return *it_;
-      }
-      //*******************************************************************************************
-
-      //**Element access operator******************************************************************
-      /*!\brief Direct access to the sparse matrix element at the current iterator position.
-      //
-      // \return Reference to the sparse matrix element at the current iterator position.
-      */
-      inline const IteratorType operator->() const {
-         return it_;
-      }
-      //*******************************************************************************************
-
-      //**Value function***************************************************************************
-      /*!\brief Access to the current value of the sparse element.
-      //
-      // \return The current value of the sparse element.
-      */
-      inline ReturnType value() const {
-         return it_->value();
-      }
-      //*******************************************************************************************
-
-      //**Index function***************************************************************************
-      /*!\brief Access to the current index of the sparse element.
-      //
-      // \return The current index of the sparse element.
-      */
-      inline size_t index() const {
-         return it_->index();
-      }
-      //*******************************************************************************************
-
-      //**Equality operator************************************************************************
-      /*!\brief Equality comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side expression iterator.
-      // \return \a true if the iterators refer to the same element, \a false if not.
-      */
-      inline bool operator==( const ConstIterator& rhs ) const {
-         return it_ == rhs.it_;
-      }
-      //*******************************************************************************************
-
-      //**Inequality operator**********************************************************************
-      /*!\brief Inequality comparison between two ConstIterator objects.
-      //
-      // \param rhs The right-hand side expression iterator.
-      // \return \a true if the iterators don't refer to the same element, \a false if they do.
-      */
-      inline bool operator!=( const ConstIterator& rhs ) const {
-         return it_ != rhs.it_;
-      }
-      //*******************************************************************************************
-
-      //**Subtraction operator*********************************************************************
-      /*!\brief Calculating the number of elements between two expression iterators.
-      //
-      // \param rhs The right-hand side expression iterator.
-      // \return The number of elements between the two expression iterators.
-      */
-      inline DifferenceType operator-( const ConstIterator& rhs ) const {
-         return it_ - rhs.it_;
-      }
-      //*******************************************************************************************
-
-    private:
-      //**Member variables*************************************************************************
-      IteratorType it_;  //!< Iterator over the elements of the sparse matrix expression.
-      //*******************************************************************************************
-   };
+   using Operand = If_< IsExpression<MT>, const MT, const MT& >;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = MT::smpAssignable };
+   enum : bool { smpAssignable = MT::smpAssignable };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -293,7 +182,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    //
    // \param sm The sparse matrix operand of the transposition expression.
    */
-   explicit inline SMatTransExpr( const MT& sm )
+   explicit inline SMatTransExpr( const MT& sm ) noexcept
       : sm_( sm )
    {}
    //**********************************************************************************************
@@ -358,7 +247,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    //
    // \return The number of rows of the matrix.
    */
-   inline size_t rows() const {
+   inline size_t rows() const noexcept {
       return sm_.columns();
    }
    //**********************************************************************************************
@@ -368,7 +257,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    //
    // \return The number of columns of the matrix.
    */
-   inline size_t columns() const {
+   inline size_t columns() const noexcept {
       return sm_.rows();
    }
    //**********************************************************************************************
@@ -438,7 +327,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    //
    // \return The sparse matrix operand.
    */
-   inline Operand operand() const {
+   inline Operand operand() const noexcept {
       return sm_;
    }
    //**********************************************************************************************
@@ -450,7 +339,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return sm_.isAliased( alias );
    }
    //**********************************************************************************************
@@ -462,7 +351,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return sm_.isAliased( alias );
    }
    //**********************************************************************************************
@@ -472,7 +361,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    //
    // \return \a true in case the expression can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const {
+   inline bool canSMPAssign() const noexcept {
       return sm_.canSMPAssign();
    }
    //**********************************************************************************************
@@ -498,7 +387,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target dense matrix
            , bool SO2 >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseAssign<MT2> >::Type
+   friend inline EnableIf_< UseAssign<MT2> >
       assign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -528,7 +417,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target sparse matrix
            , bool SO2 >    // Storage order of the target sparse matrix
-   friend inline typename EnableIf< UseAssign<MT2> >::Type
+   friend inline EnableIf_< UseAssign<MT2> >
       assign( SparseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -558,7 +447,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target dense matrix
            , bool SO2 >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseAssign<MT2> >::Type
+   friend inline EnableIf_< UseAssign<MT2> >
       addAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -592,7 +481,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target dense matrix
            , bool SO2 >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseAssign<MT2> >::Type
+   friend inline EnableIf_< UseAssign<MT2> >
       subAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -608,6 +497,40 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
 
    //**Subtraction assignment to sparse matrices***************************************************
    // No special implementation for the subtraction assignment to sparse matrices.
+   //**********************************************************************************************
+
+   //**Schur product assignment to dense matrices**************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief Schur product assignment of a sparse matrix transposition expression to a dense matrix.
+   // \ingroup sparse_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side transposition expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized Schur product assignment of a sparse
+   // matrix transposition expression to a dense matrix. Due to the explicit application of
+   // the SFINAE principle, this function can only be selected by the compiler in case the
+   // operand requires an intermediate evaluation.
+   */
+   template< typename MT2  // Type of the target dense matrix
+           , bool SO2 >    // Storage order of the target dense matrix
+   friend inline EnableIf_< UseAssign<MT2> >
+      schurAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      DMatTransposer<MT2,!SO2> tmp( ~lhs );
+      schurAssign( tmp, rhs.sm_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**Schur product assignment to sparse matrices*************************************************
+   // No special implementation for the Schur product assignment to sparse matrices.
    //**********************************************************************************************
 
    //**Multiplication assignment to dense matrices*************************************************
@@ -634,7 +557,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target dense matrix
            , bool SO2 >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT2> >
       smpAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -664,7 +587,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target sparse matrix
            , bool SO2 >    // Storage order of the target sparse matrix
-   friend inline typename EnableIf< UseSMPAssign<MT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT2> >
       smpAssign( SparseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -694,7 +617,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target dense matrix
            , bool SO2 >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT2> >
       smpAddAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -729,7 +652,7 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
    */
    template< typename MT2  // Type of the target dense matrix
            , bool SO2 >    // Storage order of the target dense matrix
-   friend inline typename EnableIf< UseSMPAssign<MT2> >::Type
+   friend inline EnableIf_< UseSMPAssign<MT2> >
       smpSubAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
    {
       BLAZE_FUNCTION_TRACE;
@@ -745,6 +668,41 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
 
    //**SMP subtraction assignment to sparse matrices***********************************************
    // No special implementation for the SMP subtraction assignment to sparse matrices.
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to dense matrices**********************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief SMP Schur product assignment of a sparse matrix transposition expression to a dense
+   //        matrix.
+   // \ingroup sparse_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side transposition expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized SMP Schur product assignment of a sparse
+   // matrix transposition expression to a dense matrix. Due to the explicit application of the
+   // SFINAE principle, this function can only be selected by the compiler in case the expression
+   // specific parallel evaluation strategy is selected.
+   */
+   template< typename MT2  // Type of the target dense matrix
+           , bool SO2 >    // Storage order of the target dense matrix
+   friend inline EnableIf_< UseSMPAssign<MT2> >
+      smpSchurAssign( DenseMatrix<MT2,SO2>& lhs, const SMatTransExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      DMatTransposer<MT2,!SO2> tmp( ~lhs );
+      smpSchurAssign( tmp, rhs.sm_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to sparse matrices*********************************************
+   // No special implementation for the SMP Schur product assignment to sparse matrices.
    //**********************************************************************************************
 
    //**SMP multiplication assignment to dense matrices*********************************************
@@ -794,11 +752,12 @@ class SMatTransExpr : public SparseMatrix< SMatTransExpr<MT,SO>, SO >
 */
 template< typename MT  // Type of the sparse matrix
         , bool SO >    // Storage order
-inline const SMatTransExpr<MT,!SO> trans( const SparseMatrix<MT,SO>& sm )
+inline decltype(auto) trans( const SparseMatrix<MT,SO>& sm )
 {
    BLAZE_FUNCTION_TRACE;
 
-   return SMatTransExpr<MT,!SO>( ~sm );
+   using ReturnType = const SMatTransExpr<MT,!SO>;
+   return ReturnType( ~sm );
 }
 //*************************************************************************************************
 
@@ -833,11 +792,36 @@ inline const SMatTransExpr<MT,!SO> trans( const SparseMatrix<MT,SO>& sm )
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline typename SMatTransExpr<MT,SO>::Operand trans( const SMatTransExpr<MT,SO>& sm )
+inline decltype(auto) trans( const SMatTransExpr<MT,SO>& sm )
 {
    BLAZE_FUNCTION_TRACE;
 
    return sm.operand();
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Calculation of the transpose of the given sparse matrix-scalar multiplication.
+// \ingroup sparse_matrix
+//
+// \param sm The sparse matrix-scalar multiplication expression to be transposed.
+// \return The transpose of the expression.
+//
+// This operator implements the performance optimized treatment of the transpose of a sparse
+// matrix-scalar multiplication. It restructures the expression \f$ A=trans(B*s1) \f$ to the
+// expression \f$ A=trans(B)*s1 \f$.
+*/
+template< typename MT  // Type of the left-hand side sparse matrix
+        , typename ST  // Type of the right-hand side scalar value
+        , bool SO >    // Storage order
+inline decltype(auto) trans( const SMatScalarMultExpr<MT,ST,SO>& sm )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   return trans( sm.leftOperand() ) * sm.rightOperand();
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -854,7 +838,8 @@ inline typename SMatTransExpr<MT,SO>::Operand trans( const SMatTransExpr<MT,SO>&
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct Rows< SMatTransExpr<MT,SO> > : public Columns<MT>
+struct Rows< SMatTransExpr<MT,SO> >
+   : public Columns<MT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -871,7 +856,8 @@ struct Rows< SMatTransExpr<MT,SO> > : public Columns<MT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct Columns< SMatTransExpr<MT,SO> > : public Rows<MT>
+struct Columns< SMatTransExpr<MT,SO> >
+   : public Rows<MT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -888,7 +874,8 @@ struct Columns< SMatTransExpr<MT,SO> > : public Rows<MT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsSymmetric< SMatTransExpr<MT,SO> > : public IsTrue< IsSymmetric<MT>::value >
+struct IsSymmetric< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsSymmetric<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -905,7 +892,8 @@ struct IsSymmetric< SMatTransExpr<MT,SO> > : public IsTrue< IsSymmetric<MT>::val
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsHermitian< SMatTransExpr<MT,SO> > : public IsTrue< IsHermitian<MT>::value >
+struct IsHermitian< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsHermitian<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -922,7 +910,8 @@ struct IsHermitian< SMatTransExpr<MT,SO> > : public IsTrue< IsHermitian<MT>::val
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsLower< SMatTransExpr<MT,SO> > : public IsTrue< IsUpper<MT>::value >
+struct IsLower< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsUpper<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -939,7 +928,8 @@ struct IsLower< SMatTransExpr<MT,SO> > : public IsTrue< IsUpper<MT>::value >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsUniLower< SMatTransExpr<MT,SO> > : public IsTrue< IsUniUpper<MT>::value >
+struct IsUniLower< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsUniUpper<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -956,7 +946,8 @@ struct IsUniLower< SMatTransExpr<MT,SO> > : public IsTrue< IsUniUpper<MT>::value
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsStrictlyLower< SMatTransExpr<MT,SO> > : public IsTrue< IsStrictlyUpper<MT>::value >
+struct IsStrictlyLower< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsStrictlyUpper<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -973,7 +964,8 @@ struct IsStrictlyLower< SMatTransExpr<MT,SO> > : public IsTrue< IsStrictlyUpper<
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsUpper< SMatTransExpr<MT,SO> > : public IsTrue< IsLower<MT>::value >
+struct IsUpper< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsLower<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -990,7 +982,8 @@ struct IsUpper< SMatTransExpr<MT,SO> > : public IsTrue< IsLower<MT>::value >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsUniUpper< SMatTransExpr<MT,SO> > : public IsTrue< IsUniLower<MT>::value >
+struct IsUniUpper< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsUniLower<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -1007,90 +1000,9 @@ struct IsUniUpper< SMatTransExpr<MT,SO> > : public IsTrue< IsUniLower<MT>::value
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsStrictlyUpper< SMatTransExpr<MT,SO> > : public IsTrue< IsStrictlyLower<MT>::value >
+struct IsStrictlyUpper< SMatTransExpr<MT,SO> >
+   : public BoolConstant< IsStrictlyLower<MT>::value >
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT >
-struct SMatTransExprTrait< SMatTransExpr<MT,false> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsSparseMatrix<MT>::value && IsColumnMajorMatrix<MT>::value
-                              , typename SMatTransExpr<MT,false>::Operand
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT >
-struct TSMatTransExprTrait< SMatTransExpr<MT,true> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsSparseMatrix<MT>::value && IsRowMajorMatrix<MT>::value
-                              , typename SMatTransExpr<MT,true>::Operand
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO, bool AF >
-struct SubmatrixExprTrait< SMatTransExpr<MT,SO>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename TransExprTrait< typename SubmatrixExprTrait<const MT,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO >
-struct RowExprTrait< SMatTransExpr<MT,SO> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename TransExprTrait< typename ColumnExprTrait<const MT>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO >
-struct ColumnExprTrait< SMatTransExpr<MT,SO> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename TransExprTrait< typename RowExprTrait<const MT>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

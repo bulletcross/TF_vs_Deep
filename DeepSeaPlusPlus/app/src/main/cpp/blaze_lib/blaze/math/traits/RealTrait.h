@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/RealTrait.h
 //  \brief Header file for the real trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,19 +40,19 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/typetraits/IsMatrix.h>
 #include <blaze/math/typetraits/IsVector.h>
 #include <blaze/util/Complex.h>
 #include <blaze/util/InvalidType.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/mpl/Or.h>
+#include <blaze/util/typetraits/Decay.h>
 #include <blaze/util/typetraits/IsBuiltin.h>
 #include <blaze/util/typetraits/IsComplex.h>
 #include <blaze/util/typetraits/IsConst.h>
 #include <blaze/util/typetraits/IsReference.h>
 #include <blaze/util/typetraits/IsVolatile.h>
-#include <blaze/util/typetraits/RemoveCV.h>
-#include <blaze/util/typetraits/RemoveReference.h>
 
 
 namespace blaze {
@@ -81,9 +81,8 @@ struct RealTrait
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
    struct MatrixOrVector {
-      typedef typename T::ElementType  ET;
-      typedef typename RealTrait<ET>::Type  RT;
-      typedef typename T::template Rebind<RT>::Other  Type;
+      using RT   = typename RealTrait< ElementType_<T> >::Type;
+      using Type = typename T::template Rebind<RT>::Other;
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -91,7 +90,7 @@ struct RealTrait
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
    struct Builtin {
-      typedef T  Type;
+      using Type = T;
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -99,7 +98,7 @@ struct RealTrait
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
    struct Complex {
-      typedef typename T::value_type  Type;
+      using Type = typename T::value_type;
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -107,36 +106,50 @@ struct RealTrait
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
    struct Failure {
-      typedef INVALID_TYPE  Type;
+      using Type = INVALID_TYPE;
    };
    /*! \endcond */
    //**********************************************************************************************
 
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsMatrix<T>, IsVector<T> >
-                      , MatrixOrVector
-                      , typename If< IsBuiltin<T>
-                                   , Builtin
-                                   , typename If< IsComplex<T>
-                                                , Complex
-                                                , Failure
-                                                >::Type
-                                   >::Type
-                      >::Type  Tmp;
-
-   typedef typename RemoveReference< typename RemoveCV<T>::Type >::Type  Type1;
+   using Tmp = If_< Or< IsMatrix<T>, IsVector<T> >
+                  , MatrixOrVector
+                  , If_< IsBuiltin<T>
+                       , Builtin
+                       , If_< IsComplex<T>
+                            , Complex
+                            , Failure > > >;
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsConst<T>, IsVolatile<T>, IsReference<T> >
-                      , RealTrait<Type1>, Tmp >::Type::Type  Type;
+   using Type = typename If_< Or< IsConst<T>, IsVolatile<T>, IsReference<T> >
+                            , RealTrait< Decay_<T> >
+                            , Tmp >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the RealTrait class template.
+// \ingroup math_traits
+//
+// The RealTrait_ alias declaration provides a convenient shortcut to access the nested \a Type
+// of the RealTrait class template. For instance, given the type \a T the following two type
+// definitions are identical:
+
+   \code
+   using Type1 = typename RealTrait<T>::Type;
+   using Type2 = RealTrait_<T>;
+   \endcode
+*/
+template< typename T >  // Type of the operand
+using RealTrait_ = typename RealTrait<T>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

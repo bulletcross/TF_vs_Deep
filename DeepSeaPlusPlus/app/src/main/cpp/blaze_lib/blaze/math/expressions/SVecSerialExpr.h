@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/SVecSerialExpr.h
 //  \brief Header file for the sparse vector serial evaluation expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,29 +40,21 @@
 // Includes
 //*************************************************************************************************
 
-#include <cmath>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/SparseVector.h>
 #include <blaze/math/constraints/TransposeFlag.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/VecSerialExpr.h>
 #include <blaze/math/expressions/SparseVector.h>
-#include <blaze/math/traits/SerialExprTrait.h>
-#include <blaze/math/traits/SubvectorExprTrait.h>
-#include <blaze/math/traits/SVecSerialExprTrait.h>
-#include <blaze/math/traits/TSVecSerialExprTrait.h>
-#include <blaze/math/typetraits/IsColumnVector.h>
 #include <blaze/math/typetraits/IsComputation.h>
 #include <blaze/math/typetraits/IsExpression.h>
-#include <blaze/math/typetraits/IsRowVector.h>
-#include <blaze/math/typetraits/IsSparseVector.h>
 #include <blaze/math/typetraits/Size.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/constraints/Reference.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/FunctionTrace.h>
 #include <blaze/util/InvalidType.h>
-#include <blaze/util/logging/FunctionTrace.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/mpl/If.h>
 #include <blaze/util/Types.h>
 
 
@@ -83,28 +75,28 @@ namespace blaze {
 */
 template< typename VT  // Type of the sparse vector
         , bool TF >    // Transpose flag
-class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
-                     , private VecSerialExpr
-                     , private Computation
+class SVecSerialExpr
+   : public VecSerialExpr< SparseVector< SVecSerialExpr<VT,TF>, TF > >
+   , private Computation
 {
  public:
    //**Type definitions****************************************************************************
-   typedef SVecSerialExpr<VT,TF>       This;           //!< Type of this SVecSerialExpr instance.
-   typedef typename VT::ResultType     ResultType;     //!< Result type for expression template evaluations.
-   typedef typename VT::TransposeType  TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename VT::ElementType    ElementType;    //!< Resulting element type.
-   typedef typename VT::ReturnType     ReturnType;     //!< Return type for expression template evaluations.
+   using This          = SVecSerialExpr<VT,TF>;  //!< Type of this SVecSerialExpr instance.
+   using ResultType    = ResultType_<VT>;        //!< Result type for expression template evaluations.
+   using TransposeType = TransposeType_<VT>;     //!< Transpose type for expression template evaluations.
+   using ElementType   = ElementType_<VT>;       //!< Resulting element type.
+   using ReturnType    = ReturnType_<VT>;        //!< Return type for expression template evaluations.
 
    //! Data type for composite expression templates.
-   typedef const ResultType  CompositeType;
+   using CompositeType = const ResultType;
 
    //! Composite data type of the sparse vector expression.
-   typedef typename SelectType< IsExpression<VT>::value, const VT, const VT& >::Type  Operand;
+   using Operand = If_< IsExpression<VT>, const VT, const VT& >;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = VT::smpAssignable };
+   enum : bool { smpAssignable = VT::smpAssignable };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -112,7 +104,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    //
    // \param sv The sparse vector operand of the serial evaluation expression.
    */
-   explicit inline SVecSerialExpr( const VT& sv )
+   explicit inline SVecSerialExpr( const VT& sv ) noexcept
       : sv_( sv )  // Sparse vector of the serial evaluation expression
    {}
    //**********************************************************************************************
@@ -149,7 +141,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    //
    // \return The size of the vector.
    */
-   inline size_t size() const {
+   inline size_t size() const noexcept {
       return sv_.size();
    }
    //**********************************************************************************************
@@ -169,7 +161,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    //
    // \return The sparse vector operand.
    */
-   inline Operand operand() const {
+   inline Operand operand() const noexcept {
       return sv_;
    }
    //**********************************************************************************************
@@ -179,7 +171,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    //
    // \return The sparse vector operand.
    */
-   inline operator Operand() const {
+   inline operator Operand() const noexcept {
       return sv_;
    }
    //**********************************************************************************************
@@ -191,7 +183,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return sv_.canAlias( alias );
    }
    //**********************************************************************************************
@@ -203,7 +195,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return sv_.isAliased( alias );
    }
    //**********************************************************************************************
@@ -213,7 +205,7 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
    //
    // \return \a true in case the expression can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const {
+   inline bool canSMPAssign() const noexcept {
       return sv_.canSMPAssign();
    }
    //**********************************************************************************************
@@ -654,11 +646,12 @@ class SVecSerialExpr : public SparseVector< SVecSerialExpr<VT,TF>, TF >
 */
 template< typename VT  // Type of the dense vector
         , bool TF >    // Transpose flag
-inline const SVecSerialExpr<VT,TF> serial( const SparseVector<VT,TF>& sv )
+inline decltype(auto) serial( const SparseVector<VT,TF>& sv )
 {
    BLAZE_FUNCTION_TRACE;
 
-   return SVecSerialExpr<VT,TF>( ~sv );
+   using ReturnType = const SVecSerialExpr<VT,TF>;
+   return ReturnType( ~sv );
 }
 //*************************************************************************************************
 
@@ -684,7 +677,7 @@ inline const SVecSerialExpr<VT,TF> serial( const SparseVector<VT,TF>& sv )
 */
 template< typename VT  // Type of the sparse vector
         , bool TF >    // Transpose flag
-inline const SVecSerialExpr<VT,TF> serial( const SVecSerialExpr<VT,TF>& sv )
+inline decltype(auto) serial( const SVecSerialExpr<VT,TF>& sv )
 {
    return sv;
 }
@@ -703,62 +696,9 @@ inline const SVecSerialExpr<VT,TF> serial( const SVecSerialExpr<VT,TF>& sv )
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename VT, bool TF >
-struct Size< SVecSerialExpr<VT,TF> > : public Size<VT>
+struct Size< SVecSerialExpr<VT,TF> >
+   : public Size<VT>
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT >
-struct SVecSerialExprTrait< SVecSerialExpr<VT,false> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsSparseVector<VT>::value && IsColumnVector<VT>::value
-                              , SVecSerialExpr<VT,false>
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT >
-struct TSVecSerialExprTrait< SVecSerialExpr<VT,true> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsSparseVector<VT>::value && IsRowVector<VT>::value
-                              , SVecSerialExpr<VT,true>
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename VT, bool TF, bool AF >
-struct SubvectorExprTrait< SVecSerialExpr<VT,TF>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SerialExprTrait< typename SubvectorExprTrait<const VT,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

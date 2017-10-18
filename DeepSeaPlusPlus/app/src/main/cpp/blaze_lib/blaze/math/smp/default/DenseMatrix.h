@@ -3,7 +3,7 @@
 //  \file blaze/math/smp/default/DenseMatrix.h
 //  \brief Header file for the default dense matrix SMP implementation
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -46,7 +46,7 @@
 #include <blaze/system/SMP.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/logging/FunctionTrace.h>
+#include <blaze/util/FunctionTrace.h>
 #include <blaze/util/StaticAssert.h>
 
 
@@ -62,16 +62,20 @@ namespace blaze {
 /*!\name Dense matrix SMP functions */
 //@{
 template< typename MT1, bool SO1, typename MT2, bool SO2 >
-inline typename EnableIf< IsDenseMatrix<MT1> >::Type
+inline EnableIf_< IsDenseMatrix<MT1> >
    smpAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs );
 
 template< typename MT1, bool SO1, typename MT2, bool SO2 >
-inline typename EnableIf< IsDenseMatrix<MT1> >::Type
+inline EnableIf_< IsDenseMatrix<MT1> >
    smpAddAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs );
 
 template< typename MT1, bool SO1, typename MT2, bool SO2 >
-inline typename EnableIf< IsDenseMatrix<MT1> >::Type
+inline EnableIf_< IsDenseMatrix<MT1> >
    smpSubAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs );
+
+template< typename MT1, bool SO1, typename MT2, bool SO2 >
+inline EnableIf_< IsDenseMatrix<MT1> >
+   smpSchurAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs );
 //@}
 //*************************************************************************************************
 
@@ -94,7 +98,7 @@ template< typename MT1  // Type of the left-hand side dense matrix
         , bool SO1      // Storage order of the left-hand side dense matrix
         , typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename EnableIf< IsDenseMatrix<MT1> >::Type
+inline EnableIf_< IsDenseMatrix<MT1> >
    smpAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs )
 {
    BLAZE_FUNCTION_TRACE;
@@ -125,7 +129,7 @@ template< typename MT1  // Type of the left-hand side dense matrix
         , bool SO1      // Storage order of the left-hand side dense matrix
         , typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename EnableIf< IsDenseMatrix<MT1> >::Type
+inline EnableIf_< IsDenseMatrix<MT1> >
    smpAddAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs )
 {
    BLAZE_FUNCTION_TRACE;
@@ -156,7 +160,7 @@ template< typename MT1  // Type of the left-hand side dense matrix
         , bool SO1      // Storage order of the left-hand side dense matrix
         , typename MT2  // Type of the right-hand side matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
-inline typename EnableIf< IsDenseMatrix<MT1> >::Type
+inline EnableIf_< IsDenseMatrix<MT1> >
    smpSubAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs )
 {
    BLAZE_FUNCTION_TRACE;
@@ -165,6 +169,38 @@ inline typename EnableIf< IsDenseMatrix<MT1> >::Type
    BLAZE_INTERNAL_ASSERT( (~lhs).columns() == (~rhs).columns(), "Invalid number of columns" );
 
    subAssign( ~lhs, ~rhs );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Default implementation of the SMP Schur product assignment of a matrix to dense matrix.
+// \ingroup smp
+//
+// \param lhs The target left-hand side dense matrix.
+// \param rhs The right-hand side matrix for the Schur product.
+// \return void
+//
+// This function implements the default SMP Schur product assignment of a matrix to a dense
+// matrix.\n
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT1  // Type of the left-hand side dense matrix
+        , bool SO1      // Storage order of the left-hand side dense matrix
+        , typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline EnableIf_< IsDenseMatrix<MT1> >
+   smpSchurAssign( Matrix<MT1,SO1>& lhs, const Matrix<MT2,SO2>& rhs )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == (~rhs).rows()   , "Invalid number of rows"    );
+   BLAZE_INTERNAL_ASSERT( (~lhs).columns() == (~rhs).columns(), "Invalid number of columns" );
+
+   schurAssign( ~lhs, ~rhs );
 }
 //*************************************************************************************************
 

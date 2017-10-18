@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsSMPAssignable.h
 //  \brief Header file for the IsSMPAssignable type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -42,10 +42,9 @@
 
 #include <blaze/math/typetraits/IsMatrix.h>
 #include <blaze/math/typetraits/IsVector.h>
-#include <blaze/util/FalseType.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/TrueType.h>
 
 
 namespace blaze {
@@ -67,21 +66,20 @@ struct IsSMPAssignableHelper
  private:
    //**struct HasNestedMember**********************************************************************
    template< typename T2 >
-   struct UseNestedMember { enum { value = T2::smpAssignable }; };
+   struct UseNestedMember { enum : bool { value = T2::smpAssignable }; };
    //**********************************************************************************************
 
    //**struct NoNestedMember***********************************************************************
    template< typename T2 >
-   struct NotSMPAssignable { enum { value = 0 }; };
+   struct NotSMPAssignable { enum : bool { value = false }; };
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
-   enum { value = If< Or< IsVector<T>, IsMatrix<T> >
-                    , UseNestedMember<T>
-                    , NotSMPAssignable<T>
-                    >::Type::value };
-   typedef typename IfTrue<value,TrueType,FalseType>::Type  Type;
+   enum : bool { value = If_< Or< IsVector<T>, IsMatrix<T> >
+                            , UseNestedMember<T>
+                            , NotSMPAssignable<T>
+                            >::value };
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -96,17 +94,18 @@ struct IsSMPAssignableHelper
 // type (i.e. if it is a data type that can possibly and efficiently be assigned by several
 // threads). In this context, built-in data types as well as complex numbers are non-SMP-assignable,
 // whereas several vector and matrix types (as for instance DynamicVector and DynamicMatrix) can be
-// SMP-assignable. If the type is SMP-assignable, the \a value member enumeration is set to 1, the
-// nested type definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise
-// \a value is set to 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// SMP-assignable. If the type is SMP-assignable, the \a value member constant is set to \a true,
+// the nested type definition \a Type is \a TrueType, and the class derives from \a TrueType.
+// Otherwise \a value is set to \a false, \a Type is \a FalseType, and the class derives from
+// \a FalseType.
 
    \code
    using blaze::StaticVector;
    using blaze::StaticMatrix;
    using blaze::DynamicMatrix;
 
-   typedef blaze::DynamicVector<int,columnVector>  VectorType;
-   typedef blaze::DenseSubvector<VectorType>       SubvectorType;
+   using VectorType    = blaze::DynamicVector<int,columnVector>;
+   using SubvectorType = blaze::Subvector<VectorType>;
 
    blaze::IsSMPAssignable< VectorType >::value            // Evaluates to 1
    blaze::IsSMPAssignable< SubvectorType >::Type          // Results in TrueType
@@ -117,16 +116,9 @@ struct IsSMPAssignableHelper
    \endcode
 */
 template< typename T >
-struct IsSMPAssignable : public IsSMPAssignableHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsSMPAssignableHelper<T>::value };
-   typedef typename IsSMPAssignableHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsSMPAssignable
+   : public BoolConstant< IsSMPAssignableHelper<T>::value >
+{};
 //*************************************************************************************************
 
 } // namespace blaze

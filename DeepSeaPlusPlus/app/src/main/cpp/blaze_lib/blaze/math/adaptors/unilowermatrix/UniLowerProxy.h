@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/unilowermatrix/UniLowerProxy.h
 //  \brief Header file for the UniLowerProxy class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,15 +40,16 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
 #include <blaze/math/constraints/Matrix.h>
 #include <blaze/math/constraints/Symmetric.h>
 #include <blaze/math/constraints/Upper.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/proxy/Proxy.h>
 #include <blaze/math/shims/Clear.h>
-#include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/Invert.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/IsNaN.h>
@@ -56,13 +57,11 @@
 #include <blaze/math/shims/IsReal.h>
 #include <blaze/math/shims/IsZero.h>
 #include <blaze/math/shims/Reset.h>
-#include <blaze/math/traits/ConjExprTrait.h>
 #include <blaze/util/constraints/Const.h>
 #include <blaze/util/constraints/Numeric.h>
 #include <blaze/util/constraints/Pointer.h>
 #include <blaze/util/constraints/Reference.h>
 #include <blaze/util/constraints/Volatile.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/InvalidType.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/Types.h>
@@ -99,12 +98,13 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class UniLowerProxy : public Proxy< UniLowerProxy<MT> >
+class UniLowerProxy
+   : public Proxy< UniLowerProxy<MT> >
 {
  private:
    //**Type definitions****************************************************************************
    //! Reference type of the underlying matrix type.
-   typedef typename MT::Reference  ReferenceType;
+   using ReferenceType = typename MT::Reference;
    //**********************************************************************************************
 
    //**struct BuiltinType**************************************************************************
@@ -112,7 +112,7 @@ class UniLowerProxy : public Proxy< UniLowerProxy<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct BuiltinType { typedef INVALID_TYPE  Type; };
+   struct BuiltinType { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
@@ -121,21 +121,21 @@ class UniLowerProxy : public Proxy< UniLowerProxy<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct ComplexType { typedef typename T::value_type  Type; };
+   struct ComplexType { using Type = typename T::value_type; };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
    //! Type of the represented matrix element.
-   typedef typename MT::ElementType  RepresentedType;
+   using RepresentedType = ElementType_<MT>;
 
    //! Value type of the represented complex element.
-   typedef typename If< IsComplex<RepresentedType>
-                      , ComplexType<RepresentedType>
-                      , BuiltinType<RepresentedType> >::Type::Type  ValueType;
+   using ValueType = typename If_< IsComplex<RepresentedType>
+                                 , ComplexType<RepresentedType>
+                                 , BuiltinType<RepresentedType> >::Type;
 
-   typedef ValueType  value_type;  //!< Value type of the represented complex element.
+   using value_type = ValueType;  //!< Value type of the represented complex element.
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -159,6 +159,7 @@ class UniLowerProxy : public Proxy< UniLowerProxy<MT> >
    template< typename T > inline const UniLowerProxy& operator-=( const T& value ) const;
    template< typename T > inline const UniLowerProxy& operator*=( const T& value ) const;
    template< typename T > inline const UniLowerProxy& operator/=( const T& value ) const;
+   template< typename T > inline const UniLowerProxy& operator%=( const T& value ) const;
    //@}
    //**********************************************************************************************
 
@@ -169,15 +170,15 @@ class UniLowerProxy : public Proxy< UniLowerProxy<MT> >
    inline void clear () const;
    inline void invert() const;
 
-   inline RepresentedType get() const;
-   inline bool            isRestricted() const;
+   inline RepresentedType get() const noexcept;
+   inline bool            isRestricted() const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Conversion operator*************************************************************************
    /*!\name Conversion operator */
    //@{
-   inline operator RepresentedType() const;
+   inline operator RepresentedType() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -415,6 +416,31 @@ inline const UniLowerProxy<MT>& UniLowerProxy<MT>::operator/=( const T& value ) 
 //*************************************************************************************************
 
 
+//*************************************************************************************************
+/*!\brief Modulo assignment to the accessed matrix element.
+//
+// \param value The right-hand side value for the modulo operation.
+// \return Reference to the assigned proxy.
+// \exception std::invalid_argument Invalid assignment to diagonal or upper matrix element.
+//
+// In case the proxy represents an element on the diagonal or in the upper part of the matrix,
+// a \a std::invalid_argument exception is thrown.
+*/
+template< typename MT >  // Type of the adapted matrix
+template< typename T >   // Type of the right-hand side value
+inline const UniLowerProxy<MT>& UniLowerProxy<MT>::operator%=( const T& value ) const
+{
+   if( isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid assignment to diagonal or upper matrix element" );
+   }
+
+   value_ %= value;
+
+   return *this;
+}
+//*************************************************************************************************
+
+
 
 
 //=================================================================================================
@@ -488,7 +514,7 @@ inline void UniLowerProxy<MT>::invert() const
 // \return Direct/raw reference to the accessed matrix element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline typename UniLowerProxy<MT>::RepresentedType UniLowerProxy<MT>::get() const
+inline typename UniLowerProxy<MT>::RepresentedType UniLowerProxy<MT>::get() const noexcept
 {
    return value_;
 }
@@ -501,7 +527,7 @@ inline typename UniLowerProxy<MT>::RepresentedType UniLowerProxy<MT>::get() cons
 // \return \a true in case access to the matrix element is restricted, \a false if not.
 */
 template< typename MT >  // Type of the adapted matrix
-inline bool UniLowerProxy<MT>::isRestricted() const
+inline bool UniLowerProxy<MT>::isRestricted() const noexcept
 {
    return row_ <= column_;
 }
@@ -522,7 +548,7 @@ inline bool UniLowerProxy<MT>::isRestricted() const
 // \return Direct/raw reference to the accessed matrix element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline UniLowerProxy<MT>::operator RepresentedType() const
+inline UniLowerProxy<MT>::operator RepresentedType() const noexcept
 {
    return get();
 }
@@ -627,10 +653,6 @@ inline void UniLowerProxy<MT>::imag( ValueType value ) const
 /*!\name UniLowerProxy global functions */
 //@{
 template< typename MT >
-inline typename ConjExprTrait< typename UniLowerProxy<MT>::RepresentedType >::Type
-   conj( const UniLowerProxy<MT>& proxy );
-
-template< typename MT >
 inline void reset( const UniLowerProxy<MT>& proxy );
 
 template< typename MT >
@@ -639,43 +661,21 @@ inline void clear( const UniLowerProxy<MT>& proxy );
 template< typename MT >
 inline void invert( const UniLowerProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const UniLowerProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const UniLowerProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const UniLowerProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const UniLowerProxy<MT>& proxy );
 
 template< typename MT >
 inline bool isnan( const UniLowerProxy<MT>& proxy );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Computing the complex conjugate of the represented element.
-// \ingroup unilower_matrix
-//
-// \param proxy The given proxy instance.
-// \return The complex conjugate of the represented element.
-//
-// This function computes the complex conjugate of the element represented by the access proxy.
-// In case the proxy represents a vector- or matrix-like data structure the function returns an
-// expression representing the complex conjugate of the vector/matrix.
-*/
-template< typename MT >
-inline typename ConjExprTrait< typename UniLowerProxy<MT>::RepresentedType >::Type
-   conj( const UniLowerProxy<MT>& proxy )
-{
-   using blaze::conj;
-
-   return conj( (~proxy).get() );
-}
 //*************************************************************************************************
 
 
@@ -740,12 +740,12 @@ inline void invert( const UniLowerProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy is in default state.
 // In case it is in default state, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const UniLowerProxy<MT>& proxy )
 {
    using blaze::isDefault;
 
-   return isDefault( proxy.get() );
+   return isDefault<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -762,12 +762,12 @@ inline bool isDefault( const UniLowerProxy<MT>& proxy )
 // the element is of complex type, the function returns \a true if the imaginary part is equal
 // to 0. Otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const UniLowerProxy<MT>& proxy )
 {
    using blaze::isReal;
 
-   return isReal( proxy.get() );
+   return isReal<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -782,12 +782,12 @@ inline bool isReal( const UniLowerProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy represents the numeric
 // value 0. In case it is 0, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const UniLowerProxy<MT>& proxy )
 {
    using blaze::isZero;
 
-   return isZero( proxy.get() );
+   return isZero<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -802,12 +802,12 @@ inline bool isZero( const UniLowerProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy represents the numeric
 // value 1. In case it is 1, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const UniLowerProxy<MT>& proxy )
 {
    using blaze::isOne;
 
-   return isOne( proxy.get() );
+   return isOne<RF>( proxy.get() );
 }
 //*************************************************************************************************
 

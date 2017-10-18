@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsInvertible.h
 //  \brief Header file for the IsInvertible type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,12 +40,13 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/typetraits/IsBlasCompatible.h>
+#include <blaze/math/typetraits/IsBLASCompatible.h>
 #include <blaze/math/typetraits/IsDenseMatrix.h>
 #include <blaze/math/typetraits/UnderlyingElement.h>
-#include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
-#include <blaze/util/TrueType.h>
+#include <blaze/util/IntegralConstant.h>
+#include <blaze/util/mpl/And.h>
+#include <blaze/util/mpl/Or.h>
+#include <blaze/util/typetraits/IsComplex.h>
 #include <blaze/util/typetraits/IsLongDouble.h>
 
 
@@ -58,38 +59,16 @@ namespace blaze {
 //=================================================================================================
 
 //*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Auxiliary helper struct for the IsInvertible type trait.
-// \ingroup math_type_traits
-*/
-template< typename T >
-struct IsInvertibleHelper
-{
-   //**********************************************************************************************
-   typedef typename UnderlyingElement<T>::Type  UET;
-   //**********************************************************************************************
-
-   //**********************************************************************************************
-   enum { value = ( IsBlasCompatible<T>::value || IsLongDouble<T>::value ||
-                    ( IsDenseMatrix<T>::value && IsBlasCompatible<UET>::value ) ) };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Compile time check for data types.
 // \ingroup math_type_traits
 //
 // This type trait tests whether or not the given template parameter is invertible. The type
 // is considered to be invertible if it is either BLAS compatible (i.e. \c float, \c double,
-// \c complex<float>, or \c complex<double>), <tt>long double</tt>, or any dense matrix type
-// with a BLAS compatible element type. If the given type is invertible, the \a value member
-// enumeration is set to 1, the nested type definition \a Type is \a TrueType, and the class
-// derives from \a TrueType. Otherwise \a value is set to 0, \a Type is \a FalseType, and the
-// class derives from \a FalseType.
+// \c complex<float>, or \c complex<double>), <tt>long double</tt>, <tt>complex<long double></tt>
+// or any dense matrix type with a BLAS compatible element type. If the given type is invertible,
+// the \a value member constant is set to \a true, the nested type definition \a Type is
+// \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to \a false,
+// \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    blaze::IsInvertible< float >::value                  // Evaluates to 1
@@ -101,16 +80,15 @@ struct IsInvertibleHelper
    \endcode
 */
 template< typename T >
-struct IsInvertible : public IsInvertibleHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsInvertibleHelper<T>::value };
-   typedef typename IsInvertibleHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsInvertible
+   : public BoolConstant< Or< IsBLASCompatible<T>
+                            , IsLongDouble<T>
+                            , And< IsComplex<T>
+                                 , IsLongDouble< UnderlyingElement_<T> > >
+                            , And< IsDenseMatrix<T>
+                                 , IsBLASCompatible< UnderlyingElement_<T> > >
+                            >::value >
+{};
 //*************************************************************************************************
 
 } // namespace blaze

@@ -3,7 +3,7 @@
 //  \file blaze/math/shims/IsNaN.h
 //  \brief Header file for the isnan shim
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -76,7 +76,7 @@ namespace blaze {
 // other cases the function returns \a false.
 */
 template< typename T >
-BLAZE_ALWAYS_INLINE typename EnableIf< IsNumeric<T>, bool >::Type isnan( T a )
+BLAZE_ALWAYS_INLINE EnableIf_< IsNumeric<T>, bool > isnan( T a ) noexcept
 {
    return a != a;
 }

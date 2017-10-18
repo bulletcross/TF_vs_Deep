@@ -3,7 +3,7 @@
 //  \file blaze/util/mpl/Greater.h
 //  \brief Header file for the Greater class template
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -55,9 +55,9 @@ namespace blaze {
 /*!\brief Compile time type comparison.
 // \ingroup mpl
 //
-// The Greater class template compares the two given types using the greater-than operator ('>').
-// In case \a T1::value is greater than \a T2::value, the nested \a value member is set to 1.
-// Otherwise it is set to 0.
+// The Greater alias declaration compares the two given types using the greater-than operator
+// ('>'). In case \a T1::value is greater than \a T2::value, the nested \a value member is set
+// to 1. Otherwise it is set to 0.
 
    \code
    using namespace blaze;
@@ -71,7 +71,8 @@ namespace blaze {
 */
 template< typename T1    // The type of the left-hand side operand
         , typename T2 >  // The type of the right-hand side operand
-struct Greater : public Bool< ( T1::value > T2::value ) >
+struct Greater
+   : public Bool< ( T1::value > T2::value ) >
 {};
 //*************************************************************************************************
 

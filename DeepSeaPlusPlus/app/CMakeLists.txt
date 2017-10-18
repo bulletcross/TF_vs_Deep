@@ -38,6 +38,21 @@ else()
    message(STATUS "found log library")
 endif()
 
+#add_library( boost-lib
+#             STATIC
+#             IMPORTED )
+
+#set_target_properties( # Specifies the target library.
+#                       boost-lib
+#
+#                       # Specifies the parameter you want to define.
+#                       PROPERTIES IMPORTED_LOCATION
+#
+#                       # Provides the path to the library you want to import.
+#                       boost-lib/src/${ANDROID_ABI}/libboost_regex-gcc-mt-1_53.a )
+
+include_directories( boost-lib/include/ )
+
 include_directories( src/main/cpp/blaze_lib/ )
 
 
@@ -50,4 +65,4 @@ target_link_libraries( # Specifies the target library.
 
                        # Links the target library to the log library
                        # included in the NDK.
-                       blaze ${log-lib} )
+                       ${log-lib} )

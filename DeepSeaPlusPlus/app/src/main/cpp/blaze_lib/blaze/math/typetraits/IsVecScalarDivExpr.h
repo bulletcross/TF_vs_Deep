@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsVecScalarDivExpr.h
 //  \brief Header file for the IsVecScalarDivExpr type trait class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,11 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/is_base_of.hpp>
+#include <utility>
 #include <blaze/math/expressions/VecScalarDivExpr.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -63,9 +63,17 @@ namespace blaze {
 template< typename T >
 struct IsVecScalarDivExprHelper
 {
+ private:
    //**********************************************************************************************
-   enum { value = boost::is_base_of<VecScalarDivExpr,T>::value && !boost::is_base_of<T,VecScalarDivExpr>::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   template< typename VT >
+   static TrueType test( const VecScalarDivExpr<VT>& );
+
+   static FalseType test( ... );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -77,25 +85,18 @@ struct IsVecScalarDivExprHelper
 //        template.
 // \ingroup math_type_traits
 //
-// This type trait class tests whether or not the given type \a Type is a vector/scalar
-// division expression template. In order to qualify as a valid vector/scalar division
-// expression template, the given type has to derive (publicly or privately) from the
-// VecScalarDivExpr base class. In case the given type is a valid vector/scalar division
-// expression template, the \a value member enumeration is set to 1, the nested type
-// definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise
-// \a value is set to 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// This type trait class tests whether or not the given type \a Type is a vector/scalar division
+// expression template. In order to qualify as a valid vector/scalar division expression template,
+// the given type has to derive publicly from the VecScalarDivExpr base class. In case the given
+// type is a valid vector/scalar division expression template, the \a value member constant is
+// set to \a true, the nested type definition \a Type is \a TrueType, and the class derives from
+// \a TrueType. Otherwise \a value is set to \a false, \a Type is \a FalseType, and the class
+// derives from \a FalseType.
 */
 template< typename T >
-struct IsVecScalarDivExpr : public IsVecScalarDivExprHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsVecScalarDivExprHelper<T>::value };
-   typedef typename IsVecScalarDivExprHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsVecScalarDivExpr
+   : public IsVecScalarDivExprHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

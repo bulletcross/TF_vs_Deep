@@ -3,7 +3,7 @@
 //  \file blaze/math/shims/Square.h
 //  \brief Header file for the square shim
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -63,7 +63,8 @@ namespace blaze {
 // data type. For values of built-in data type this results in a plain multiplication.
 */
 template< typename T >
-BLAZE_ALWAYS_INLINE const typename MultExprTrait<T,T>::Type sq( const T& a )
+BLAZE_ALWAYS_INLINE constexpr MultExprTrait_<T,T> sq( const T& a )
+   noexcept( noexcept( a * a ) )
 {
    return a * a;
 }

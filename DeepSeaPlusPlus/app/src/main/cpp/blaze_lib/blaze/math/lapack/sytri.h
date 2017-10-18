@@ -3,7 +3,7 @@
 //  \file blaze/math/lapack/sytri.h
 //  \brief Header file for the LAPACK symmetric matrix inversion functions (sytri)
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,43 +40,21 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/cast.hpp>
+#include <memory>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Adaptor.h>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Computation.h>
 #include <blaze/math/constraints/MutableDataAccess.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/DenseMatrix.h>
+#include <blaze/math/lapack/clapack/sytri.h>
 #include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/Complex.h>
-#include <blaze/util/Exception.h>
-#include <blaze/util/StaticAssert.h>
-#include <blaze/util/UniqueArray.h>
+#include <blaze/util/NumericCast.h>
 
 
 namespace blaze {
-
-//=================================================================================================
-//
-//  LAPACK FORWARD DECLARATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-extern "C" {
-
-void ssytri_( char* uplo, int* n, float*  A, int* lda, int* ipiv, float*  work, int* info );
-void dsytri_( char* uplo, int* n, double* A, int* lda, int* ipiv, double* work, int* info );
-void csytri_( char* uplo, int* n, float*  A, int* lda, int* ipiv, float*  work, int* info );
-void zsytri_( char* uplo, int* n, double* A, int* lda, int* ipiv, double* work, int* info );
-
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-
 
 //=================================================================================================
 //
@@ -87,179 +65,9 @@ void zsytri_( char* uplo, int* n, double* A, int* lda, int* ipiv, double* work, 
 //*************************************************************************************************
 /*!\name LAPACK LDLT-based inversion functions (sytri) */
 //@{
-inline void sytri( char uplo, int n, float* A, int lda, const int* ipiv, float* work, int* info );
-
-inline void sytri( char uplo, int n, double* A, int lda, const int* ipiv, double* work, int* info );
-
-inline void sytri( char uplo, int n, complex<float>* A, int lda,
-                   const int* ipiv, complex<float>* work, int* info );
-
-inline void sytri( char uplo, int n, complex<double>* A, int lda,
-                   const int* ipiv, complex<double>* work, int* info );
-
 template< typename MT, bool SO >
 inline void sytri( DenseMatrix<MT,SO>& A, char uplo, const int* ipiv );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for the inversion of the given dense symmetric indefinite single precision
-//        column-major square matrix.
-// \ingroup lapack_inversion
-//
-// \param uplo \c 'L' in case of a lower matrix, \c 'U' in case of an upper matrix.
-// \param n The number of rows/columns of the symmetric matrix \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the single precision column-major matrix.
-// \param lda The total number of elements between two columns of the matrix \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param work Auxiliary array of size \a n.
-// \param info Return code of the function call.
-// \return void
-//
-// This function performs the dense matrix inversion based on the LAPACK ssytri() function for
-// symmetric indefinite single precision column-major matrices that have already been factorized
-// by the ssytrf() function.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The inversion finished successfully.
-//   - < 0: If \a info = -i, the i-th argument had an illegal value.
-//   - > 0: If \a info = i, element D(i,i) is exactly zero and the inverse could not be computed.
-//
-// For more information on the ssytri() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void sytri( char uplo, int n, float* A, int lda, const int* ipiv, float* work, int* info )
-{
-   ssytri_( &uplo, &n, A, &lda, const_cast<int*>( ipiv ), work, info );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for the inversion of the given dense symmetric indefinite double precision
-//        column-major square matrix.
-// \ingroup lapack_inversion
-//
-// \param uplo \c 'L' in case of a lower matrix, \c 'U' in case of an upper matrix.
-// \param n The number of rows/columns of the symmetric matrix \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the double precision column-major matrix.
-// \param lda The total number of elements between two columns of the matrix \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param work Auxiliary array of size \a n.
-// \param info Return code of the function call.
-// \return void
-//
-// This function performs the dense matrix inversion based on the LAPACK dsytri() function for
-// symmetric indefinite double precision column-major matrices that have already been factorized
-// by the dsytrf() function.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The inversion finished successfully.
-//   - < 0: If \a info = -i, the i-th argument had an illegal value.
-//   - > 0: If \a info = i, element D(i,i) is exactly zero and the inverse could not be computed.
-//
-// For more information on the dsytri() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void sytri( char uplo, int n, double* A, int lda, const int* ipiv, double* work, int* info )
-{
-   dsytri_( &uplo, &n, A, &lda, const_cast<int*>( ipiv ), work, info );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for the inversion of the given dense symmetric indefinite single precision
-//        complex column-major square matrix.
-// \ingroup lapack_inversion
-//
-// \param uplo \c 'L' in case of a lower matrix, \c 'U' in case of an upper matrix.
-// \param n The number of rows/columns of the symmetric matrix \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the single precision complex column-major matrix.
-// \param lda The total number of elements between two columns of the matrix \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param work Auxiliary array of size \a n.
-// \param info Return code of the function call.
-// \return void
-//
-// This function performs the dense matrix inversion based on the LAPACK csytri() function for
-// symmetric indefinite single precision complex column-major matrices that have already been
-// factorized by the csytrf() function.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The inversion finished successfully.
-//   - < 0: If \a info = -i, the i-th argument had an illegal value.
-//   - > 0: If \a info = i, element D(i,i) is exactly zero and the inverse could not be computed.
-//
-// For more information on the csytri() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void sytri( char uplo, int n, complex<float>* A, int lda,
-                   const int* ipiv, complex<float>* work, int* info )
-{
-   BLAZE_STATIC_ASSERT( sizeof( complex<float> ) == 2UL*sizeof( float ) );
-
-   csytri_( &uplo, &n, reinterpret_cast<float*>( A ), &lda,
-            const_cast<int*>( ipiv ), reinterpret_cast<float*>( work ), info );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for the inversion of the given dense symmetric indefinite double precision
-//        complex column-major square matrix.
-// \ingroup lapack_inversion
-//
-// \param uplo \c 'L' in case of a lower matrix, \c 'U' in case of an upper matrix.
-// \param n The number of rows/columns of the symmetric matrix \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the double precision complex column-major matrix.
-// \param lda The total number of elements between two columns of the matrix \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param work Auxiliary array of size \a n.
-// \param info Return code of the function call.
-// \return void
-//
-// This function performs the dense matrix inversion based on the LAPACK zsytri() function for
-// symmetric indefinite double precision complex column-major matrices that have already been
-// factorized by the zsytrf() function.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The inversion finished successfully.
-//   - < 0: If \a info = -i, the i-th argument had an illegal value.
-//   - > 0: If \a info = i, element D(i,i) is exactly zero and the inverse could not be computed.
-//
-// For more information on the zsytri() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void sytri( char uplo, int n, complex<double>* A, int lda,
-                   const int* ipiv, complex<double>* work, int* info )
-{
-   BLAZE_STATIC_ASSERT( sizeof( complex<double> ) == 2UL*sizeof( double ) );
-
-   zsytri_( &uplo, &n, reinterpret_cast<double*>( A ), &lda,
-            const_cast<int*>( ipiv ), reinterpret_cast<double*>( work ), info );
-}
 //*************************************************************************************************
 
 
@@ -273,7 +81,7 @@ inline void sytri( char uplo, int n, complex<double>* A, int lda,
 // \return void
 // \exception std::invalid_argument Invalid non-square matrix provided.
 // \exception std::invalid_argument Invalid uplo argument provided.
-// \exception std::invalid_argument Inversion of singular matrix failed.
+// \exception std::runtime_error Inversion of singular matrix failed.
 //
 // This function performs the dense matrix inversion based on the LAPACK sytri() functions for
 // symmetric indefinite matrices that have already been factorized by the sytrf() functions.
@@ -287,15 +95,16 @@ inline void sytri( char uplo, int n, complex<double>* A, int lda,
 //  - ... the given \a uplo argument is neither \c 'L' nor \c 'U';
 //  - ... the given matrix is singular and not invertible.
 //
-// In all failure cases a \a std::invalid_argument exception is thrown.
+// In all failure cases an exception is thrown.
 //
 // For more information on the sytri() functions (i.e. ssytri(), dsytri(), csytri(), and zsytri())
 // see the LAPACK online documentation browser:
 //
 //        http://www.netlib.org/lapack/explore-html/
 //
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
+// \note This function can only be used if a fitting LAPACK library, which supports this function,
+// is available and linked to the executable. Otherwise a call to this function will result in a
+// linker error.
 //
 // \note This function does only provide the basic exception safety guarantee, i.e. in case of an
 // exception \a A may already have been modified.
@@ -304,14 +113,12 @@ template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order of the dense matrix
 inline void sytri( DenseMatrix<MT,SO>& A, char uplo, const int* ipiv )
 {
-   using boost::numeric_cast;
-
    BLAZE_CONSTRAINT_MUST_NOT_BE_ADAPTOR_TYPE( MT );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT );
    BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( MT );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT> );
 
-   typedef typename MT::ElementType  ET;
+   using ET = ElementType_<MT>;
 
    if( !isSquare( ~A ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid non-square matrix provided" );
@@ -333,14 +140,14 @@ inline void sytri( DenseMatrix<MT,SO>& A, char uplo, const int* ipiv )
       ( uplo == 'L' )?( uplo = 'U' ):( uplo = 'L' );
    }
 
-   const UniqueArray<ET> work( new ET[n] );
+   const std::unique_ptr<ET[]> work( new ET[n] );
 
    sytri( uplo, n, (~A).data(), lda, ipiv, work.get(), &info );
 
    BLAZE_INTERNAL_ASSERT( info >= 0, "Invalid argument for matrix inversion" );
 
    if( info > 0 ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Inversion of singular matrix failed" );
+      BLAZE_THROW_LAPACK_ERROR( "Inversion of singular matrix failed" );
    }
 }
 //*************************************************************************************************

@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsRowVector.h
 //  \brief Header file for the IsRowVector type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,10 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/is_base_of.hpp>
-#include <blaze/math/expressions/DenseVector.h>
-#include <blaze/math/expressions/SparseVector.h>
+#include <utility>
+#include <blaze/math/expressions/Vector.h>
+#include <blaze/math/TransposeFlag.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
 #include <blaze/util/typetraits/RemoveCV.h>
 
@@ -67,14 +66,15 @@ struct IsRowVectorHelper
 {
  private:
    //**********************************************************************************************
-   typedef typename RemoveCV<T>::Type  T2;
+   template< typename VT >
+   static TrueType test( const Vector<VT,rowVector>& );
+
+   static FalseType test( ... );
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
-   enum { value = boost::is_base_of< DenseVector <T2,true>, T2 >::value ||
-                  boost::is_base_of< SparseVector<T2,true>, T2 >::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -87,9 +87,9 @@ struct IsRowVectorHelper
 //
 // This type trait tests whether or not the given template argument is a row dense or sparse
 // vector type (i.e. a vector whose transposition flag is set to blaze::rowVector). In case
-// the type is a row vector type, the \a value member enumeration is set to 1, the nested
+// the type is a row vector type, the \a value member constant is set to \a true, the nested
 // type definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise
-// \a value is set to 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// \a value is set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    using blaze::rowVector;
@@ -104,16 +104,9 @@ struct IsRowVectorHelper
    \endcode
 */
 template< typename T >
-struct IsRowVector : public IsRowVectorHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsRowVectorHelper<T>::value };
-   typedef typename IsRowVectorHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsRowVector
+   : public IsRowVectorHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsHermitian.h
 //  \brief Header file for the IsHermitian type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -58,20 +58,20 @@ namespace blaze {
 //
 // This type trait tests whether or not the given template parameter is an Hermitian matrix type
 // (i.e. a matrix type that is guaranteed to be Hermitian at compile time). In case the type is
-// a Hermitian matrix type, the \a value member enumeration is set to 1, the nested type definition
-// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to 0,
-// \a Type is \a FalseType, and the class derives from \a FalseType.
+// a Hermitian matrix type, the \a value member constant is set to \a true, the nested type
+// definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value
+// is set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    using blaze::rowMajor;
 
-   typedef blaze::StaticMatrix<double,rowMajor>   StaticMatrixType;
-   typedef blaze::DynamicMatrix<float,rowMajor>   DynamicMatrixType;
-   typedef blaze::CompressedMatrix<int,rowMajor>  CompressedMatrixType;
+   using StaticMatrixType     = blaze::StaticMatrix<double,rowMajor>;
+   using DynamicMatrixType    = blaze::DynamicMatrix<float,rowMajor>;
+   using CompressedMatrixType = blaze::CompressedMatrix<int,rowMajor>;
 
-   typedef blaze::HermitianMatrix<StaticMatrixType>      HermitianStaticType;
-   typedef blaze::HermitianMatrix<DynamicMatrixType>     HermitianDynamicType;
-   typedef blaze::HermitianMatrix<CompressedMatrixType>  HermitianCompressedType;
+   using HermitianStaticType     = blaze::HermitianMatrix<StaticMatrixType>;
+   using HermitianDynamicType    = blaze::HermitianMatrix<DynamicMatrixType>;
+   using HermitianCompressedType = blaze::HermitianMatrix<CompressedMatrixType>;
 
    blaze::IsHermitian< HermitianStaticType >::value        // Evaluates to 1
    blaze::IsHermitian< const HermitianDynamicType >::Type  // Results in TrueType
@@ -82,16 +82,9 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-struct IsHermitian : public FalseType
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = 0 };
-   typedef FalseType  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsHermitian
+   : public FalseType
+{};
 //*************************************************************************************************
 
 
@@ -101,14 +94,9 @@ struct IsHermitian : public FalseType
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsHermitian< const T > : public IsHermitian<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsHermitian<T>::value };
-   typedef typename IsHermitian<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsHermitian< const T >
+   : public IsHermitian<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -119,14 +107,9 @@ struct IsHermitian< const T > : public IsHermitian<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsHermitian< volatile T > : public IsHermitian<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsHermitian<T>::value };
-   typedef typename IsHermitian<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsHermitian< volatile T >
+   : public IsHermitian<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -137,14 +120,9 @@ struct IsHermitian< volatile T > : public IsHermitian<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsHermitian< const volatile T > : public IsHermitian<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsHermitian<T>::value };
-   typedef typename IsHermitian<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsHermitian< const volatile T >
+   : public IsHermitian<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 

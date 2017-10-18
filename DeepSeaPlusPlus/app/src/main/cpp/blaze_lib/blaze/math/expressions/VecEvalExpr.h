@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/VecEvalExpr.h
 //  \brief Header file for the VecEvalExpr base class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -58,11 +58,13 @@ namespace blaze {
 // The VecEvalExpr class serves as a tag for all expression templates that implement a vector
 // evaluation operation. All classes, that represent a vector evaluation operation and that
 // are used within the expression template environment of the Blaze library have to derive
-// from this class in order to qualify as vector evaluation expression template. Only in case
-// a class is derived from the VecEvalExpr base class, the IsVecEvalExpr type trait recognizes
-// the class as valid vector evaluation expression template.
+// publicly from this class in order to qualify as vector evaluation expression template. Only
+// in case a class is derived publicly from the VecEvalExpr base class, the IsVecEvalExpr type
+// trait recognizes the class as valid vector evaluation expression template.
 */
-struct VecEvalExpr : private EvalExpr
+template< typename VT >  // Vector base type of the expression
+struct VecEvalExpr
+   : public EvalExpr<VT>
 {};
 //*************************************************************************************************
 

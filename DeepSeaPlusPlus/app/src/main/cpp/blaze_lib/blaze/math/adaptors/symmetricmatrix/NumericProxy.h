@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/symmetricmatrix/NumericProxy.h
 //  \brief Header file for the NumericProxy class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,6 +40,7 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Expression.h>
 #include <blaze/math/constraints/Hermitian.h>
 #include <blaze/math/constraints/Lower.h>
@@ -48,7 +49,6 @@
 #include <blaze/math/constraints/Upper.h>
 #include <blaze/math/proxy/Proxy.h>
 #include <blaze/math/shims/Clear.h>
-#include <blaze/math/shims/Conjugate.h>
 #include <blaze/math/shims/Invert.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/IsNaN.h>
@@ -56,7 +56,6 @@
 #include <blaze/math/shims/IsReal.h>
 #include <blaze/math/shims/IsZero.h>
 #include <blaze/math/shims/Reset.h>
-#include <blaze/math/traits/ConjExprTrait.h>
 #include <blaze/util/constraints/Const.h>
 #include <blaze/util/constraints/Numeric.h>
 #include <blaze/util/constraints/Pointer.h>
@@ -96,7 +95,8 @@ namespace blaze {
    \endcode
 */
 template< typename MT >  // Type of the adapted matrix
-class NumericProxy : public Proxy< NumericProxy<MT> >
+class NumericProxy
+   : public Proxy< NumericProxy<MT> >
 {
  private:
    //**struct BuiltinType**************************************************************************
@@ -104,7 +104,7 @@ class NumericProxy : public Proxy< NumericProxy<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct BuiltinType { typedef INVALID_TYPE  Type; };
+   struct BuiltinType { using Type = INVALID_TYPE; };
    /*! \endcond */
    //**********************************************************************************************
 
@@ -113,22 +113,22 @@ class NumericProxy : public Proxy< NumericProxy<MT> >
    /*!\brief Auxiliary struct to determine the value type of the represented complex element.
    */
    template< typename T >
-   struct ComplexType { typedef typename T::value_type  Type; };
+   struct ComplexType { using Type = typename T::value_type; };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**Type definitions****************************************************************************
-   typedef typename MT::ElementType     RepresentedType;  //!< Type of the represented matrix element.
-   typedef typename MT::Reference       Reference;        //!< Reference to the represented element.
-   typedef typename MT::ConstReference  ConstReference;   //!< Reference-to-const to the represented element.
-   typedef NumericProxy*                Pointer;          //!< Pointer to the represented element.
-   typedef const NumericProxy*          ConstPointer;     //!< Pointer-to-const to the represented element.
+   using RepresentedType = ElementType_<MT>;     //!< Type of the represented matrix element.
+   using Reference       = Reference_<MT>;       //!< Reference to the represented element.
+   using ConstReference  = ConstReference_<MT>;  //!< Reference-to-const to the represented element.
+   using Pointer         = NumericProxy*;        //!< Pointer to the represented element.
+   using ConstPointer    = const NumericProxy*;  //!< Pointer-to-const to the represented element.
 
    //! Value type of the represented complex element.
-   typedef typename If< IsComplex<RepresentedType>
-                      , ComplexType<RepresentedType>
-                      , BuiltinType<RepresentedType> >::Type::Type  ValueType;
+   using ValueType = typename If_< IsComplex<RepresentedType>
+                                 , ComplexType<RepresentedType>
+                                 , BuiltinType<RepresentedType> >::Type;
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
@@ -152,6 +152,7 @@ class NumericProxy : public Proxy< NumericProxy<MT> >
    template< typename T > inline NumericProxy& operator-=( const T& value );
    template< typename T > inline NumericProxy& operator*=( const T& value );
    template< typename T > inline NumericProxy& operator/=( const T& value );
+   template< typename T > inline NumericProxy& operator%=( const T& value );
    //@}
    //**********************************************************************************************
 
@@ -170,14 +171,14 @@ class NumericProxy : public Proxy< NumericProxy<MT> >
    inline void clear () const;
    inline void invert() const;
 
-   inline ConstReference get() const;
+   inline ConstReference get() const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Conversion operator*************************************************************************
    /*!\name Conversion operator */
    //@{
-   inline operator ConstReference() const;
+   inline operator ConstReference() const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -378,6 +379,25 @@ inline NumericProxy<MT>& NumericProxy<MT>::operator/=( const T& value )
 //*************************************************************************************************
 
 
+//*************************************************************************************************
+/*!\brief Modulo assignment to the accessed matrix element.
+//
+// \param value The right-hand side value for the modulo operation.
+// \return Reference to the assigned proxy.
+*/
+template< typename MT >  // Type of the adapted matrix
+template< typename T >   // Type of the right-hand side value
+inline NumericProxy<MT>& NumericProxy<MT>::operator%=( const T& value )
+{
+   matrix_(row_,column_) %= value;
+   if( row_ != column_ )
+      matrix_(column_,row_) %= value;
+
+   return *this;
+}
+//*************************************************************************************************
+
+
 
 
 //=================================================================================================
@@ -481,7 +501,7 @@ inline void NumericProxy<MT>::invert() const
 // \return Direct/raw reference to the accessed matrix element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline typename NumericProxy<MT>::ConstReference NumericProxy<MT>::get() const
+inline typename NumericProxy<MT>::ConstReference NumericProxy<MT>::get() const noexcept
 {
    return const_cast<const MT&>( matrix_ )(row_,column_);
 }
@@ -502,7 +522,7 @@ inline typename NumericProxy<MT>::ConstReference NumericProxy<MT>::get() const
 // \return Direct/raw reference to the accessed matrix element.
 */
 template< typename MT >  // Type of the adapted matrix
-inline NumericProxy<MT>::operator ConstReference() const
+inline NumericProxy<MT>::operator ConstReference() const noexcept
 {
    return get();
 }
@@ -598,10 +618,6 @@ inline void NumericProxy<MT>::imag( ValueType value ) const
 /*!\name NumericProxy global functions */
 //@{
 template< typename MT >
-inline typename ConjExprTrait< typename NumericProxy<MT>::RepresentedType >::Type
-   conj( const NumericProxy<MT>& proxy );
-
-template< typename MT >
 inline void reset( const NumericProxy<MT>& proxy );
 
 template< typename MT >
@@ -610,43 +626,21 @@ inline void clear( const NumericProxy<MT>& proxy );
 template< typename MT >
 inline void invert( const NumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const NumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const NumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const NumericProxy<MT>& proxy );
 
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const NumericProxy<MT>& proxy );
 
 template< typename MT >
 inline bool isnan( const NumericProxy<MT>& proxy );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Computing the complex conjugate of the represented element.
-// \ingroup symmetric_matrix
-//
-// \param proxy The given proxy instance.
-// \return The complex conjugate of the represented element.
-//
-// This function computes the complex conjugate of the element represented by the access proxy.
-// In case the proxy represents a vector- or matrix-like data structure the function returns an
-// expression representing the complex conjugate of the vector/matrix.
-*/
-template< typename MT >
-inline typename ConjExprTrait< typename NumericProxy<MT>::RepresentedType >::Type
-   conj( const NumericProxy<MT>& proxy )
-{
-   using blaze::conj;
-
-   return conj( (~proxy).get() );
-}
 //*************************************************************************************************
 
 
@@ -711,12 +705,12 @@ inline void invert( const NumericProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy is in default state.
 // In case it is in default state, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isDefault( const NumericProxy<MT>& proxy )
 {
    using blaze::isDefault;
 
-   return isDefault( proxy.get() );
+   return isDefault<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -733,12 +727,12 @@ inline bool isDefault( const NumericProxy<MT>& proxy )
 // the element is of complex type, the function returns \a true if the imaginary part is equal
 // to 0. Otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isReal( const NumericProxy<MT>& proxy )
 {
    using blaze::isReal;
 
-   return isReal( proxy.get() );
+   return isReal<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -753,12 +747,12 @@ inline bool isReal( const NumericProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy represents the numeric
 // value 0. In case it is 0, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isZero( const NumericProxy<MT>& proxy )
 {
    using blaze::isZero;
 
-   return isZero( proxy.get() );
+   return isZero<RF>( proxy.get() );
 }
 //*************************************************************************************************
 
@@ -773,12 +767,12 @@ inline bool isZero( const NumericProxy<MT>& proxy )
 // This function checks whether the element represented by the access proxy represents the numeric
 // value 1. In case it is 1, the function returns \a true, otherwise it returns \a false.
 */
-template< typename MT >
+template< bool RF, typename MT >
 inline bool isOne( const NumericProxy<MT>& proxy )
 {
    using blaze::isOne;
 
-   return isOne( proxy.get() );
+   return isOne<RF>( proxy.get() );
 }
 //*************************************************************************************************
 

@@ -3,7 +3,7 @@
 //  \file blaze/math/lapack/gesv.h
 //  \brief Header file for the LAPACK general linear system solver functions (gesv)
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,43 +40,21 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/cast.hpp>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/Adaptor.h>
-#include <blaze/math/constraints/BlasCompatible.h>
+#include <blaze/math/constraints/BLASCompatible.h>
 #include <blaze/math/constraints/Computation.h>
 #include <blaze/math/constraints/MutableDataAccess.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/DenseMatrix.h>
 #include <blaze/math/expressions/DenseVector.h>
+#include <blaze/math/lapack/clapack/gesv.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/Complex.h>
 #include <blaze/util/constraints/SameType.h>
-#include <blaze/util/Exception.h>
-#include <blaze/util/StaticAssert.h>
+#include <blaze/util/NumericCast.h>
 
 
 namespace blaze {
-
-//=================================================================================================
-//
-//  LAPACK FORWARD DECLARATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-extern "C" {
-
-void sgesv_( int* n, int* nrhs, float*  A, int* lda, int* ipiv, float*  b, int* ldb, int* info );
-void dgesv_( int* n, int* nrhs, double* A, int* lda, int* ipiv, double* b, int* ldb, int* info );
-void cgesv_( int* n, int* nrhs, float*  A, int* lda, int* ipiv, float*  b, int* ldb, int* info );
-void zgesv_( int* n, int* nrhs, double* A, int* lda, int* ipiv, double* b, int* ldb, int* info );
-
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-
 
 //=================================================================================================
 //
@@ -87,222 +65,12 @@ void zgesv_( int* n, int* nrhs, double* A, int* lda, int* ipiv, double* b, int* 
 //*************************************************************************************************
 /*!\name LAPACK general linear system functions (gesv) */
 //@{
-inline void gesv( int n, int nrhs, float* A, int lda, int* ipiv, float* B, int ldb, int* info );
-
-inline void gesv( int n, int nrhs, double* A, int lda, int* ipiv, double* B, int ldb, int* info );
-
-inline void gesv( int n, int nrhs, complex<float>* A, int lda, int* ipiv, complex<float>* B, int ldb, int* info );
-
-inline void gesv( int n, int nrhs, complex<double>* A, int lda, int* ipiv, complex<double>* B, int ldb, int* info );
-
 template< typename MT, bool SO, typename VT, bool TF >
 inline void gesv( DenseMatrix<MT,SO>& A, DenseVector<VT,TF>& b, int* ipiv );
 
 template< typename MT1, bool SO1, typename MT2, bool SO2 >
 inline void gesv( DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO2>& B, int* ipiv );
 //@}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for solving a general single precision linear system of equations
-//        (\f$ A*X=B \f$).
-// \ingroup lapack_solver
-//
-// \param n The number of rows/columns of matrix \a A \f$[0..\infty)\f$.
-// \param nrhs The number of right-hand side vectors \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the single precision column-major square matrix.
-// \param lda The total number of elements between two columns of matrix \a A \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param B Pointer to the first element of the column-major matrix.
-// \param ldb The total number of elements between two columns of matrix \a B \f$[0..\infty)\f$.
-// \param info Return code of the function call.
-// \return void
-//
-// This function uses the LAPACK sgesv() function to compute the solution to the general system of
-// linear equations \f$ A*X=B \f$, where \a A is a n-by-n matrix and \a X and \a B are n-by-nrhs
-// matrices.
-//
-// The LU decomposition with partial pivoting and row interchanges is used to factor \a A as
-
-                          \f[ A = P \cdot L \cdot U, \f]
-
-// where \c P is a permutation matrix, \c L is a lower unitriangular matrix, and \c U is an upper
-// triangular matrix. The resulting decomposition is stored within \a A: \c L is stored in the
-// lower part of \a A and \c U is stored in the upper part. The unit diagonal elements of \c L
-// are not stored. The factored form of \a A is then used to solve the system of equations.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The function finished successfully.
-//   - < 0: If info = -i, the i-th argument had an illegal value.
-//   - > 0: If info = i, the decomposition has been completed, but since factor U(i,i) is exactly
-//          singular the solution could not be computed.
-//
-// For more information on the sgesv() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void gesv( int n, int nrhs, float* A, int lda, int* ipiv, float* B, int ldb, int* info )
-{
-   sgesv_( &n, &nrhs, A, &lda, ipiv, B, &ldb, info );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for solving a general double precision linear system of equations
-//        (\f$ A*X=B \f$).
-// \ingroup lapack_solver
-//
-// \param n The number of rows/columns of matrix \a A \f$[0..\infty)\f$.
-// \param nrhs The number of right-hand side vectors \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the double precision column-major square matrix.
-// \param lda The total number of elements between two columns of matrix \a A \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param B Pointer to the first element of the column-major matrix.
-// \param ldb The total number of elements between two columns of matrix \a B \f$[0..\infty)\f$.
-// \param info Return code of the function call.
-// \return void
-//
-// This function uses the LAPACK dgesv() function to compute the solution to the general system of
-// linear equations \f$ A*X=B \f$, where \a A is a n-by-n matrix and \a X and \a B are n-by-nrhs
-// matrices.
-//
-// The LU decomposition with partial pivoting and row interchanges is used to factor \a A as
-
-                          \f[ A = P \cdot L \cdot U, \f]
-
-// where \c P is a permutation matrix, \c L is a lower unitriangular matrix, and \c U is an upper
-// triangular matrix. The resulting decomposition is stored within \a A: \c L is stored in the
-// lower part of \a A and \c U is stored in the upper part. The unit diagonal elements of \c L
-// are not stored. The factored form of \a A is then used to solve the system of equations.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The function finished successfully.
-//   - < 0: If info = -i, the i-th argument had an illegal value.
-//   - > 0: If info = i, the decomposition has been completed, but since factor U(i,i) is exactly
-//          singular the solution could not be computed.
-//
-// For more information on the dgesv() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void gesv( int n, int nrhs, double* A, int lda, int* ipiv, double* B, int ldb, int* info )
-{
-   dgesv_( &n, &nrhs, A, &lda, ipiv, B, &ldb, info );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for solving a general single precision complex linear system of equations
-//        (\f$ A*X=B \f$).
-// \ingroup lapack_solver
-//
-// \param n The number of rows/columns of matrix \a A \f$[0..\infty)\f$.
-// \param nrhs The number of right-hand side vectors \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the single precision complex column-major square matrix.
-// \param lda The total number of elements between two columns of matrix \a A \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param B Pointer to the first element of the column-major matrix.
-// \param ldb The total number of elements between two columns of matrix \a B \f$[0..\infty)\f$.
-// \param info Return code of the function call.
-// \return void
-//
-// This function uses the LAPACK cgesv() function to compute the solution to the general system of
-// linear equations \f$ A*X=B \f$, where \a A is a n-by-n matrix and \a X and \a B are n-by-nrhs
-// matrices.
-//
-// The LU decomposition with partial pivoting and row interchanges is used to factor \a A as
-
-                          \f[ A = P \cdot L \cdot U, \f]
-
-// where \c P is a permutation matrix, \c L is a lower unitriangular matrix, and \c U is an upper
-// triangular matrix. The resulting decomposition is stored within \a A: \c L is stored in the
-// lower part of \a A and \c U is stored in the upper part. The unit diagonal elements of \c L
-// are not stored. The factored form of \a A is then used to solve the system of equations.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The function finished successfully.
-//   - < 0: If info = -i, the i-th argument had an illegal value.
-//   - > 0: If info = i, the decomposition has been completed, but since factor U(i,i) is exactly
-//          singular the solution could not be computed.
-//
-// For more information on the cgesv() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void gesv( int n, int nrhs, complex<float>* A, int lda, int* ipiv, complex<float>* B, int ldb, int* info )
-{
-   BLAZE_STATIC_ASSERT( sizeof( complex<float> ) == 2UL*sizeof( float ) );
-
-   cgesv_( &n, &nrhs, reinterpret_cast<float*>( A ), &lda, ipiv,
-           reinterpret_cast<float*>( B ), &ldb, info );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief LAPACK kernel for solving a general double precision complex linear system of equations
-//        (\f$ A*X=B \f$).
-// \ingroup lapack_solver
-//
-// \param n The number of rows/columns of matrix \a A \f$[0..\infty)\f$.
-// \param nrhs The number of right-hand side vectors \f$[0..\infty)\f$.
-// \param A Pointer to the first element of the double precision complex column-major square matrix.
-// \param lda The total number of elements between two columns of matrix \a A \f$[0..\infty)\f$.
-// \param ipiv Auxiliary array of size \a n for the pivot indices.
-// \param B Pointer to the first element of the column-major matrix.
-// \param ldb The total number of elements between two columns of matrix \a B \f$[0..\infty)\f$.
-// \param info Return code of the function call.
-// \return void
-//
-// This function uses the LAPACK zgesv() function to compute the solution to the general system of
-// linear equations \f$ A*X=B \f$, where \a A is a n-by-n matrix and \a X and \a B are n-by-nrhs
-// matrices.
-//
-// The LU decomposition with partial pivoting and row interchanges is used to factor \a A as
-
-                          \f[ A = P \cdot L \cdot U, \f]
-
-// where \c P is a permutation matrix, \c L is a lower unitriangular matrix, and \c U is an upper
-// triangular matrix. The resulting decomposition is stored within \a A: \c L is stored in the
-// lower part of \a A and \c U is stored in the upper part. The unit diagonal elements of \c L
-// are not stored. The factored form of \a A is then used to solve the system of equations.
-//
-// The \a info argument provides feedback on the success of the function call:
-//
-//   - = 0: The function finished successfully.
-//   - < 0: If info = -i, the i-th argument had an illegal value.
-//   - > 0: If info = i, the decomposition has been completed, but since factor U(i,i) is exactly
-//          singular the solution could not be computed.
-//
-// For more information on the zgesv() function, see the LAPACK online documentation browser:
-//
-//        http://www.netlib.org/lapack/explore-html/
-//
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
-*/
-inline void gesv( int n, int nrhs, complex<double>* A, int lda, int* ipiv, complex<double>* B, int ldb, int* info )
-{
-   BLAZE_STATIC_ASSERT( sizeof( complex<double> ) == 2UL*sizeof( double ) );
-
-   zgesv_( &n, &nrhs, reinterpret_cast<double*>( A ), &lda, ipiv,
-           reinterpret_cast<double*>( B ), &ldb, info );
-}
 //*************************************************************************************************
 
 
@@ -315,7 +83,8 @@ inline void gesv( int n, int nrhs, complex<double>* A, int lda, int* ipiv, compl
 // \param ipiv Auxiliary array of size \a n for the pivot indices.
 // \return void
 // \exception std::invalid_argument Invalid non-square matrix provided.
-// \exception std::invalid_argument Inversion of singular matrix failed.
+// \exception std::invalid_argument Invalid right-hand side vector provided.
+// \exception std::runtime_error Inversion of singular matrix failed.
 //
 // This function uses the LAPACK gesv() functions to compute the solution to the system of general
 // linear equations:
@@ -323,10 +92,11 @@ inline void gesv( int n, int nrhs, complex<double>* A, int lda, int* ipiv, compl
 //  - \f$ A  *x=b \f$ if \a A is column-major
 //  - \f$ A^T*x=b \f$ if \a A is row-major
 //
-// In this context the general system matrix \a A n-by-n matrix and \a x and \a b are n-dimensional
-// vectors. Note that the function only works for general, non-adapted matrices with \c float,
-// \c double, \c complex<float>, or \c complex<double> element type. The attempt to call the
-// function with adaptors or matrices of any other element type results in a compile time error!
+// In this context the general system matrix \a A \a n-by-\a n matrix and \a x and \a b are
+// n-dimensional vectors. Note that the function only works for general, non-adapted matrices
+// with \c float, \c double, \c complex<float>, or \c complex<double> element type. The attempt
+// to call the function with adaptors or matrices of any other element type results in a compile
+// time error!
 //
 // If the function exits successfully, the vector \a b contains the solution of the linear system
 // of equations and \a A has been decomposed by means of an LU decomposition with partial pivoting
@@ -344,15 +114,16 @@ inline void gesv( int n, int nrhs, complex<double>* A, int lda, int* ipiv, compl
 //  - ... the given system matrix is not a square matrix;
 //  - ... the given system matrix is singular and not invertible.
 //
-// In all failure cases a \a std::invalid_argument exception is thrown.
+// In all failure cases an exception is thrown.
 //
 // For more information on the gesv() functions (i.e. sgesv(), dgesv(), cgesv(), and zgesv()),
 // see the LAPACK online documentation browser:
 //
 //        http://www.netlib.org/lapack/explore-html/
 //
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
+// \note This function can only be used if a fitting LAPACK library, which supports this function,
+// is available and linked to the executable. Otherwise a call to this function will result in a
+// linker error.
 //
 // \note This function does only provide the basic exception safety guarantee, i.e. in case of an
 // exception \a A may already have been modified.
@@ -363,18 +134,20 @@ template< typename MT  // Type of the system matrix
         , bool TF >    // Transpose flag of the right-hand side vector
 inline void gesv( DenseMatrix<MT,SO>& A, DenseVector<VT,TF>& b, int* ipiv )
 {
-   using boost::numeric_cast;
-
    BLAZE_CONSTRAINT_MUST_NOT_BE_ADAPTOR_TYPE( MT );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( VT );
    BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( MT );
    BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( VT );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_SAME_TYPE( typename MT::ElementType, typename VT::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT> );
+   BLAZE_CONSTRAINT_MUST_BE_SAME_TYPE( ElementType_<MT>, ElementType_<VT> );
 
    if( !isSquare( ~A ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid non-square matrix provided" );
+   }
+
+   if( (~b).size() != (~A).rows() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid right-hand side vector provided" );
    }
 
    int n   ( numeric_cast<int>( (~A).rows() ) );
@@ -392,7 +165,7 @@ inline void gesv( DenseMatrix<MT,SO>& A, DenseVector<VT,TF>& b, int* ipiv )
    BLAZE_INTERNAL_ASSERT( info >= 0, "Invalid function argument" );
 
    if( info > 0 ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Inversion of singular matrix failed" );
+      BLAZE_THROW_LAPACK_ERROR( "Inversion of singular matrix failed" );
    }
 }
 //*************************************************************************************************
@@ -407,8 +180,8 @@ inline void gesv( DenseMatrix<MT,SO>& A, DenseVector<VT,TF>& b, int* ipiv )
 // \param ipiv Auxiliary array of size \a n for the pivot indices.
 // \return void
 // \exception std::invalid_argument Invalid non-square matrix provided.
-// \exception std::invalid_argument Matrix sizes do not match.
-// \exception std::invalid_argument Inversion of singular matrix failed.
+// \exception std::invalid_argument Invalid right-hand side matrix provided.
+// \exception std::runtime_error Inversion of singular matrix failed.
 //
 // This function uses the LAPACK gesv() functions to compute the solution to the general system of
 // linera equations:
@@ -418,11 +191,11 @@ inline void gesv( DenseMatrix<MT,SO>& A, DenseVector<VT,TF>& b, int* ipiv )
 //  - \f$ A  *X^T=B^T \f$ if \a A is column-major and \a B is row-major
 //  - \f$ A^T*X^T=B^T \f$ if both \a A and \a B are row-major
 //
-// In this context the general system matrix \a A is a n-by-n matrix and \a X and \a B are either
-// row-major m-by-n matrices or column-major n-by-m matrices. Note that the function only works for
-// general, non-adapted matrices with \c float, \c double, \c complex<float>, or \c complex<double>
-// element type. The attempt to call the function with adaptors or matrices of any other element
-// type results in a compile time error!
+// In this context the general system matrix \a A is a \a n-by-\a n matrix and \a X and \a B are
+// either row-major \a m-by-\a n matrices or column-major \a n-by-\a m matrices. Note that the
+// function only works for general, non-adapted matrices with \c float, \c double, \c complex<float>,
+// or \c complex<double> element type. The attempt to call the function with adaptors or matrices
+// of any other element type results in a compile time error!
 //
 // If the function exits successfully, the matrix \a B contains the solutions of the linear system
 // of equations and \a A has been decomposed by means of an LU decomposition with partial pivoting
@@ -441,15 +214,16 @@ inline void gesv( DenseMatrix<MT,SO>& A, DenseVector<VT,TF>& b, int* ipiv )
 //  - ... the sizes of the two given matrices do not match;
 //  - ... the given system matrix is singular and not invertible.
 //
-// In all failure cases a \a std::invalid_argument exception is thrown.
+// In all failure cases an exception is thrown.
 //
 // For more information on the gesv() functions (i.e. sgesv(), dgesv(), cgesv(), and zgesv()),
 // see the LAPACK online documentation browser:
 //
 //        http://www.netlib.org/lapack/explore-html/
 //
-// \note This function can only be used if the fitting LAPACK library is available and linked to
-// the executable. Otherwise a call to this function will result in a linker error.
+// \note This function can only be used if a fitting LAPACK library, which supports this function,
+// is available and linked to the executable. Otherwise a call to this function will result in a
+// linker error.
 //
 // \note This function does only provide the basic exception safety guarantee, i.e. in case of an
 // exception \a A may already have been modified.
@@ -460,16 +234,14 @@ template< typename MT1  // Type of the system matrix
         , bool SO2 >    // Storage order of the right-hand side matrix
 inline void gesv( DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO2>& B, int* ipiv )
 {
-   using boost::numeric_cast;
-
    BLAZE_CONSTRAINT_MUST_NOT_BE_ADAPTOR_TYPE( MT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_ADAPTOR_TYPE( MT2 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT1 );
    BLAZE_CONSTRAINT_MUST_NOT_BE_COMPUTATION_TYPE( MT2 );
    BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( MT1 );
    BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( MT2 );
-   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( typename MT1::ElementType );
-   BLAZE_CONSTRAINT_MUST_BE_SAME_TYPE( typename MT1::ElementType, typename MT2::ElementType );
+   BLAZE_CONSTRAINT_MUST_BE_BLAS_COMPATIBLE_TYPE( ElementType_<MT1> );
+   BLAZE_CONSTRAINT_MUST_BE_SAME_TYPE( ElementType_<MT1>, ElementType_<MT2> );
 
    if( !isSquare( ~A ) ) {
       BLAZE_THROW_INVALID_ARGUMENT( "Invalid non-square matrix provided" );
@@ -483,7 +255,7 @@ inline void gesv( DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO2>& B, int* ipiv )
    int info( 0 );
 
    if( n != mrhs ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Matrix sizes do not match" );
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid right-hand side matrix provided" );
    }
 
    if( n == 0 ) {
@@ -495,7 +267,7 @@ inline void gesv( DenseMatrix<MT1,SO1>& A, DenseMatrix<MT2,SO2>& B, int* ipiv )
    BLAZE_INTERNAL_ASSERT( info >= 0, "Invalid function argument" );
 
    if( info > 0 ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Inversion of singular matrix failed" );
+      BLAZE_THROW_LAPACK_ERROR( "Inversion of singular matrix failed" );
    }
 }
 //*************************************************************************************************

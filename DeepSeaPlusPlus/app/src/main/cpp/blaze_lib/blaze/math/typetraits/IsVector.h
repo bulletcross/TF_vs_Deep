@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsVector.h
 //  \brief Header file for the IsVector type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,11 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/typetraits/IsDenseVector.h>
-#include <blaze/math/typetraits/IsSparseVector.h>
+#include <utility>
+#include <blaze/math/expressions/Vector.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -63,9 +63,17 @@ namespace blaze {
 template< typename T >
 struct IsVectorHelper
 {
+ private:
    //**********************************************************************************************
-   enum { value = IsDenseVector<T>::value || IsSparseVector<T>::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   template< typename VT, bool TF >
+   static TrueType test( const Vector<VT,TF>& );
+
+   static FalseType test( ... );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -77,10 +85,10 @@ struct IsVectorHelper
 // \ingroup math_type_traits
 //
 // This type trait tests whether or not the given template parameter is a N-dimensional dense
-// or sparse vector type. In case the type is a vector type, the \a value member enumeration
-// is set to 1, the nested type definition \a Type is \a TrueType, and the class derives from
-// \a TrueType. Otherwise \a value is set to 0, \a Type is \a FalseType, and the class derives
-// from \a FalseType.
+// or sparse vector type (i.e. whether \a T is derived from the Vector base class). In case
+// the type is a vector type, the \a value member constant is set to \a true, the nested type
+// definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value
+// is set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    blaze::IsVector< StaticVector<float,3U,false> >::value      // Evaluates to 1
@@ -91,17 +99,11 @@ struct IsVectorHelper
    blaze::IsVector< volatile CompressedMatrix<int,true> >      // Is derived from FalseType
    \endcode
 */
+
 template< typename T >
-struct IsVector : public IsVectorHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsVectorHelper<T>::value };
-   typedef typename IsVectorHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsVector
+   : public IsVectorHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

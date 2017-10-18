@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsExpression.h
 //  \brief Header file for the IsExpression type trait class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,11 +40,11 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/type_traits/is_base_of.hpp>
+#include <utility>
 #include <blaze/math/expressions/Expression.h>
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
 #include <blaze/util/TrueType.h>
+#include <blaze/util/typetraits/RemoveCV.h>
 
 
 namespace blaze {
@@ -63,9 +63,17 @@ namespace blaze {
 template< typename T >
 struct IsExpressionHelper
 {
+ private:
    //**********************************************************************************************
-   enum { value = boost::is_base_of<Expression,T>::value && !boost::is_base_of<T,Expression>::value };
-   typedef typename SelectType<value,TrueType,FalseType>::Type  Type;
+   template< typename U >
+   static TrueType test( const Expression<U>& );
+
+   static FalseType test( ... );
+   //**********************************************************************************************
+
+ public:
+   //**********************************************************************************************
+   using Type = decltype( test( std::declval< RemoveCV_<T> >() ) );
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -78,22 +86,15 @@ struct IsExpressionHelper
 //
 // This type trait class tests whether or not the given type \a Type is a Blaze expression
 // template. In order to qualify as a valid expression template, the given type has to derive
-// (publicly or privately) from the Expression base class. In case the given type is a valid
-// expression template, the \a value member enumeration is set to 1, the nested type definition
-// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set
-// to 0, \a Type is \a FalseType, and the class derives from \a FalseType.
+// publicly from the Expression base class. In case the given type is a valid expression
+// template, the \a value member constant is set to \a true, the nested type definition
+// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is
+// set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 */
 template< typename T >
-struct IsExpression : public IsExpressionHelper<T>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsExpressionHelper<T>::value };
-   typedef typename IsExpressionHelper<T>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsExpression
+   : public IsExpressionHelper<T>::Type
+{};
 //*************************************************************************************************
 
 } // namespace blaze

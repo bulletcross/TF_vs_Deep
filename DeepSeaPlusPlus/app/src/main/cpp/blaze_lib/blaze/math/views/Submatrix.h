@@ -1,9 +1,9 @@
 //=================================================================================================
 /*!
 //  \file blaze/math/views/Submatrix.h
-//  \brief Header file for all restructuring submatrix functions
+//  \brief Header file for the implementation of the Submatrix view
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,35 +40,54 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/AlignmentFlag.h>
+#include <blaze/math/constraints/MutableDataAccess.h>
+#include <blaze/math/constraints/RequiresEvaluation.h>
+#include <blaze/math/expressions/DeclExpr.h>
+#include <blaze/math/expressions/MatEvalExpr.h>
+#include <blaze/math/expressions/MatMapExpr.h>
+#include <blaze/math/expressions/MatMatAddExpr.h>
+#include <blaze/math/expressions/MatMatMapExpr.h>
+#include <blaze/math/expressions/MatMatMultExpr.h>
+#include <blaze/math/expressions/MatMatSubExpr.h>
 #include <blaze/math/expressions/Matrix.h>
-#include <blaze/math/Functions.h>
+#include <blaze/math/expressions/MatScalarDivExpr.h>
+#include <blaze/math/expressions/MatScalarMultExpr.h>
+#include <blaze/math/expressions/MatSerialExpr.h>
+#include <blaze/math/expressions/MatTransExpr.h>
+#include <blaze/math/expressions/MatVecMultExpr.h>
+#include <blaze/math/expressions/SchurExpr.h>
+#include <blaze/math/expressions/TVecMatMultExpr.h>
+#include <blaze/math/expressions/VecTVecMultExpr.h>
+#include <blaze/math/InversionFlag.h>
+#include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/Serial.h>
-#include <blaze/math/traits/SubmatrixExprTrait.h>
-#include <blaze/math/typetraits/IsComputation.h>
+#include <blaze/math/traits/AddTrait.h>
+#include <blaze/math/traits/ColumnTrait.h>
+#include <blaze/math/traits/DivTrait.h>
+#include <blaze/math/traits/MultTrait.h>
+#include <blaze/math/traits/RowTrait.h>
+#include <blaze/math/traits/SubmatrixTrait.h>
+#include <blaze/math/traits/SubTrait.h>
+#include <blaze/math/typetraits/HasConstDataAccess.h>
+#include <blaze/math/typetraits/HasMutableDataAccess.h>
+#include <blaze/math/typetraits/IsAligned.h>
 #include <blaze/math/typetraits/IsLower.h>
-#include <blaze/math/typetraits/IsMatAbsExpr.h>
-#include <blaze/math/typetraits/IsMatConjExpr.h>
-#include <blaze/math/typetraits/IsMatEvalExpr.h>
-#include <blaze/math/typetraits/IsMatImagExpr.h>
-#include <blaze/math/typetraits/IsMatMatAddExpr.h>
-#include <blaze/math/typetraits/IsMatMatMultExpr.h>
-#include <blaze/math/typetraits/IsMatMatSubExpr.h>
-#include <blaze/math/typetraits/IsMatRealExpr.h>
-#include <blaze/math/typetraits/IsMatScalarDivExpr.h>
-#include <blaze/math/typetraits/IsMatScalarMultExpr.h>
-#include <blaze/math/typetraits/IsMatSerialExpr.h>
-#include <blaze/math/typetraits/IsMatTransExpr.h>
+#include <blaze/math/typetraits/IsRestricted.h>
 #include <blaze/math/typetraits/IsStrictlyLower.h>
 #include <blaze/math/typetraits/IsStrictlyUpper.h>
-#include <blaze/math/typetraits/IsTransExpr.h>
 #include <blaze/math/typetraits/IsUpper.h>
-#include <blaze/math/typetraits/IsVecTVecMultExpr.h>
+#include <blaze/math/views/submatrix/BaseTemplate.h>
+#include <blaze/math/views/submatrix/Dense.h>
+#include <blaze/math/views/submatrix/Sparse.h>
 #include <blaze/math/views/Subvector.h>
+#include <blaze/util/algorithms/Max.h>
+#include <blaze/util/algorithms/Min.h>
 #include <blaze/util/DisableIf.h>
-#include <blaze/util/EnableIf.h>
-#include <blaze/util/logging/FunctionTrace.h>
-#include <blaze/util/mpl/Or.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/IntegralConstant.h>
+#include <blaze/util/TrueType.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/RemoveReference.h>
 
@@ -77,7 +96,7 @@ namespace blaze {
 
 //=================================================================================================
 //
-//  GLOBAL FUNCTION
+//  GLOBAL FUNCTIONS
 //
 //=================================================================================================
 
@@ -100,18 +119,18 @@ namespace blaze {
    using blaze::rowMajor;
    using blaze::columnMajor;
 
-   typedef blaze::DynamicMatrix<double,rowMajor>     DenseMatrix;
-   typedef blaze::CompressedMatrix<int,columnMajor>  SparseMatrix;
+   using DenseMatrix  = blaze::DynamicMatrix<double,rowMajor>;
+   using SparseMatrix = blaze::CompressedMatrix<int,columnMajor>;
 
    DenseMatrix  D;
    SparseMatrix S;
    // ... Resizing and initialization
 
    // Creating a dense submatrix of size 8x4, starting in row 0 and column 16
-   blaze::DenseSubmatrix<DenseMatrix> dsm = submatrix( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<DenseMatrix> dsm = submatrix( D, 0UL, 16UL, 8UL, 4UL );
 
    // Creating a sparse submatrix of size 7x3, starting in row 2 and column 4
-   blaze::SparseSubmatrix<SparseMatrix> ssm = submatrix( S, 2UL, 4UL, 7UL, 3UL );
+   blaze::Submatrix<SparseMatrix> ssm = submatrix( S, 2UL, 4UL, 7UL, 3UL );
    \endcode
 
 // In case the submatrix is not properly specified (i.e. if the specified row or column is larger
@@ -123,9 +142,9 @@ namespace blaze {
 // the creation of the dense submatrix is equivalent to the following three function calls:
 
    \code
-   blaze::DenseSubmatrix<DenseMatrix>           dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
-   blaze::DenseSubmatrix<DenseMatrix,unaligned> dsm = submatrix           ( D, 0UL, 16UL, 8UL, 4UL );
-   blaze::DenseSubmatrix<DenseMatrix,unaligned> dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<DenseMatrix>           dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<DenseMatrix,unaligned> dsm = submatrix           ( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<DenseMatrix,unaligned> dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
    \endcode
 
 // In contrast to unaligned submatrices, which provide full flexibility, aligned submatrices pose
@@ -134,7 +153,7 @@ namespace blaze {
 // following function call has to be used:
 
    \code
-   blaze::DenseSubmatrix<DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
    \endcode
 
 // Note however that in this case the given arguments \a row, \a columns, \a m, and \a n are
@@ -142,7 +161,7 @@ namespace blaze {
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline typename SubmatrixExprTrait<MT,unaligned>::Type
+inline decltype(auto)
    submatrix( Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
@@ -153,10 +172,10 @@ inline typename SubmatrixExprTrait<MT,unaligned>::Type
 
 
 //*************************************************************************************************
-/*!\brief Creating a view on a specific submatrix of the given matrix.
+/*!\brief Creating a view on a specific submatrix of the given constant matrix.
 // \ingroup views
 //
-// \param matrix The matrix containing the submatrix.
+// \param matrix The constant matrix containing the submatrix.
 // \param row The index of the first row of the submatrix.
 // \param column The index of the first column of the submatrix.
 // \param m The number of rows of the submatrix.
@@ -164,25 +183,24 @@ inline typename SubmatrixExprTrait<MT,unaligned>::Type
 // \return View on the specific submatrix of the matrix.
 // \exception std::invalid_argument Invalid submatrix specification.
 //
-// This function returns an expression representing the specified submatrix of the given matrix.
-// The following example demonstrates the creation of a dense and sparse submatrix:
+// This function returns an expression representing the specified submatrix of the given constant
+// matrix. The following example demonstrates the creation of a dense and sparse submatrix:
 
    \code
    using blaze::rowMajor;
    using blaze::columnMajor;
 
-   typedef blaze::DynamicMatrix<double,rowMajor>     DenseMatrix;
-   typedef blaze::CompressedMatrix<int,columnMajor>  SparseMatrix;
+   using DenseMatrix  = blaze::DynamicMatrix<double,rowMajor>;
+   using SparseMatrix = blaze::CompressedMatrix<int,columnMajor>;
 
-   DenseMatrix  D;
-   SparseMatrix S;
-   // ... Resizing and initialization
+   const DenseMatrix  D( ... );
+   const SparseMatrix S( ... );
 
    // Creating a dense submatrix of size 8x4, starting in row 0 and column 16
-   blaze::DenseSubmatrix<DenseMatrix> dsm = submatrix( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<const DenseMatrix> dsm = submatrix( D, 0UL, 16UL, 8UL, 4UL );
 
    // Creating a sparse submatrix of size 7x3, starting in row 2 and column 4
-   blaze::SparseSubmatrix<SparseMatrix> ssm = submatrix( S, 2UL, 4UL, 7UL, 3UL );
+   blaze::Submatrix<const SparseMatrix> ssm = submatrix( S, 2UL, 4UL, 7UL, 3UL );
    \endcode
 
 // In case the submatrix is not properly specified (i.e. if the specified row or column is larger
@@ -194,9 +212,9 @@ inline typename SubmatrixExprTrait<MT,unaligned>::Type
 // the creation of the dense submatrix is equivalent to the following three function calls:
 
    \code
-   blaze::DenseSubmatrix<DenseMatrix>           dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
-   blaze::DenseSubmatrix<DenseMatrix,unaligned> dsm = submatrix           ( D, 0UL, 16UL, 8UL, 4UL );
-   blaze::DenseSubmatrix<DenseMatrix,unaligned> dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<const DenseMatrix>           dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<const DenseMatrix,unaligned> dsm = submatrix           ( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<const DenseMatrix,unaligned> dsm = submatrix<unaligned>( D, 0UL, 16UL, 8UL, 4UL );
    \endcode
 
 // In contrast to unaligned submatrices, which provide full flexibility, aligned submatrices pose
@@ -205,7 +223,7 @@ inline typename SubmatrixExprTrait<MT,unaligned>::Type
 // following function call has to be used:
 
    \code
-   blaze::DenseSubmatrix<DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<const DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
    \endcode
 
 // Note however that in this case the given arguments \a row, \a columns, \a m, and \a n are
@@ -213,8 +231,38 @@ inline typename SubmatrixExprTrait<MT,unaligned>::Type
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline typename SubmatrixExprTrait<const MT,unaligned>::Type
+inline decltype(auto)
    submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   return submatrix<unaligned>( ~matrix, row, column, m, n );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Creating a view on a specific submatrix of the given temporary matrix.
+// \ingroup views
+//
+// \param matrix The temporary matrix containing the submatrix.
+// \param row The index of the first row of the submatrix.
+// \param column The index of the first column of the submatrix.
+// \param m The number of rows of the submatrix.
+// \param n The number of columns of the submatrix.
+// \return View on the specific submatrix of the matrix.
+// \exception std::invalid_argument Invalid submatrix specification.
+//
+// This function returns an expression representing the specified submatrix of the given
+// temporary matrix. In case the submatrix is not properly specified (i.e. if the specified
+// row or column is greater than the total number of rows or columns of the given matrix or
+// the submatrix is specified beyond the number of rows or columns of the matrix) a
+// \a std::invalid_argument exception is thrown.
+*/
+template< typename MT  // Type of the dense matrix
+        , bool SO >    // Storage order
+inline decltype(auto)
+   submatrix( Matrix<MT,SO>&& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -243,18 +291,18 @@ inline typename SubmatrixExprTrait<const MT,unaligned>::Type
    using blaze::rowMajor;
    using blaze::columnMajor;
 
-   typedef blaze::DynamicMatrix<double,rowMajor>     DenseMatrix;
-   typedef blaze::CompressedMatrix<int,columnMajor>  SparseMatrix;
+   using DenseMatrix  = blaze::DynamicMatrix<double,rowMajor>;
+   using SparseMatrix = blaze::CompressedMatrix<int,columnMajor>;
 
    DenseMatrix  D;
    SparseMatrix S;
    // ... Resizing and initialization
 
    // Creating an aligned dense submatrix of size 8x4, starting in row 0 and column 16
-   blaze::DenseSubmatrix<DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
 
    // Creating an unaligned sparse submatrix of size 7x3, starting in row 2 and column 4
-   blaze::SparseSubmatrix<SparseMatrix,unaligned> ssm = submatrix<unaligned>( S, 2UL, 4UL, 7UL, 3UL );
+   blaze::Submatrix<SparseMatrix,unaligned> ssm = submatrix<unaligned>( S, 2UL, 4UL, 7UL, 3UL );
    \endcode
 
 // In case the submatrix is not properly specified (i.e. if the specified row or column is larger
@@ -271,13 +319,13 @@ inline typename SubmatrixExprTrait<const MT,unaligned>::Type
 // type and the available vectorization mode (SSE, AVX, ...). In order to be properly aligned the
 // first element of each row/column of the submatrix must be aligned. The following source code
 // gives some examples for a double precision row-major dynamic matrix, assuming that padding is
-// enabled and that AVX is available, which packs 4 \c double values into an intrinsic vector:
+// enabled and that AVX is available, which packs 4 \c double values into a SIMD vector:
 
    \code
    using blaze::rowMajor;
 
-   typedef blaze::DynamicMatrix<double,rowMajor>      MatrixType;
-   typedef blaze::DenseSubmatrix<MatrixType,aligned>  SubmatrixType;
+   using MatrixType    = blaze::DynamicMatrix<double,rowMajor>;
+   using SubmatrixType = blaze::Submatrix<MatrixType,aligned>;
 
    MatrixType D( 13UL, 17UL );
    // ... Resizing and initialization
@@ -300,23 +348,21 @@ inline typename SubmatrixExprTrait<const MT,unaligned>::Type
 template< bool AF      // Alignment flag
         , typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
-                         , typename SubmatrixExprTrait<MT,AF>::Type >::Type
+inline Submatrix<MT,AF>
    submatrix( Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
-   typedef typename SubmatrixExprTrait<MT,AF>::Type  ReturnType;
-   return ReturnType( ~matrix, row, column, m, n );
+   return Submatrix<MT,AF>( ~matrix, row, column, m, n );
 }
 //*************************************************************************************************
 
 
 //*************************************************************************************************
-/*!\brief Creating a view on a specific submatrix of the given matrix.
+/*!\brief Creating a view on a specific submatrix of the given constant matrix.
 // \ingroup views
 //
-// \param matrix The matrix containing the submatrix.
+// \param matrix The constant matrix containing the submatrix.
 // \param row The index of the first row of the submatrix.
 // \param column The index of the first column of the submatrix.
 // \param m The number of rows of the submatrix.
@@ -332,18 +378,17 @@ inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
    using blaze::rowMajor;
    using blaze::columnMajor;
 
-   typedef blaze::DynamicMatrix<double,rowMajor>     DenseMatrix;
-   typedef blaze::CompressedMatrix<int,columnMajor>  SparseMatrix;
+   using DenseMatrix  = blaze::DynamicMatrix<double,rowMajor>;
+   using SparseMatrix = blaze::CompressedMatrix<int,columnMajor>;
 
-   DenseMatrix  D;
-   SparseMatrix S;
-   // ... Resizing and initialization
+   const DenseMatrix  D( ... );
+   const SparseMatrix S( ... );
 
    // Creating an aligned dense submatrix of size 8x4, starting in row 0 and column 16
-   blaze::DenseSubmatrix<DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
+   blaze::Submatrix<const DenseMatrix,aligned> dsm = submatrix<aligned>( D, 0UL, 16UL, 8UL, 4UL );
 
    // Creating an unaligned sparse submatrix of size 7x3, starting in row 2 and column 4
-   blaze::SparseSubmatrix<SparseMatrix,unaligned> ssm = submatrix<unaligned>( S, 2UL, 4UL, 7UL, 3UL );
+   blaze::Submatrix<const SparseMatrix,unaligned> ssm = submatrix<unaligned>( S, 2UL, 4UL, 7UL, 3UL );
    \endcode
 
 // In case the submatrix is not properly specified (i.e. if the specified row or column is larger
@@ -360,16 +405,15 @@ inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
 // type and the available vectorization mode (SSE, AVX, ...). In order to be properly aligned the
 // first element of each row/column of the submatrix must be aligned. The following source code
 // gives some examples for a double precision row-major dynamic matrix, assuming that padding is
-// enabled and that AVX is available, which packs 4 \c double values into an intrinsic vector:
+// enabled and that AVX is available, which packs 4 \c double values into a SIMD vector:
 
    \code
    using blaze::rowMajor;
 
-   typedef blaze::DynamicMatrix<double,rowMajor>      MatrixType;
-   typedef blaze::DenseSubmatrix<MatrixType,aligned>  SubmatrixType;
+   using MatrixType    = blaze::DynamicMatrix<double,rowMajor>;
+   using SubmatrixType = blaze::Submatrix<const MatrixType,aligned>;
 
-   MatrixType D( 13UL, 17UL );
-   // ... Resizing and initialization
+   const MatrixType D( ... );
 
    // OK: Starts at position (0,0), i.e. the first element of each row is aligned (due to padding)
    SubmatrixType dsm1 = submatrix<aligned>( D, 0UL, 0UL, 7UL, 11UL );
@@ -389,14 +433,44 @@ inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
 template< bool AF      // Alignment flag
         , typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
-                         , typename SubmatrixExprTrait<const MT,AF>::Type >::Type
+inline const Submatrix<const MT,AF>
    submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
-   typedef typename SubmatrixExprTrait<const MT,AF>::Type  ReturnType;
-   return ReturnType( ~matrix, row, column, m, n );
+   return Submatrix<const MT,AF>( ~matrix, row, column, m, n );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Creating a view on a specific submatrix of the given temporary matrix.
+// \ingroup views
+//
+// \param matrix The temporary matrix containing the submatrix.
+// \param row The index of the first row of the submatrix.
+// \param column The index of the first column of the submatrix.
+// \param m The number of rows of the submatrix.
+// \param n The number of columns of the submatrix.
+// \return View on the specific submatrix of the matrix.
+// \exception std::invalid_argument Invalid submatrix specification.
+//
+// This function returns an expression representing an aligned or unaligned submatrix of the
+// given temporary dense or sparse matrix, based on the specified alignment flag \a AF. In
+// case the submatrix is not properly specified (i.e. if the specified row or column is larger
+// than the total number of rows or columns of the given matrix or the submatrix is specified
+// beyond the number of rows or columns of the matrix) or any alignment restrictions are
+// violated, a \a std::invalid_argument exception is thrown.
+*/
+template< bool AF      // Alignment flag
+        , typename MT  // Type of the dense matrix
+        , bool SO >    // Storage order
+inline Submatrix<MT,AF>
+   submatrix( Matrix<MT,SO>&& matrix, size_t row, size_t column, size_t m, size_t n )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   return Submatrix<MT,AF>( ~matrix, row, column, m, n );
 }
 //*************************************************************************************************
 
@@ -405,9 +479,91 @@ inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
 
 //=================================================================================================
 //
-//  GLOBAL RESTRUCTURING OPERATORS
+//  GLOBAL RESTRUCTURING FUNCTIONS
 //
 //=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Creating a view on a specific subvector of the given matrix/vector multiplication.
+// \ingroup views
+//
+// \param vector The constant matrix/vector multiplication.
+// \param index The index of the first element of the subvector.
+// \param size The size of the subvector.
+// \return View on the specified subvector of the multiplication.
+//
+// This function returns an expression representing the specified subvector of the given
+// matrix/vector multiplication.
+*/
+template< bool AF        // Alignment flag
+        , typename VT >  // Vector base type of the expression
+inline decltype(auto) subvector( const MatVecMultExpr<VT>& vector, size_t index, size_t size )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   using MT = RemoveReference_< LeftOperand_< VectorType_<VT> > >;
+
+   decltype(auto) left ( (~vector).leftOperand()  );
+   decltype(auto) right( (~vector).rightOperand() );
+
+   const size_t column( ( IsUpper<MT>::value )
+                        ?( ( !AF && IsStrictlyUpper<MT>::value )?( index + 1UL ):( index ) )
+                        :( 0UL ) );
+   const size_t n( ( IsLower<MT>::value )
+                   ?( ( IsUpper<MT>::value )?( size )
+                                            :( ( IsStrictlyLower<MT>::value && size > 0UL )
+                                               ?( index + size - 1UL )
+                                               :( index + size ) ) )
+                   :( ( IsUpper<MT>::value )?( left.columns() - column )
+                                            :( left.columns() ) ) );
+
+   return submatrix<AF>( left, index, column, size, n ) * subvector<AF>( right, column, n );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Creating a view on a specific subvector of the given vector/matrix multiplication.
+// \ingroup views
+//
+// \param vector The constant vector/matrix multiplication.
+// \param index The index of the first element of the subvector.
+// \param size The size of the subvector.
+// \return View on the specified subvector of the multiplication.
+//
+// This function returns an expression representing the specified subvector of the given
+// vector/matrix multiplication.
+*/
+template< bool AF        // Alignment flag
+        , typename VT >  // Vector base type of the expression
+inline decltype(auto) subvector( const TVecMatMultExpr<VT>& vector, size_t index, size_t size )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   using MT = RemoveReference_< RightOperand_< VectorType_<VT> > >;
+
+   decltype(auto) left ( (~vector).leftOperand()  );
+   decltype(auto) right( (~vector).rightOperand() );
+
+   const size_t row( ( IsLower<MT>::value )
+                     ?( ( !AF && IsStrictlyLower<MT>::value )?( index + 1UL ):( index ) )
+                     :( 0UL ) );
+   const size_t m( ( IsUpper<MT>::value )
+                   ?( ( IsLower<MT>::value )?( size )
+                                            :( ( IsStrictlyUpper<MT>::value && size > 0UL )
+                                               ?( index + size - 1UL )
+                                               :( index + size ) ) )
+                   :( ( IsLower<MT>::value )?( right.rows() - row )
+                                            :( right.rows() ) ) );
+
+   return subvector<AF>( left, row, m ) * submatrix<AF>( right, row, index, m, size );
+}
+/*! \endcond */
+//*************************************************************************************************
+
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
@@ -424,11 +580,10 @@ inline typename DisableIf< Or< IsComputation<MT>, IsTransExpr<MT> >
 // This function returns an expression representing the specified submatrix of the given
 // matrix/matrix addition.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatMatAddExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatMatAddExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -454,15 +609,43 @@ inline typename EnableIf< IsMatMatAddExpr<MT>, typename SubmatrixExprTrait<MT,AF
 // This function returns an expression representing the specified submatrix of the given
 // matrix/matrix subtraction.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatMatSubExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatMatSubExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
    return submatrix<AF>( (~matrix).leftOperand() , row, column, m, n ) -
+          submatrix<AF>( (~matrix).rightOperand(), row, column, m, n );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Creating a view on a specific submatrix of the given Schur product.
+// \ingroup views
+//
+// \param matrix The constant Schur product.
+// \param row The index of the first row of the submatrix.
+// \param column The index of the first column of the submatrix.
+// \param m The number of rows of the submatrix.
+// \param n The number of columns of the submatrix.
+// \return View on the specified submatrix of the Schur product.
+//
+// This function returns an expression representing the specified submatrix of the given Schur
+// product.
+*/
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const SchurExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   return submatrix<AF>( (~matrix).leftOperand() , row, column, m, n ) %
           submatrix<AF>( (~matrix).rightOperand(), row, column, m, n );
 }
 /*! \endcond */
@@ -484,19 +667,18 @@ inline typename EnableIf< IsMatMatSubExpr<MT>, typename SubmatrixExprTrait<MT,AF
 // This function returns an expression representing the specified submatrix of the given
 // matrix/matrix multiplication.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatMatMultExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatMatMultExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
-   typedef typename RemoveReference< typename MT::LeftOperand >::Type   MT1;
-   typedef typename RemoveReference< typename MT::RightOperand >::Type  MT2;
+   using MT1 = RemoveReference_< LeftOperand_< MatrixType_<MT> > >;
+   using MT2 = RemoveReference_< RightOperand_< MatrixType_<MT> > >;
 
-   typename MT::LeftOperand  left ( (~matrix).leftOperand()  );
-   typename MT::RightOperand right( (~matrix).rightOperand() );
+   decltype(auto) left ( (~matrix).leftOperand()  );
+   decltype(auto) right( (~matrix).rightOperand() );
 
    const size_t begin( max( ( IsUpper<MT1>::value )
                             ?( ( !AF && IsStrictlyUpper<MT1>::value )?( row + 1UL ):( row ) )
@@ -535,11 +717,10 @@ inline typename EnableIf< IsMatMatMultExpr<MT>, typename SubmatrixExprTrait<MT,A
 // This function returns an expression representing the specified submatrix of the given
 // outer product.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsVecTVecMultExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const VecTVecMultExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -565,11 +746,10 @@ inline typename EnableIf< IsVecTVecMultExpr<MT>, typename SubmatrixExprTrait<MT,
 // This function returns an expression representing the specified submatrix of the given
 // matrix/scalar multiplication.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatScalarMultExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatScalarMultExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -594,11 +774,10 @@ inline typename EnableIf< IsMatScalarMultExpr<MT>, typename SubmatrixExprTrait<M
 // This function returns an expression representing the specified submatrix of the given
 // matrix/scalar division.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatScalarDivExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatScalarDivExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -610,28 +789,27 @@ inline typename EnableIf< IsMatScalarDivExpr<MT>, typename SubmatrixExprTrait<MT
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Creating a view on a specific submatrix of the given matrix \a abs operation.
+/*!\brief Creating a view on a specific submatrix of the given unary matrix map operation.
 // \ingroup views
 //
-// \param matrix The constant matrix \a abs operation.
+// \param matrix The constant unary matrix map operation.
 // \param row The index of the first row of the submatrix.
 // \param column The index of the first column of the submatrix.
 // \param m The number of rows of the submatrix.
 // \param n The number of columns of the submatrix.
-// \return View on the specified submatrix of the \a abs operation.
+// \return View on the specified submatrix of the unary map operation.
 //
-// This function returns an expression representing the specified submatrix of the given matrix
-// \a abs operation.
+// This function returns an expression representing the specified submatrix of the given unary
+// matrix map operation.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatAbsExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatMapExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
-   return abs( submatrix<AF>( (~matrix).operand(), row, column, m, n ) );
+   return map( submatrix<AF>( (~matrix).operand(), row, column, m, n ), (~matrix).operation() );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -639,86 +817,29 @@ inline typename EnableIf< IsMatAbsExpr<MT>, typename SubmatrixExprTrait<MT,AF>::
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-/*!\brief Creating a view on a specific submatrix of the given matrix \a conj operation.
+/*!\brief Creating a view on a specific submatrix of the given binary matrix map operation.
 // \ingroup views
 //
-// \param matrix The constant matrix \a conj operation.
+// \param matrix The constant binary matrix map operation.
 // \param row The index of the first row of the submatrix.
 // \param column The index of the first column of the submatrix.
 // \param m The number of rows of the submatrix.
 // \param n The number of columns of the submatrix.
-// \return View on the specified submatrix of the \a conj operation.
+// \return View on the specified submatrix of the binary map operation.
 //
-// This function returns an expression representing the specified submatrix of the given matrix
-// \a conj operation.
+// This function returns an expression representing the specified submatrix of the given binary
+// matrix map operation.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatConjExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatMatMapExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
-   return conj( submatrix<AF>( (~matrix).operand(), row, column, m, n ) );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Creating a view on a specific submatrix of the given matrix \a real operation.
-// \ingroup views
-//
-// \param matrix The constant matrix \a real operation.
-// \param row The index of the first row of the submatrix.
-// \param column The index of the first column of the submatrix.
-// \param m The number of rows of the submatrix.
-// \param n The number of columns of the submatrix.
-// \return View on the specified submatrix of the \a real operation.
-//
-// This function returns an expression representing the specified submatrix of the given matrix
-// \a real operation.
-*/
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatRealExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
-{
-   BLAZE_FUNCTION_TRACE;
-
-   return real( submatrix<AF>( (~matrix).operand(), row, column, m, n ) );
-}
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-/*!\brief Creating a view on a specific submatrix of the given matrix \a imag operation.
-// \ingroup views
-//
-// \param matrix The constant matrix \a imag operation.
-// \param row The index of the first row of the submatrix.
-// \param column The index of the first column of the submatrix.
-// \param m The number of rows of the submatrix.
-// \param n The number of columns of the submatrix.
-// \return View on the specified submatrix of the \a imag operation.
-//
-// This function returns an expression representing the specified submatrix of the given matrix
-// \a imag operation.
-*/
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatImagExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
-{
-   BLAZE_FUNCTION_TRACE;
-
-   return imag( submatrix<AF>( (~matrix).operand(), row, column, m, n ) );
+   return map( submatrix<AF>( (~matrix).leftOperand() , row, column, m, n ),
+               submatrix<AF>( (~matrix).rightOperand(), row, column, m, n ),
+               (~matrix).operation() );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -739,11 +860,10 @@ inline typename EnableIf< IsMatImagExpr<MT>, typename SubmatrixExprTrait<MT,AF>:
 // This function returns an expression representing the specified submatrix of the given matrix
 // evaluation operation.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatEvalExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatEvalExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
@@ -768,15 +888,42 @@ inline typename EnableIf< IsMatEvalExpr<MT>, typename SubmatrixExprTrait<MT,AF>:
 // This function returns an expression representing the specified submatrix of the given matrix
 // serialization operation.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatSerialExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatSerialExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
    return serial( submatrix<AF>( (~matrix).operand(), row, column, m, n ) );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Creating a view on a specific submatrix of the given matrix declaration operation.
+// \ingroup views
+//
+// \param matrix The constant matrix declaration operation.
+// \param row The index of the first row of the submatrix.
+// \param column The index of the first column of the submatrix.
+// \param m The number of rows of the submatrix.
+// \param n The number of columns of the submatrix.
+// \return View on the specified submatrix of the declaration operation.
+//
+// This function returns an expression representing the specified submatrix of the given matrix
+// declaration operation.
+*/
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const DeclExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   return submatrix<AF>( (~matrix).operand(), row, column, m, n );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -797,16 +944,1392 @@ inline typename EnableIf< IsMatSerialExpr<MT>, typename SubmatrixExprTrait<MT,AF
 // This function returns an expression representing the specified submatrix of the given matrix
 // transpose operation.
 */
-template< bool AF      // Alignment flag
-        , typename MT  // Type of the matrix
-        , bool SO >    // Storage order
-inline typename EnableIf< IsMatTransExpr<MT>, typename SubmatrixExprTrait<MT,AF>::Type >::Type
-   submatrix( const Matrix<MT,SO>& matrix, size_t row, size_t column, size_t m, size_t n )
+template< bool AF        // Alignment flag
+        , typename MT >  // Matrix base type of the expression
+inline decltype(auto)
+   submatrix( const MatTransExpr<MT>& matrix, size_t row, size_t column, size_t m, size_t n )
 {
    BLAZE_FUNCTION_TRACE;
 
    return trans( submatrix<AF>( (~matrix).operand(), column, row, n, m ) );
 }
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Creating a view on a specific submatrix of another submatrix.
+// \ingroup views
+//
+// \param sm The constant submatrix
+// \param row The index of the first row of the submatrix.
+// \param column The index of the first column of the submatrix.
+// \param m The number of rows of the submatrix.
+// \param n The number of columns of the submatrix.
+// \return View on the specified submatrix of the other submatrix.
+//
+// This function returns an expression representing the specified submatrix of the given submatrix.
+*/
+template< bool AF1     // Required alignment flag
+        , typename MT  // Type of the sparse submatrix
+        , bool AF2     // Present alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline const Submatrix<MT,AF1,SO,DF>
+   submatrix( const Submatrix<MT,AF2,SO,DF>& sm, size_t row, size_t column, size_t m, size_t n )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   if( ( row + m > sm.rows() ) || ( column + n > sm.columns() ) ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid submatrix specification" );
+   }
+
+   return Submatrix<MT,AF1,SO,DF>( sm.operand(), sm.row() + row, sm.column() + column, m, n );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  SUBMATRIX OPERATORS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*!\name Submatrix operators */
+//@{
+template< typename MT, bool AF, bool SO, bool DF >
+inline void reset( Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline void reset( Submatrix<MT,AF,SO,DF>&& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline void reset( Submatrix<MT,AF,SO,DF>& sm, size_t i );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline void clear( Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline void clear( Submatrix<MT,AF,SO,DF>&& sm );
+
+template< bool RF, typename MT, bool AF, bool SO, bool DF >
+inline bool isDefault( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isIntact( const Submatrix<MT,AF,SO,DF>& sm ) noexcept;
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isSymmetric( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isHermitian( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isLower( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isUniLower( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isStrictlyLower( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isUpper( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isUniUpper( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isStrictlyUpper( const Submatrix<MT,AF,SO,DF>& sm );
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isSame( const Submatrix<MT,AF,SO,DF>& a, const Matrix<MT,SO>& b ) noexcept;
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isSame( const Matrix<MT,SO>& a, const Submatrix<MT,AF,SO,DF>& b ) noexcept;
+
+template< typename MT, bool AF, bool SO, bool DF >
+inline bool isSame( const Submatrix<MT,AF,SO,DF>& a, const Submatrix<MT,AF,SO,DF>& b ) noexcept;
+//@}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Resetting the given submatrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be resetted.
+// \return void
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline void reset( Submatrix<MT,AF,SO,DF>& sm )
+{
+   sm.reset();
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Resetting the given temporary submatrix.
+// \ingroup submatrix
+//
+// \param sm The temporary submatrix to be resetted.
+// \return void
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline void reset( Submatrix<MT,AF,SO,DF>&& sm )
+{
+   sm.reset();
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Reset the specified row/column of the given submatrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be resetted.
+// \param i The index of the row/column to be resetted.
+// \return void
+//
+// This function resets the values in the specified row/column of the given submatrix to their
+// default value. In case the given submatrix is a \a rowMajor matrix the function resets the
+// values in row \a i, if it is a \a columnMajor matrix the function resets the values in column
+// \a i. Note that the capacity of the row/column remains unchanged.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline void reset( Submatrix<MT,AF,SO,DF>& sm, size_t i )
+{
+   sm.reset( i );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Clearing the given matrix.
+// \ingroup submatrix
+//
+// \param sm The matrix to be cleared.
+// \return void
+//
+// Clearing a submatrix is equivalent to resetting it via the reset() function.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline void clear( Submatrix<MT,AF,SO,DF>& sm )
+{
+   sm.reset();
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Clearing the given temporary matrix.
+// \ingroup submatrix
+//
+// \param sm The temporary matrix to be cleared.
+// \return void
+//
+// Clearing a submatrix is equivalent to resetting it via the reset() function.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline void clear( Submatrix<MT,AF,SO,DF>&& sm )
+{
+   sm.reset();
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns whether the given submatrix is in default state.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be tested for its default state.
+// \return \a true in case the given submatrix is component-wise zero, \a false otherwise.
+//
+// This function checks whether the submatrix is in default state. For instance, in
+// case the submatrix is instantiated for a built-in integral or floating point data type, the
+// function returns \a true in case all submatrix elements are 0 and \a false in case any submatrix
+// element is not 0. The following example demonstrates the use of the \a isDefault function:
+
+   \code
+   blaze::DynamicMatrix<double,rowMajor> A;
+   // ... Resizing and initialization
+   if( isDefault( submatrix( A, 12UL, 13UL, 22UL, 33UL ) ) ) { ... }
+   \endcode
+
+// Optionally, it is possible to switch between strict semantics (blaze::strict) and relaxed
+// semantics (blaze::relaxed):
+
+   \code
+   if( isDefault<relaxed>( submatrix( A, 12UL, 13UL, 22UL, 33UL ) ) ) { ... }
+   \endcode
+*/
+template< bool RF      // Relaxation flag
+        , typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isDefault( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using blaze::isDefault;
+
+   if( SO == rowMajor ) {
+      for( size_t i=0UL; i<(~sm).rows(); ++i )
+         for( size_t j=0UL; j<(~sm).columns(); ++j )
+            if( !isDefault<RF>( (~sm)(i,j) ) )
+               return false;
+   }
+   else {
+      for( size_t j=0UL; j<(~sm).columns(); ++j )
+         for( size_t i=0UL; i<(~sm).rows(); ++i )
+            if( !isDefault<RF>( (~sm)(i,j) ) )
+               return false;
+   }
+
+   return true;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Returns whether the given sparse submatrix is in default state.
+// \ingroup submatrix
+//
+// \param sm The sparse submatrix to be tested for its default state.
+// \return \a true in case the given submatrix is component-wise zero, \a false otherwise.
+//
+// This function checks whether the submatrix is in default state. For instance, in
+// case the submatrix is instantiated for a built-in integral or floating point data type, the
+// function returns \a true in case all submatrix elements are 0 and \a false in case any submatrix
+// element is not 0. The following example demonstrates the use of the \a isDefault function:
+
+   \code
+   blaze::CompressedMatrix<double,rowMajor> A;
+   // ... Resizing and initialization
+   if( isDefault( submatrix( A, 12UL, 13UL, 22UL, 33UL ) ) ) { ... }
+   \endcode
+*/
+template< bool RF      // Relaxation flag
+        , typename MT  // Type of the sparse matrix
+        , bool AF      // Alignment flag
+        , bool SO >    // Storage order
+inline bool isDefault( const Submatrix<MT,AF,SO,false>& sm )
+{
+   using blaze::isDefault;
+
+   using ConstIterator = ConstIterator_< Submatrix<MT,AF,SO,false> >;
+
+   const size_t iend( ( SO == rowMajor)?( sm.rows() ):( sm.columns() ) );
+
+   for( size_t i=0UL; i<iend; ++i ) {
+      for( ConstIterator element=sm.begin(i); element!=sm.end(i); ++element )
+         if( !isDefault<RF>( element->value() ) ) return false;
+   }
+
+   return true;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns whether the invariants of the given submatrix are intact.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be tested.
+// \return \a true in case the given submatrix's invariants are intact, \a false otherwise.
+//
+// This function checks whether the invariants of the submatrix are intact, i.e. if its
+// state is valid. In case the invariants are intact, the function returns \a true, else it
+// will return \a false. The following example demonstrates the use of the \a isIntact()
+// function:
+
+   \code
+   blaze::DynamicMatrix<double,rowMajor> A;
+   // ... Resizing and initialization
+   if( isIntact( submatrix( A, 12UL, 13UL, 22UL, 33UL ) ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isIntact( const Submatrix<MT,AF,SO,DF>& sm ) noexcept
+{
+   return ( sm.row() + sm.rows() <= sm.operand().rows() &&
+            sm.column() + sm.columns() <= sm.operand().columns() &&
+            isIntact( sm.operand() ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is symmetric.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is symmetric, \a false if not.
+//
+// This function checks if the given submatrix is symmetric. The submatrix is considered to
+// be symmetric if it is a square matrix whose transpose is equal to itself (\f$ A = A^T \f$). The
+// following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isSymmetric( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isSymmetric( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsSymmetric<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isSymmetric( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is Hermitian.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is Hermitian, \a false if not.
+//
+// This function checks if the given submatrix is Hermitian. The submatrix is considered to
+// be Hermitian if it is a square matrix whose transpose is equal to its conjugate transpose
+// (\f$ A = \overline{A^T} \f$). The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isHermitian( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isHermitian( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsHermitian<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isHermitian( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is a lower triangular matrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is a lower triangular matrix, \a false if not.
+//
+// This function checks if the given submatrix is a lower triangular matrix. The matrix is
+// considered to be lower triangular if it is a square matrix of the form
+
+                        \f[\left(\begin{array}{*{5}{c}}
+                        l_{0,0} & 0       & 0       & \cdots & 0       \\
+                        l_{1,0} & l_{1,1} & 0       & \cdots & 0       \\
+                        l_{2,0} & l_{2,1} & l_{2,2} & \cdots & 0       \\
+                        \vdots  & \vdots  & \vdots  & \ddots & \vdots  \\
+                        l_{N,0} & l_{N,1} & l_{N,2} & \cdots & l_{N,N} \\
+                        \end{array}\right).\f]
+
+// \f$ 0 \times 0 \f$ or \f$ 1 \times 1 \f$ matrices are considered as trivially lower triangular.
+// The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isLower( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isLower( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsLower<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isLower( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is a lower unitriangular matrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is a lower unitriangular matrix, \a false if not.
+//
+// This function checks if the given submatrix is a lower unitriangular matrix. The matrix is
+// considered to be lower triangular if it is a square matrix of the form
+
+                        \f[\left(\begin{array}{*{5}{c}}
+                        1       & 0       & 0       & \cdots & 0      \\
+                        l_{1,0} & 1       & 0       & \cdots & 0      \\
+                        l_{2,0} & l_{2,1} & 1       & \cdots & 0      \\
+                        \vdots  & \vdots  & \vdots  & \ddots & \vdots \\
+                        l_{N,0} & l_{N,1} & l_{N,2} & \cdots & 1      \\
+                        \end{array}\right).\f]
+
+// The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isUniLower( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isUniLower( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsUniLower<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isUniLower( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is a strictly lower triangular matrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is a strictly lower triangular matrix, \a false if not.
+//
+// This function checks if the given submatrix is a strictly lower triangular matrix. The
+// matrix is considered to be lower triangular if it is a square matrix of the form
+
+                        \f[\left(\begin{array}{*{5}{c}}
+                        0       & 0       & 0       & \cdots & 0      \\
+                        l_{1,0} & 0       & 0       & \cdots & 0      \\
+                        l_{2,0} & l_{2,1} & 0       & \cdots & 0      \\
+                        \vdots  & \vdots  & \vdots  & \ddots & \vdots \\
+                        l_{N,0} & l_{N,1} & l_{N,2} & \cdots & 0      \\
+                        \end{array}\right).\f]
+
+// The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isStrictlyLower( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isStrictlyLower( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsStrictlyLower<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isStrictlyLower( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is an upper triangular matrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is an upper triangular matrix, \a false if not.
+//
+// This function checks if the given sparse submatrix is an upper triangular matrix. The matrix
+// is considered to be upper triangular if it is a square matrix of the form
+
+                        \f[\left(\begin{array}{*{5}{c}}
+                        u_{0,0} & u_{0,1} & u_{0,2} & \cdots & u_{0,N} \\
+                        0       & u_{1,1} & u_{1,2} & \cdots & u_{1,N} \\
+                        0       & 0       & u_{2,2} & \cdots & u_{2,N} \\
+                        \vdots  & \vdots  & \vdots  & \ddots & \vdots  \\
+                        0       & 0       & 0       & \cdots & u_{N,N} \\
+                        \end{array}\right).\f]
+
+// \f$ 0 \times 0 \f$ or \f$ 1 \times 1 \f$ matrices are considered as trivially upper triangular.
+// The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isUpper( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isUpper( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsUpper<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isUpper( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is an upper unitriangular matrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is an upper unitriangular matrix, \a false if not.
+//
+// This function checks if the given sparse submatrix is an upper triangular matrix. The matrix
+// is considered to be upper triangular if it is a square matrix of the form
+
+                        \f[\left(\begin{array}{*{5}{c}}
+                        1      & u_{0,1} & u_{0,2} & \cdots & u_{0,N} \\
+                        0      & 1       & u_{1,2} & \cdots & u_{1,N} \\
+                        0      & 0       & 1       & \cdots & u_{2,N} \\
+                        \vdots & \vdots  & \vdots  & \ddots & \vdots  \\
+                        0      & 0       & 0       & \cdots & 1       \\
+                        \end{array}\right).\f]
+
+// The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isUniUpper( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isUniUpper( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsUniUpper<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isUniUpper( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checks if the given submatrix is a strictly upper triangular matrix.
+// \ingroup submatrix
+//
+// \param sm The submatrix to be checked.
+// \return \a true if the submatrix is a strictly upper triangular matrix, \a false if not.
+//
+// This function checks if the given sparse submatrix is a strictly upper triangular matrix. The
+// matrix is considered to be upper triangular if it is a square matrix of the form
+
+                        \f[\left(\begin{array}{*{5}{c}}
+                        0      & u_{0,1} & u_{0,2} & \cdots & u_{0,N} \\
+                        0      & 0       & u_{1,2} & \cdots & u_{1,N} \\
+                        0      & 0       & 0       & \cdots & u_{2,N} \\
+                        \vdots & \vdots  & \vdots  & \ddots & \vdots  \\
+                        0      & 0       & 0       & \cdots & 0       \\
+                        \end{array}\right).\f]
+
+// The following code example demonstrates the use of the function:
+
+   \code
+   using Matrix = blaze::DynamicMatrix<int,blaze::rowMajor>;
+
+   Matrix A( 32UL, 16UL );
+   // ... Initialization
+
+   blaze::Submatrix<Matrix> sm( A, 8UL, 8UL, 16UL, 16UL );
+
+   if( isStrictlyUpper( sm ) ) { ... }
+   \endcode
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isStrictlyUpper( const Submatrix<MT,AF,SO,DF>& sm )
+{
+   using BaseType = BaseType_< Submatrix<MT,AF,SO,DF> >;
+
+   if( IsStrictlyUpper<MT>::value && sm.row() == sm.column() && sm.rows() == sm.columns() )
+      return true;
+   else return isStrictlyUpper( static_cast<const BaseType&>( sm ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns whether the given matrix and submatrix represent the same observable state.
+// \ingroup submatrix
+//
+// \param a The submatrix to be tested for its state.
+// \param b The matrix to be tested for its state.
+// \return \a true in case the submatrix and matrix share a state, \a false otherwise.
+//
+// This overload of the isSame function tests if the given submatrix refers to the full given
+// matrix and by that represents the same observable state. In this case, the function returns
+// \a true, otherwise it returns \a false.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isSame( const Submatrix<MT,AF,SO,DF>& a, const Matrix<MT,SO>& b ) noexcept
+{
+   return ( isSame( a.operand(), ~b ) &&
+            ( a.rows() == (~b).rows() ) &&
+            ( a.columns() == (~b).columns() ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns whether the given matrix and submatrix represent the same observable state.
+// \ingroup submatrix
+//
+// \param a The matrix to be tested for its state.
+// \param b The submatrix to be tested for its state.
+// \return \a true in case the matrix and submatrix share a state, \a false otherwise.
+//
+// This overload of the isSame function tests if the given submatrix refers to the full given
+// matrix and by that represents the same observable state. In this case, the function returns
+// \a true, otherwise it returns \a false.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isSame( const Matrix<MT,SO>& a, const Submatrix<MT,AF,SO,DF>& b ) noexcept
+{
+   return ( isSame( ~a, b.operand() ) &&
+            ( (~a).rows() == b.rows() ) &&
+            ( (~a).columns() == b.columns() ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns whether the two given submatrices represent the same observable state.
+// \ingroup submatrix
+//
+// \param a The first submatrix to be tested for its state.
+// \param b The second submatrix to be tested for its state.
+// \return \a true in case the two submatrices share a state, \a false otherwise.
+//
+// This overload of the isSame function tests if the two given submatrices refer to exactly the
+// same part of the same matrix. In case both submatrices represent the same observable state,
+// the function returns \a true, otherwise it returns \a false.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline bool isSame( const Submatrix<MT,AF,SO,DF>& a, const Submatrix<MT,AF,SO,DF>& b ) noexcept
+{
+   return ( isSame( a.operand(), b.operand() ) &&
+            ( a.row() == b.row() ) && ( a.column() == b.column() ) &&
+            ( a.rows() == b.rows() ) && ( a.columns() == b.columns() ) );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief In-place inversion of the given submatrix.
+// \ingroup submatrix
+//
+// \param sm The dense submatrix to be inverted.
+// \return void
+// \exception std::invalid_argument Inversion of singular matrix failed.
+//
+// This function inverts the given dense submatrix by means of the specified matrix decomposition
+// algorithm \a IF:
+
+   \code
+   invert<byLU>( A );    // Inversion of a general matrix
+   invert<byLDLT>( A );  // Inversion of a symmetric indefinite matrix
+   invert<byLDLH>( A );  // Inversion of a Hermitian indefinite matrix
+   invert<byLLH>( A );   // Inversion of a Hermitian positive definite matrix
+   \endcode
+
+// The matrix inversion fails if ...
+//
+//  - ... the given submatrix is not a square matrix;
+//  - ... the given submatrix is singular and not invertible.
+//
+// In all failure cases either a compilation error is created if the failure can be predicted at
+// compile time or a \a std::invalid_argument exception is thrown.
+//
+// \note This function can only be used if a fitting LAPACK library is available and linked to
+// the executable. Otherwise a linker error will be created.
+//
+// \note This function does only provide the basic exception safety guarantee, i.e. in case of an
+// exception \a sm may already have been modified.
+*/
+template< InversionFlag IF  // Inversion algorithm
+        , typename MT       // Type of the dense matrix
+        , bool AF           // Alignment flag
+        , bool SO >         // Storage order
+inline DisableIf_< HasMutableDataAccess<MT> > invert( Submatrix<MT,AF,SO,true>& sm )
+{
+   using RT = ResultType_< Submatrix<MT,AF,SO,true> >;
+
+   BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION  ( RT );
+   BLAZE_CONSTRAINT_MUST_HAVE_MUTABLE_DATA_ACCESS( RT );
+
+   RT tmp( sm );
+   invert<IF>( tmp );
+   sm = tmp;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the assignment of a vector to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side vector to be assigned.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF      // Density flag
+        , typename VT  // Type of the right-hand side vector
+        , bool TF >    // Transpose flag of the right-hand side vector
+inline bool tryAssign( const Submatrix<MT,AF,SO,DF>& lhs, const Vector<VT,TF>& rhs,
+                       size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( TF || ( (~rhs).size() <= lhs.rows() - row ), "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( !TF || ( (~rhs).size() <= lhs.columns() - column ), "Invalid number of columns" );
+
+   return tryAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the assignment of a matrix to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side matrix to be assigned.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT1  // Type of the matrix
+        , bool AF       // Alignment flag
+        , bool SO1      // Storage order
+        , bool DF       // Density flag
+        , typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline bool tryAssign( const Submatrix<MT1,AF,SO1,DF>& lhs, const Matrix<MT2,SO2>& rhs,
+                       size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).rows() <= lhs.rows() - row, "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).columns() <= lhs.columns() - column, "Invalid number of columns" );
+
+   return tryAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the addition assignment of a vector to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side vector to be added.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF      // Density flag
+        , typename VT  // Type of the right-hand side vector
+        , bool TF >    // Transpose flag of the right-hand side vector
+inline bool tryAddAssign( const Submatrix<MT,AF,SO,DF>& lhs, const Vector<VT,TF>& rhs,
+                          size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( TF || ( (~rhs).size() <= lhs.rows() - row ), "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( !TF || ( (~rhs).size() <= lhs.columns() - column ), "Invalid number of columns" );
+
+   return tryAddAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the addition assignment of a matrix to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side matrix to be added.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT1  // Type of the matrix
+        , bool AF       // Alignment flag
+        , bool SO1      // Storage order
+        , bool DF       // Density flag
+        , typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline bool tryAddAssign( const Submatrix<MT1,AF,SO1,DF>& lhs, const Matrix<MT2,SO2>& rhs,
+                          size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).rows() <= lhs.rows() - row, "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).columns() <= lhs.columns() - column, "Invalid number of columns" );
+
+   return tryAddAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the subtraction assignment of a vector to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side vector to be subtracted.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF      // Density flag
+        , typename VT  // Type of the right-hand side vector
+        , bool TF >    // Transpose flag of the right-hand side vector
+inline bool trySubAssign( const Submatrix<MT,AF,SO,DF>& lhs, const Vector<VT,TF>& rhs,
+                          size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( TF || ( (~rhs).size() <= lhs.rows() - row ), "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( !TF || ( (~rhs).size() <= lhs.columns() - column ), "Invalid number of columns" );
+
+   return trySubAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the subtraction assignment of a matrix to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side matrix to be subtracted.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT1  // Type of the matrix
+        , bool AF       // Alignment flag
+        , bool SO1      // Storage order
+        , bool DF       // Density flag
+        , typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline bool trySubAssign( const Submatrix<MT1,AF,SO1,DF>& lhs, const Matrix<MT2,SO2>& rhs,
+                          size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).rows() <= lhs.rows() - row, "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).columns() <= lhs.columns() - column, "Invalid number of columns" );
+
+   return trySubAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the multiplication assignment of a vector to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side vector to be multiplied.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF      // Density flag
+        , typename VT  // Type of the right-hand side vector
+        , bool TF >    // Transpose flag of the right-hand side vector
+inline bool tryMultAssign( const Submatrix<MT,AF,SO,DF>& lhs, const Vector<VT,TF>& rhs,
+                           size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( TF || ( (~rhs).size() <= lhs.rows() - row ), "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( !TF || ( (~rhs).size() <= lhs.columns() - column ), "Invalid number of columns" );
+
+   return tryMultAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the Schur product assignment of a matrix to a submatrix.
+// \ingroup submatrix
+//
+// \param lhs The target left-hand side submatrix.
+// \param rhs The right-hand side matrix for the Schur product.
+// \param row The row index of the first element to be modified.
+// \param column The column index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename MT1  // Type of the matrix
+        , bool AF       // Alignment flag
+        , bool SO1      // Storage order
+        , bool DF       // Density flag
+        , typename MT2  // Type of the right-hand side matrix
+        , bool SO2 >    // Storage order of the right-hand side matrix
+inline bool trySchurAssign( const Submatrix<MT1,AF,SO1,DF>& lhs, const Matrix<MT2,SO2>& rhs,
+                            size_t row, size_t column )
+{
+   BLAZE_INTERNAL_ASSERT( row <= lhs.rows(), "Invalid row access index" );
+   BLAZE_INTERNAL_ASSERT( column <= lhs.columns(), "Invalid column access index" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).rows() <= lhs.rows() - row, "Invalid number of rows" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).columns() <= lhs.columns() - column, "Invalid number of columns" );
+
+   return trySchurAssign( lhs.operand(), ~rhs, lhs.row() + row, lhs.column() + column );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Removal of all restrictions on the data access to the given submatrix.
+// \ingroup submatrix
+//
+// \param dm The submatrix to be derestricted.
+// \return Submatrix without access restrictions.
+//
+// This function removes all restrictions on the data access to the given submatrix. It returns a
+// submatrix that does provide the same interface but does not have any restrictions on the data
+// access.\n
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in the violation of invariants, erroneous results and/or in compilation errors.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline decltype(auto) derestrict( Submatrix<MT,AF,SO,DF>& dm )
+{
+   return submatrix( derestrict( dm.operand() ), dm.row(), dm.column(), dm.rows(), dm.columns() );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Removal of all restrictions on the data access to the given temporary submatrix.
+// \ingroup submatrix
+//
+// \param dm The temporary submatrix to be derestricted.
+// \return Submatrix without access restrictions.
+//
+// This function removes all restrictions on the data access to the given temporary submatrix. It
+// returns a submatrix that does provide the same interface but does not have any restrictions on
+// the data access.\n
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in the violation of invariants, erroneous results and/or in compilation errors.
+*/
+template< typename MT  // Type of the matrix
+        , bool AF      // Alignment flag
+        , bool SO      // Storage order
+        , bool DF >    // Density flag
+inline decltype(auto) derestrict( Submatrix<MT,AF,SO,DF>&& dm )
+{
+   return submatrix( derestrict( dm.operand() ), dm.row(), dm.column(), dm.rows(), dm.columns() );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ISRESTRICTED SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF >
+struct IsRestricted< Submatrix<MT,AF,SO,DF> >
+   : public BoolConstant< IsRestricted<MT>::value >
+{};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  HASCONSTDATAACCESS SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO >
+struct HasConstDataAccess< Submatrix<MT,AF,SO,true> >
+   : public BoolConstant< HasConstDataAccess<MT>::value >
+{};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  HASMUTABLEDATAACCESS SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO >
+struct HasMutableDataAccess< Submatrix<MT,AF,SO,true> >
+   : public BoolConstant< HasMutableDataAccess<MT>::value >
+{};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ISALIGNED SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool SO >
+struct IsAligned< Submatrix<MT,aligned,SO,true> >
+   : public TrueType
+{};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ADDTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF, typename T >
+struct AddTrait< Submatrix<MT,AF,SO,DF>, T >
+{
+   using Type = AddTrait_< SubmatrixTrait_<MT>, T >;
+};
+
+template< typename T, typename MT, bool AF, bool SO, bool DF >
+struct AddTrait< T, Submatrix<MT,AF,SO,DF> >
+{
+   using Type = AddTrait_< T, SubmatrixTrait_<MT> >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  SUBTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF, typename T >
+struct SubTrait< Submatrix<MT,AF,SO,DF>, T >
+{
+   using Type = SubTrait_< SubmatrixTrait_<MT>, T >;
+};
+
+template< typename T, typename MT, bool AF, bool SO, bool DF >
+struct SubTrait< T, Submatrix<MT,AF,SO,DF> >
+{
+   using Type = SubTrait_< T, SubmatrixTrait_<MT> >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  MULTTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF, typename T >
+struct MultTrait< Submatrix<MT,AF,SO,DF>, T >
+{
+   using Type = MultTrait_< SubmatrixTrait_<MT>, T >;
+};
+
+template< typename T, typename MT, bool AF, bool SO, bool DF >
+struct MultTrait< T, Submatrix<MT,AF,SO,DF> >
+{
+   using Type = MultTrait_< T, SubmatrixTrait_<MT> >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  DIVTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF, typename T >
+struct DivTrait< Submatrix<MT,AF,SO,DF>, T >
+{
+   using Type = DivTrait_< SubmatrixTrait_<MT>, T >;
+};
+
+template< typename T, typename MT, bool AF, bool DF, bool SO >
+struct DivTrait< T, Submatrix<MT,AF,SO,DF> >
+{
+   using Type = DivTrait_< T, SubmatrixTrait_<MT> >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  SUBMATRIXTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF >
+struct SubmatrixTrait< Submatrix<MT,AF,SO,DF> >
+{
+   using Type = SubmatrixTrait_< ResultType_< Submatrix<MT,AF,SO,DF> > >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ROWTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF >
+struct RowTrait< Submatrix<MT,AF,SO,DF> >
+{
+   using Type = RowTrait_< ResultType_< Submatrix<MT,AF,SO,DF> > >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  COLUMNTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename MT, bool AF, bool SO, bool DF >
+struct ColumnTrait< Submatrix<MT,AF,SO,DF> >
+{
+   using Type = ColumnTrait_< ResultType_< Submatrix<MT,AF,SO,DF> > >;
+};
 /*! \endcond */
 //*************************************************************************************************
 

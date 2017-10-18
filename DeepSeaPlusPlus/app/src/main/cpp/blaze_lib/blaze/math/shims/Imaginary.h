@@ -3,7 +3,7 @@
 //  \file blaze/math/shims/Imaginary.h
 //  \brief Header file for the imaginary shim
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -80,8 +80,7 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-BLAZE_ALWAYS_INLINE typename EnableIf< IsBuiltin<T>, T >::Type
-   imag( T a )
+BLAZE_ALWAYS_INLINE EnableIf_< IsBuiltin<T>, T > imag( T a ) noexcept
 {
    UNUSED_PARAMETER( a );
 

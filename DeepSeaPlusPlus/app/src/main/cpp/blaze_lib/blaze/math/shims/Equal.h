@@ -3,7 +3,7 @@
 //  \file blaze/math/shims/Equal.h
 //  \brief Header file for the equal shim
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,8 +41,9 @@
 //*************************************************************************************************
 
 #include <cmath>
-#include <boost/math/special_functions/next.hpp>
 #include <blaze/math/Accuracy.h>
+#include <blaze/math/RelaxationFlag.h>
+#include <blaze/util/algorithms/Max.h>
 #include <blaze/util/Complex.h>
 
 
@@ -65,12 +66,14 @@ namespace blaze {
 // The equal shim represents an abstract interface for testing two values/objects for equality.
 // In case the two values/objects are equal, the function returns \a true, otherwise it returns
 // \a false. Per default, the comparison of the two values/objects uses the equality operator
-// operator==(). For built-in floating point data types a special comparison is selected that
-// takes the limited machine accuracy into account.
+// operator==(). For built-in floating point data types the function either uses the equality
+// comparison (strict semantics) or a special comparison is selected that takes the limited
+// machine accuracy into account (relaxed semantics).
 */
-template< typename T1    // Type of the left-hand side value/object
+template< bool RF        // Relaxation flag
+        , typename T1    // Type of the left-hand side value/object
         , typename T2 >  // Type of the right-hand side value/object
-inline bool equal( const T1& a, const T2& b )
+inline constexpr bool equal( const T1& a, const T2& b )
 {
    return a == b;
 }
@@ -95,15 +98,16 @@ inline bool equal( const T1& a, const T2& b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( float a, float b )
 {
-   using boost::math::float_advance;
-
-   const int distance( 6 );
-
-   return ( std::fabs( a - b ) <= 1E-6 ) ||
-          ( a < b && b <= float_advance( a, distance ) ) ||
-          ( b < a && a <= float_advance( b, distance ) );
+   if( RF == relaxed ) {
+      const float acc( static_cast<float>( accuracy ) );
+      return ( std::fabs( a - b ) <= max( acc, acc * std::fabs( a ) ) );
+   }
+   else {
+      return a == b;
+   }
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -127,9 +131,10 @@ inline bool equal( float a, float b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( float a, double b )
 {
-   return equal( a, static_cast<float>( b ) );
+   return equal<RF>( a, static_cast<float>( b ) );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -153,9 +158,10 @@ inline bool equal( float a, double b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( float a, long double b )
 {
-   return equal( a, static_cast<float>( b ) );
+   return equal<RF>( a, static_cast<float>( b ) );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -175,9 +181,10 @@ inline bool equal( float a, long double b )
 // should be avoided. This function offers the possibility to compare two floating-point values
 // with a certain accuracy margin.
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( double a, float b )
 {
-   return equal( static_cast<float>( a ), b );
+   return equal<RF>( static_cast<float>( a ), b );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -201,15 +208,16 @@ inline bool equal( double a, float b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( double a, double b )
 {
-   using boost::math::float_advance;
-
-   const int distance( 4 );
-
-   return ( std::fabs( a - b ) <= accuracy ) ||
-          ( a < b && b <= float_advance( a, distance ) ) ||
-          ( b < a && a <= float_advance( b, distance ) );
+   if( RF == relaxed ) {
+      const double acc( static_cast<double>( accuracy ) );
+      return ( std::fabs( a - b ) <= max( acc, acc * std::fabs( a ) ) );
+   }
+   else {
+      return a == b;
+   }
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -233,9 +241,10 @@ inline bool equal( double a, double b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( double a, long double b )
 {
-   return std::fabs( a - b ) <= ( 1E-8L * std::fabs( b ) );
+   return equal<RF>( a, static_cast<double>( b ) );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -259,9 +268,10 @@ inline bool equal( double a, long double b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( long double a, float b )
 {
-   return equal( static_cast<float>( a ), b );
+   return equal<RF>( static_cast<float>( a ), b );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -285,9 +295,10 @@ inline bool equal( long double a, float b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( long double a, double b )
 {
-   return equal( static_cast<double>( a ), b );
+   return equal<RF>( static_cast<double>( a ), b );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -311,15 +322,16 @@ inline bool equal( long double a, double b )
 //
 //       http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 */
+template< bool RF >  // Relaxation flag
 inline bool equal( long double a, long double b )
 {
-   using boost::math::float_advance;
-
-   const int distance( 4 );
-
-   return ( std::fabs( a - b ) <= accuracy ) ||
-          ( a < b && b <= float_advance( a, distance ) ) ||
-          ( b < a && a <= float_advance( b, distance ) );
+   if( RF == relaxed ) {
+      const long double acc( static_cast<long double>( accuracy ) );
+      return ( std::fabs( a - b ) <= max( acc, acc * std::fabs( a ) ) );
+   }
+   else {
+      return a == b;
+   }
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -338,11 +350,12 @@ inline bool equal( long double a, long double b )
 // real part of the complex value with the scalar. In case these two values match and in case
 // the imaginary part is zero, the function returns \a true. Otherwise it returns \a false.
 */
-template< typename T1    // Type of the left-hand side complex value
+template< bool RF        // Relaxation flag
+        , typename T1    // Type of the left-hand side complex value
         , typename T2 >  // Type of the right-hand side scalar value
 inline bool equal( complex<T1> a, T2 b )
 {
-   return equal( real( a ), b ) && equal( imag( a ), T1() );
+   return equal<RF>( real( a ), b ) && equal<RF>( imag( a ), T1() );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -361,11 +374,12 @@ inline bool equal( complex<T1> a, T2 b )
 // scalar with the real part of the complex value. In case these two values match and in case
 // the imaginary part is zero, the function returns \a true. Otherwise it returns \a false.
 */
-template< typename T1    // Type of the left-hand side scalar value
+template< bool RF        // Relaxation flag
+        , typename T1    // Type of the left-hand side scalar value
         , typename T2 >  // Type of the right-hand side complex value
 inline bool equal( T1 a, complex<T2> b )
 {
-   return equal( a, real( b ) ) && equal( imag( b ), T2() );
+   return equal<RF>( a, real( b ) ) && equal<RF>( imag( b ), T2() );
 }
 /*! \endcond */
 //*************************************************************************************************
@@ -384,13 +398,37 @@ inline bool equal( T1 a, complex<T2> b )
 // a direct comparison of two floating point numbers should be avoided. This function offers the
 // possibility to compare two floating-point values with a certain accuracy margin.
 */
-template< typename T1    // Type of the left-hand side complex value
+template< bool RF        // Relaxation flag
+        , typename T1    // Type of the left-hand side complex value
         , typename T2 >  // Type of the right-hand side complex value
 inline bool equal( complex<T1> a, complex<T2> b )
 {
-   return equal( real( a ), real( b ) ) && equal( imag( a ), imag( b ) );
+   return equal<RF>( real( a ), real( b ) ) && equal<RF>( imag( a ), imag( b ) );
 }
 /*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Generic equality check.
+// \ingroup math_shims
+//
+// \param a First value/object.
+// \param b Second value/object.
+// \return \a true if the two values/objects are equal, \a false if not.
+//
+// The equal shim represents an abstract interface for testing two values/objects for equality.
+// In case the two values/objects are equal, the function returns \a true, otherwise it returns
+// \a false. Per default, the comparison of the two values/objects uses the equality operator
+// operator==(). For built-in floating point data types a special comparison is selected that
+// takes the limited machine accuracy into account.
+*/
+template< typename T1    // Type of the left-hand side value/object
+        , typename T2 >  // Type of the right-hand side value/object
+inline constexpr bool equal( const T1& a, const T2& b )
+{
+   return equal<relaxed>( a, b );
+}
 //*************************************************************************************************
 
 } // namespace blaze

@@ -3,7 +3,7 @@
 //  \file blaze/math/typetraits/IsLower.h
 //  \brief Header file for the IsLower type trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -42,10 +42,8 @@
 
 #include <blaze/math/typetraits/IsStrictlyLower.h>
 #include <blaze/math/typetraits/IsUniLower.h>
-#include <blaze/util/FalseType.h>
-#include <blaze/util/mpl/If.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/mpl/Or.h>
-#include <blaze/util/TrueType.h>
 
 
 namespace blaze {
@@ -62,21 +60,21 @@ namespace blaze {
 //
 // This type trait tests whether or not the given template parameter is a lower triangular matrix
 // type (i.e. a matrix type that is guaranteed to be lower triangular at compile time). This also
-// includes lower unitriangular and strictly lower triangular matrices. In case the type is a lower
-// triangular matrix type, the \a value member enumeration is set to 1, the nested type definition
-// \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value is set to 0,
-// \a Type is \a FalseType, and the class derives from \a FalseType.
+// includes lower unitriangular and strictly lower triangular matrices. In case the type is a
+// lower triangular matrix type, the \a value member constant is set to \a true, the nested type
+// definition \a Type is \a TrueType, and the class derives from \a TrueType. Otherwise \a value
+// is set to \a false, \a Type is \a FalseType, and the class derives from \a FalseType.
 
    \code
    using blaze::rowMajor;
 
-   typedef blaze::StaticMatrix<double,3UL,3UL,rowMajor>  StaticMatrixType;
-   typedef blaze::DynamicMatrix<float,rowMajor>          DynamicMatrixType;
-   typedef blaze::CompressedMatrix<int,rowMajor>         CompressedMatrixType;
+   using StaticMatrixType     = blaze::StaticMatrix<double,3UL,3UL,rowMajor>;
+   using DynamicMatrixType    = blaze::DynamicMatrix<float,rowMajor>;
+   using CompressedMatrixType = blaze::CompressedMatrix<int,rowMajor>;
 
-   typedef blaze::LowerMatrix<StaticMatrixType>         LowerStaticType;
-   typedef blaze::LowerMatrix<DynamicMatrixType>        LowerDynamicType;
-   typedef blaze::UniLowerMatrix<CompressedMatrixType>  UniLowerCompressedType;
+   using LowerStaticType        = blaze::LowerMatrix<StaticMatrixType>;
+   using LowerDynamicType       = blaze::LowerMatrix<DynamicMatrixType>;
+   using UniLowerCompressedType = blaze::UniLowerMatrix<CompressedMatrixType>;
 
    blaze::IsLower< LowerStaticType >::value           // Evaluates to 1
    blaze::IsLower< const LowerDynamicType >::Type     // Results in TrueType
@@ -87,16 +85,9 @@ namespace blaze {
    \endcode
 */
 template< typename T >
-struct IsLower : public If< Or< IsUniLower<T>, IsStrictlyLower<T> >, TrueType, FalseType >::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = IsUniLower<T>::value || IsStrictlyLower<T>::value };
-   typedef typename If< Or< IsUniLower<T>, IsStrictlyLower<T> >, TrueType, FalseType >::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsLower
+   : public BoolConstant< Or< IsUniLower<T>, IsStrictlyLower<T> >::value >
+{};
 //*************************************************************************************************
 
 
@@ -106,14 +97,9 @@ struct IsLower : public If< Or< IsUniLower<T>, IsStrictlyLower<T> >, TrueType, F
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsLower< const T > : public IsLower<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsLower<T>::value };
-   typedef typename IsLower<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsLower< const T >
+   : public IsLower<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -124,14 +110,9 @@ struct IsLower< const T > : public IsLower<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsLower< volatile T > : public IsLower<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsLower<T>::value };
-   typedef typename IsLower<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsLower< volatile T >
+   : public IsLower<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -142,14 +123,9 @@ struct IsLower< volatile T > : public IsLower<T>::Type
 // \ingroup math_type_traits
 */
 template< typename T >
-struct IsLower< const volatile T > : public IsLower<T>::Type
-{
- public:
-   //**********************************************************************************************
-   enum { value = IsLower<T>::value };
-   typedef typename IsLower<T>::Type  Type;
-   //**********************************************************************************************
-};
+struct IsLower< const volatile T >
+   : public IsLower<T>
+{};
 /*! \endcond */
 //*************************************************************************************************
 

@@ -3,7 +3,7 @@
 //  \file blaze/math/proxy/SparseMatrixProxy.h
 //  \brief Header file for the SparseMatrixProxy class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,7 +40,9 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/SparseMatrix.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/SparseMatrix.h>
 #include <blaze/math/shims/Clear.h>
 #include <blaze/math/shims/Reset.h>
@@ -49,7 +51,6 @@
 #include <blaze/system/Inline.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
 #include <blaze/util/Types.h>
 
 
@@ -71,31 +72,33 @@ namespace blaze {
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
-class SparseMatrixProxy : public SparseMatrix< PT, IsColumnMajorMatrix<MT>::value >
+class SparseMatrixProxy
+   : public SparseMatrix< PT, IsColumnMajorMatrix<MT>::value >
 {
  public:
    //**Type definitions****************************************************************************
-   typedef typename MT::ResultType      ResultType;      //!< Result type for expression template evaluations.
-   typedef typename MT::OppositeType    OppositeType;    //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename MT::TransposeType   TransposeType;   //!< Transpose type for expression template evaluations.
-   typedef typename MT::ElementType     ElementType;     //!< Type of the sparse matrix elements.
-   typedef typename MT::ReturnType      ReturnType;      //!< Return type for expression template evaluations.
-   typedef typename MT::CompositeType   CompositeType;   //!< Data type for composite expression templates.
-   typedef typename MT::Reference       Reference;       //!< Reference to a non-constant matrix value.
-   typedef typename MT::ConstReference  ConstReference;  //!< Reference to a constant matrix value.
-   typedef typename MT::Iterator        Iterator;        //!< Iterator over non-constant elements.
-   typedef typename MT::ConstIterator   ConstIterator;   //!< Iterator over constant elements.
+   using ResultType     = ResultType_<MT>;      //!< Result type for expression template evaluations.
+   using OppositeType   = OppositeType_<MT>;    //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType  = TransposeType_<MT>;   //!< Transpose type for expression template evaluations.
+   using ElementType    = ElementType_<MT>;     //!< Type of the sparse matrix elements.
+   using ReturnType     = ReturnType_<MT>;      //!< Return type for expression template evaluations.
+   using CompositeType  = CompositeType_<MT>;   //!< Data type for composite expression templates.
+   using Reference      = Reference_<MT>;       //!< Reference to a non-constant matrix value.
+   using ConstReference = ConstReference_<MT>;  //!< Reference to a constant matrix value.
+   using Iterator       = Iterator_<MT>;        //!< Iterator over non-constant elements.
+   using ConstIterator  = ConstIterator_<MT>;   //!< Iterator over constant elements.
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation flag for SMP assignments.
-   enum { smpAssignable = MT::smpAssignable };
+   enum : bool { smpAssignable = MT::smpAssignable };
    //**********************************************************************************************
 
    //**Data access functions***********************************************************************
    /*!\name Data access functions */
    //@{
    inline Reference operator()( size_t i, size_t j ) const;
+   inline Reference at( size_t i, size_t j ) const;
 
    inline Iterator      begin ( size_t i ) const;
    inline ConstIterator cbegin( size_t i ) const;
@@ -107,31 +110,45 @@ class SparseMatrixProxy : public SparseMatrix< PT, IsColumnMajorMatrix<MT>::valu
    //**Utility functions***************************************************************************
    /*!\name Utility functions */
    //@{
-   inline size_t   rows() const;
-   inline size_t   columns() const;
-   inline size_t   capacity() const;
-   inline size_t   capacity( size_t i ) const;
-   inline size_t   nonZeros() const;
-   inline size_t   nonZeros( size_t i ) const;
-   inline void     reset() const;
-   inline void     reset( size_t i ) const;
-   inline void     clear() const;
-   inline Iterator set( size_t i, size_t j, const ElementType& value ) const;
+   inline size_t rows() const;
+   inline size_t columns() const;
+   inline size_t capacity() const;
+   inline size_t capacity( size_t i ) const;
+   inline size_t nonZeros() const;
+   inline size_t nonZeros( size_t i ) const;
+   inline void   reset() const;
+   inline void   reset( size_t i ) const;
+   inline void   clear() const;
+   inline void   finalize( size_t i ) const;
+   inline void   resize( size_t m, size_t n, bool preserve=true ) const;
+   inline void   reserve( size_t n ) const;
+   inline void   reserve( size_t i, size_t n ) const;
+   inline void   trim() const;
+   inline void   trim( size_t i ) const;
+   //@}
+   //**********************************************************************************************
+
+   //**Insertion functions*************************************************************************
+   /*!\name Insertion functions */
+   //@{
+   inline Iterator set   ( size_t i, size_t j, const ElementType& value ) const;
    inline Iterator insert( size_t i, size_t j, const ElementType& value ) const;
    inline void     append( size_t i, size_t j, const ElementType& value, bool check=false ) const;
-   inline void     finalize( size_t i ) const;
+   //@}
+   //**********************************************************************************************
+
+   //**Erase functions*****************************************************************************
+   /*!\name Erase functions */
+   //@{
    inline void     erase( size_t i, size_t j ) const;
    inline Iterator erase( size_t i, Iterator pos ) const;
    inline Iterator erase( size_t i, Iterator first, Iterator last ) const;
-   inline void     resize( size_t m, size_t n, bool preserve=true ) const;
-   inline void     reserve( size_t n ) const;
-   inline void     reserve( size_t i, size_t n ) const;
-   inline void     trim() const;
-   inline void     trim( size_t i ) const;
-   inline void     transpose() const;
-   inline void     ctranspose() const;
 
-   template< typename Other > inline void scale( const Other& scalar ) const;
+   template< typename Pred >
+   inline void erase( Pred predicate );
+
+   template< typename Pred >
+   inline void erase( size_t i, Iterator first, Iterator last, Pred predicate );
    //@}
    //**********************************************************************************************
 
@@ -141,6 +158,16 @@ class SparseMatrixProxy : public SparseMatrix< PT, IsColumnMajorMatrix<MT>::valu
    inline Iterator find      ( size_t i, size_t j ) const;
    inline Iterator lowerBound( size_t i, size_t j ) const;
    inline Iterator upperBound( size_t i, size_t j ) const;
+   //@}
+   //**********************************************************************************************
+
+   //**Numeric functions***************************************************************************
+   /*!\name Numeric functions */
+   //@{
+   inline void transpose() const;
+   inline void ctranspose() const;
+
+   template< typename Other > inline void scale( const Other& scalar ) const;
    //@}
    //**********************************************************************************************
 
@@ -168,6 +195,13 @@ class SparseMatrixProxy : public SparseMatrix< PT, IsColumnMajorMatrix<MT>::valu
 // \param i Access index for the row. The index has to be in the range \f$[0..M-1]\f$.
 // \param j Access index for the column. The index has to be in the range \f$[0..N-1]\f$.
 // \return Reference to the accessed value.
+// \exception std::invalid_argument Invalid access to restricted element.
+//
+// This function returns a reference to the accessed value at position (\a i,\a j). In case
+// the sparse matrix does not yet store an element at position (\a i,\a j) , a new element is
+// inserted into the sparse matrix. Note that this function only performs an index check in
+// case BLAZE_USER_ASSERT() is active. In contrast, the at() function is guaranteed to perform
+// a check of the given access indices.
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
@@ -179,6 +213,34 @@ inline typename SparseMatrixProxy<PT,MT>::Reference
    }
 
    return (~*this).get()(i,j);
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Checked access to the matrix elements.
+//
+// \param i Access index for the row. The index has to be in the range \f$[0..M-1]\f$.
+// \param j Access index for the column. The index has to be in the range \f$[0..N-1]\f$.
+// \return Reference to the accessed value.
+// \exception std::invalid_argument Invalid access to restricted element.
+// \exception std::out_of_range Invalid matrix access index.
+//
+// This function returns a reference to the accessed value at position (\a i,\a j). In case
+// the sparse matrix does not yet store an element at position (\a i,\a j) , a new element is
+// inserted into the sparse matrix. In contrast to the subscript operator this function always
+// performs a check of the given access indices.
+*/
+template< typename PT    // Type of the proxy
+        , typename MT >  // Type of the sparse matrix
+inline typename SparseMatrixProxy<PT,MT>::Reference
+   SparseMatrixProxy<PT,MT>::at( size_t i, size_t j ) const
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   return (~*this).get().at(i,j);
 }
 //*************************************************************************************************
 
@@ -436,6 +498,7 @@ inline void SparseMatrixProxy<PT,MT>::clear() const
 // \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
 // \param value The value of the element to be set.
 // \return Iterator to the set element.
+// \exception std::invalid_argument Invalid access to restricted element.
 // \exception std::invalid_argument Invalid sparse matrix access index.
 //
 // This function sets the value of an element of the sparse matrix. In case the sparse matrix
@@ -463,6 +526,7 @@ inline typename SparseMatrixProxy<PT,MT>::Iterator
 // \param j The column index of the new element. The index has to be in the range \f$[0..N-1]\f$.
 // \param value The value of the element to be inserted.
 // \return Iterator to the newly inserted element.
+// \exception std::invalid_argument Invalid access to restricted element.
 // \exception std::invalid_argument Invalid sparse matrix access index.
 //
 // This function inserts a new element into the sparse matrix. However, duplicate elements are
@@ -491,6 +555,7 @@ inline typename SparseMatrixProxy<PT,MT>::Iterator
 // \param value The value of the element to be appended.
 // \param check \a true if the new value should be checked for default values, \a false if not.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function provides a very efficient way to fill a sparse matrix with elements. It appends
 // a new element to the end of the specified row/column without any additional memory allocation.
@@ -506,7 +571,7 @@ inline typename SparseMatrixProxy<PT,MT>::Iterator
 // value is a default value (for instance 0 in case of an integral element type) the value is
 // not appended. Per default the values are not tested.
 //
-// \note: Although append() does not allocate new memory, it still invalidates all iterators
+// \note Although append() does not allocate new memory, it still invalidates all iterators
 // returned by the end() functions!
 */
 template< typename PT    // Type of the proxy
@@ -527,12 +592,13 @@ inline void SparseMatrixProxy<PT,MT>::append( size_t i, size_t j, const ElementT
 //
 // \param i The index of the row/column to be finalized \f$[0..M-1]\f$.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function is part of the low-level interface to efficiently fill a matrix with elements.
 // After completion of row/column \a i via the append() function, this function can be called to
 // finalize row/column \a i and prepare the next row/column for insertion process via append().
 //
-// \note: Although finalize() does not allocate new memory, it still invalidates all iterators
+// \note Although finalize() does not allocate new memory, it still invalidates all iterators
 // returned by the end() functions!
 */
 template< typename PT    // Type of the proxy
@@ -549,85 +615,13 @@ inline void SparseMatrixProxy<PT,MT>::finalize( size_t i ) const
 
 
 //*************************************************************************************************
-/*!\brief Erasing an element from the sparse matrix.
-//
-// \param i The row index of the element to be erased. The index has to be in the range \f$[0..M-1]\f$.
-// \param j The column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
-// \return void
-//
-// This function erases an element from the sparse matrix.
-*/
-template< typename PT    // Type of the proxy
-        , typename MT >  // Type of the sparse matrix
-inline void SparseMatrixProxy<PT,MT>::erase( size_t i, size_t j ) const
-{
-   if( (~*this).isRestricted() ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
-   }
-
-   (~*this).get().erase( i, j );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Erasing an element from the sparse matrix.
-//
-// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..M-1]\f$.
-// \param pos Iterator to the element to be erased.
-// \return Iterator to the element after the erased element.
-//
-// This function erases an element from the sparse matrix. In case the storage order is set to
-// \a rowMajor the function erases an element from row \a i, in case the storage flag is set to
-// \a columnMajor the function erases an element from column \a i.
-*/
-template< typename PT    // Type of the proxy
-        , typename MT >  // Type of the sparse matrix
-inline typename SparseMatrixProxy<PT,MT>::Iterator
-   SparseMatrixProxy<PT,MT>::erase( size_t i, Iterator pos ) const
-{
-   if( (~*this).isRestricted() ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
-   }
-
-   return (~*this).get().erase( i, pos );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Erasing a range of elements from the sparse matrix.
-//
-// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..M-1]\f$.
-// \param first Iterator to first element to be erased.
-// \param last Iterator just past the last element to be erased.
-// \return Iterator to the element after the erased element.
-//
-// This function erases a range of element from the sparse matrix. In case the storage order is
-// set to \a rowMajor the function erases a range of elements from row \a i, in case the storage
-// flag is set to \a columnMajor the function erases a range of elements from column \a i.
-*/
-template< typename PT    // Type of the proxy
-        , typename MT >  // Type of the sparse matrix
-inline typename SparseMatrixProxy<PT,MT>::Iterator
-   SparseMatrixProxy<PT,MT>::erase( size_t i, Iterator first, Iterator last ) const
-{
-   if( (~*this).isRestricted() ) {
-      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
-   }
-
-   return (~*this).get().erase( i, first, last );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Changing the size of the represented matrix.
 //
 // \param m The new number of rows of the matrix.
 // \param n The new number of columns of the matrix.
 // \param preserve \a true if the old values of the matrix should be preserved, \a false if not.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function resizes the matrix using the given size to \f$ m \times n \f$. Depending on
 // the type of the matrix, during this operation new dynamic memory may be allocated in case
@@ -654,6 +648,7 @@ inline void SparseMatrixProxy<PT,MT>::resize( size_t m, size_t n, bool preserve 
 //
 // \param n The new minimum capacity of the matrix.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function increases the capacity of the sparse matrix to at least \a nonzeros elements.
 // The current values of the matrix elements and the individual capacities of the matrix rows
@@ -678,6 +673,7 @@ inline void SparseMatrixProxy<PT,MT>::reserve( size_t n ) const
 // \param i The row/column index of the new element \f$[0..M-1]\f$ or \f$[0..N-1]\f$.
 // \param n The new minimum capacity of the specified row/column.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function increases the capacity of row/column \a i of the sparse matrix to at least
 // \a nonzeros elements. The current values of the sparse matrix and all other individual
@@ -703,6 +699,7 @@ inline void SparseMatrixProxy<PT,MT>::reserve( size_t i, size_t n ) const
 /*!\brief Removing all excessive capacity from all rows/columns.
 //
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // The trim() function can be used to reverse the effect of all row/column-specific reserve()
 // calls. The function removes all excessive capacity from all rows (in case of a rowMajor
@@ -727,6 +724,7 @@ inline void SparseMatrixProxy<PT,MT>::trim() const
 //
 // \param i The index of the row/column to be trimmed (\f$[0..M-1]\f$ or \f$[0..N-1]\f$).
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
 //
 // This function can be used to reverse the effect of a row/column-specific reserve() call.
 // It removes all excessive capacity from the specified row (in case of a rowMajor matrix)
@@ -750,6 +748,7 @@ inline void SparseMatrixProxy<PT,MT>::trim( size_t i ) const
 /*!\brief In-place transpose of the represented matrix.
 //
 // \return Reference to the transposed matrix.
+// \exception std::invalid_argument Invalid access to restricted element.
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
@@ -768,6 +767,7 @@ inline void SparseMatrixProxy<PT,MT>::transpose() const
 /*!\brief In-place conjugate transpose of the represented matrix.
 //
 // \return Reference to the transposed matrix.
+// \exception std::invalid_argument Invalid access to restricted element.
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
@@ -787,6 +787,11 @@ inline void SparseMatrixProxy<PT,MT>::ctranspose() const
 //
 // \param scalar The scalar value for the matrix scaling.
 // \return void
+// \exception std::invalid_argument Invalid access to restricted element.
+//
+// This function scales the matrix by applying the given scalar value \a scalar to each element
+// of the matrix. For built-in and \c complex data types it has the same effect as using the
+// multiplication assignment operator.
 */
 template< typename PT       // Type of the proxy
         , typename MT >     // Type of the sparse matrix
@@ -798,6 +803,149 @@ inline void SparseMatrixProxy<PT,MT>::scale( const Other& scalar ) const
    }
 
    (~*this).get().scale( scalar );
+}
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ERASE FUNCTIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*!\brief Erasing an element from the sparse matrix.
+//
+// \param i The row index of the element to be erased. The index has to be in the range \f$[0..M-1]\f$.
+// \param j The column index of the element to be erased. The index has to be in the range \f$[0..N-1]\f$.
+// \return void
+// \exception std::invalid_argument Invalid access to restricted element.
+//
+// This function erases an element from the sparse matrix.
+*/
+template< typename PT    // Type of the proxy
+        , typename MT >  // Type of the sparse matrix
+inline void SparseMatrixProxy<PT,MT>::erase( size_t i, size_t j ) const
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   (~*this).get().erase( i, j );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Erasing an element from the sparse matrix.
+//
+// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..M-1]\f$.
+// \param pos Iterator to the element to be erased.
+// \return Iterator to the element after the erased element.
+// \exception std::invalid_argument Invalid access to restricted element.
+//
+// This function erases an element from the sparse matrix. In case the storage order is set to
+// \a rowMajor the function erases an element from row \a i, in case the storage flag is set to
+// \a columnMajor the function erases an element from column \a i.
+*/
+template< typename PT    // Type of the proxy
+        , typename MT >  // Type of the sparse matrix
+inline typename SparseMatrixProxy<PT,MT>::Iterator
+   SparseMatrixProxy<PT,MT>::erase( size_t i, Iterator pos ) const
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   return (~*this).get().erase( i, pos );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Erasing a range of elements from the sparse matrix.
+//
+// \param i The row/column index of the element to be erased. The index has to be in the range \f$[0..M-1]\f$.
+// \param first Iterator to first element to be erased.
+// \param last Iterator just past the last element to be erased.
+// \return Iterator to the element after the erased element.
+// \exception std::invalid_argument Invalid access to restricted element.
+//
+// This function erases a range of elements from the sparse matrix. In case the storage order is
+// set to \a rowMajor the function erases a range of elements from row \a i, in case the storage
+// flag is set to \a columnMajor the function erases a range of elements from column \a i.
+*/
+template< typename PT    // Type of the proxy
+        , typename MT >  // Type of the sparse matrix
+inline typename SparseMatrixProxy<PT,MT>::Iterator
+   SparseMatrixProxy<PT,MT>::erase( size_t i, Iterator first, Iterator last ) const
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   return (~*this).get().erase( i, first, last );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Erasing specific elements from the sparse matrix.
+//
+// \param predicate The unary predicate for the element selection.
+// \return void.
+//
+// This function erases specific elements from the sparse matrix. The elements are selected
+// by the given unary predicate \a predicate, which is expected to accept a single argument of
+// the type of the elements and to be pure.
+//
+// \note The predicate is required to be pure, i.e. to produce deterministic results for elements
+// with the same value. The attempt to use an impure predicate leads to undefined behavior!
+*/
+template< typename PT      // Type of the proxy
+        , typename MT >    // Type of the sparse matrix
+template< typename Pred >  // Type of the unary predicate
+inline void SparseMatrixProxy<PT,MT>::erase( Pred predicate )
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   (~*this).get().erase( predicate );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Erasing specific elements from a range of the sparse matrix.
+//
+// \param i The row/column index of the elements to be erased. The index has to be in the range \f$[0..M-1]\f$.
+// \param first Iterator to first element of the range.
+// \param last Iterator just past the last element of the range.
+// \param predicate The unary predicate for the element selection.
+// \return void
+//
+// This function erases specific elements from a range of elements of the sparse matrix. The
+// elements are selected by the given unary predicate \a predicate, which is expected to accept
+// a single argument of the type of the elements and to be pure. In case the storage order is
+// set to \a rowMajor the function erases a range of elements from row \a i, in case the storage
+// flag is set to \a columnMajor the function erases a range of elements from column \a i.
+//
+// \note The predicate is required to be pure, i.e. to produce deterministic results for elements
+// with the same value. The attempt to use an impure predicate leads to undefined behavior!
+*/
+template< typename PT      // Type of the proxy
+        , typename MT >    // Type of the sparse matrix
+template< typename Pred >  // Type of the unary predicate
+inline void SparseMatrixProxy<PT,MT>::erase( size_t i, Iterator first, Iterator last, Pred predicate )
+{
+   if( (~*this).isRestricted() ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid access to restricted element" );
+   }
+
+   (~*this).get().erase( i, first, last, predicate );
 }
 //*************************************************************************************************
 
@@ -846,9 +994,9 @@ inline typename SparseMatrixProxy<PT,MT>::Iterator
 // an index not less then the given column index. In case of a column-major matrix, the function
 // returns a column iterator to the first element with an index not less then the given row
 // index. In combination with the upperBound() function this function can be used to create a
-// pair of iterators specifying a range of indices. Note that the returned compressed matrix
-// iterator is subject to invalidation due to inserting operations via the function call operator
-// or the insert() function!
+// pair of iterators specifying a range of indices. Note that the returned sparse matrix iterator
+// is subject to invalidation due to inserting operations via the function call operator or the
+// insert() function!
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
@@ -871,9 +1019,9 @@ inline typename SparseMatrixProxy<PT,MT>::Iterator
 // an index greater then the given column index. In case of a column-major matrix, the function
 // returns a column iterator to the first element with an index greater then the given row
 // index. In combination with the upperBound() function this function can be used to create a
-// pair of iterators specifying a range of indices. Note that the returned compressed matrix
-// iterator is subject to invalidation due to inserting operations via the function call operator
-// or the insert() function!
+// pair of iterators specifying a range of indices. Note that the returned sparse matrix iterator
+// is subject to invalidation due to inserting operations via the function call operator or the
+// insert() function!
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
@@ -1162,7 +1310,7 @@ BLAZE_ALWAYS_INLINE size_t nonZeros( const SparseMatrixProxy<PT,MT>& proxy, size
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
-BLAZE_ALWAYS_INLINE typename DisableIf< IsSquare<MT> >::Type
+BLAZE_ALWAYS_INLINE DisableIf_< IsSquare<MT> >
    resize_backend( const SparseMatrixProxy<PT,MT>& proxy, size_t m, size_t n, bool preserve )
 {
    proxy.resize( m, n, preserve );
@@ -1187,7 +1335,7 @@ BLAZE_ALWAYS_INLINE typename DisableIf< IsSquare<MT> >::Type
 */
 template< typename PT    // Type of the proxy
         , typename MT >  // Type of the sparse matrix
-BLAZE_ALWAYS_INLINE typename EnableIf< IsSquare<MT> >::Type
+BLAZE_ALWAYS_INLINE EnableIf_< IsSquare<MT> >
    resize_backend( const SparseMatrixProxy<PT,MT>& proxy, size_t m, size_t n, bool preserve )
 {
    if( m != n ) {

@@ -3,7 +3,7 @@
 //  \file blaze/util/valuetraits/IsMultipleOf.h
 //  \brief Header file for the IsMultipleOf value trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,7 +41,7 @@
 //*************************************************************************************************
 
 #include <blaze/util/FalseType.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/TrueType.h>
 
 
@@ -60,9 +60,9 @@ namespace blaze {
 // This value trait tests whether the first given integral value \a M is a multiple of the second
 // integral value \a N (i.e. if \f$ M = x*N \f$, where x is any positive integer in the range
 // \f$ [0..\infty) \f$). In case the value is a multiple of \a N, the \a value member enumeration
-// is set to 1, the nested type definition \a Type is \a TrueType, and the class derives from
-// \a TrueType. Otherwise \a value is set to 0, \a Type is \a FalseType, and the class derives
-// from \a FalseType.
+// is set to \a true, the nested type definition \a Type is \a TrueType, and the class derives
+// from \a TrueType. Otherwise \a value is set to \a false, \a Type is \a FalseType, and the
+// class derives from \a FalseType.
 
    \code
    blaze::IsMultipleOf<8,2>::value  // Evaluates to 1 (x*2 = 8 for x = 4)
@@ -76,16 +76,9 @@ namespace blaze {
    \endcode
 */
 template< size_t M, size_t N >
-struct IsMultipleOf : public SelectType<M%N,FalseType,TrueType>::Type
-{
- public:
-   //**********************************************************************************************
-   /*! \cond BLAZE_INTERNAL */
-   enum { value = ( M%N )?( 0 ):( 1 ) };
-   typedef typename SelectType<M%N,FalseType,TrueType>::Type  Type;
-   /*! \endcond */
-   //**********************************************************************************************
-};
+struct IsMultipleOf
+   : public BoolConstant< M % N == 0UL >
+{};
 //*************************************************************************************************
 
 
@@ -95,14 +88,9 @@ struct IsMultipleOf : public SelectType<M%N,FalseType,TrueType>::Type
 // \ingroup type_traits
 */
 template< size_t M >
-struct IsMultipleOf<M,0UL> : public FalseType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 0 };
-   typedef FalseType  Type;
-   //**********************************************************************************************
-};
+struct IsMultipleOf<M,0UL>
+   : public FalseType
+{};
 /*! \endcond */
 //*************************************************************************************************
 
@@ -113,14 +101,9 @@ struct IsMultipleOf<M,0UL> : public FalseType
 // \ingroup type_traits
 */
 template<>
-struct IsMultipleOf<0,0> : public TrueType
-{
- public:
-   //**********************************************************************************************
-   enum { value = 1 };
-   typedef TrueType  Type;
-   //**********************************************************************************************
-};
+struct IsMultipleOf<0,0>
+   : public TrueType
+{};
 /*! \endcond */
 //*************************************************************************************************
 

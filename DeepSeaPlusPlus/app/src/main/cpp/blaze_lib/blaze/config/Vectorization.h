@@ -3,7 +3,7 @@
 //  \file blaze/config/Vectorization.h
 //  \brief Configuration of the vectorization policy of the Blaze library
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -49,6 +49,16 @@
 // Possible settings for the vectorization switch:
 //  - Deactivated: \b 0
 //  - Activated  : \b 1 (default)
+//
+// \note It is possible to (de-)activate vectorization via command line or by defining this
+// symbol manually before including any Blaze header file:
+
+   \code
+   #define BLAZE_USE_VECTORIZATION 1
+   #include <blaze/Blaze.h>
+   \endcode
 */
+#ifndef BLAZE_USE_VECTORIZATION
 #define BLAZE_USE_VECTORIZATION 1
+#endif
 //*************************************************************************************************

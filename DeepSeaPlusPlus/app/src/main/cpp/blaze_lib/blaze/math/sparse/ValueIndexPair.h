@@ -3,7 +3,7 @@
 //  \file blaze/math/sparse/ValueIndexPair.h
 //  \brief Header file for the ValueIndexPair class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -46,9 +46,12 @@
 #include <blaze/util/constraints/Pointer.h>
 #include <blaze/util/constraints/Reference.h>
 #include <blaze/util/constraints/Volatile.h>
-#include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
+#include <blaze/util/mpl/And.h>
+#include <blaze/util/mpl/Not.h>
 #include <blaze/util/Types.h>
+#include <blaze/util/typetraits/RemoveReference.h>
+#include <blaze/util/typetraits/IsRValueReference.h>
 
 
 namespace blaze {
@@ -67,20 +70,22 @@ namespace blaze {
 // matrix.
 */
 template< typename Type >  // Type of the value element
-class ValueIndexPair : private SparseElement
+class ValueIndexPair
+   : private SparseElement
 {
  public:
    //**Type definitions****************************************************************************
-   typedef Type         ValueType;       //!< The value type of the value-index-pair.
-   typedef size_t       IndexType;       //!< The index type of the value-index-pair.
-   typedef Type&        Reference;       //!< Reference return type.
-   typedef const Type&  ConstReference;  //!< Reference-to-const return type.
+   using ValueType      = Type;         //!< The value type of the value-index-pair.
+   using IndexType      = size_t;       //!< The index type of the value-index-pair.
+   using Reference      = Type&;        //!< Reference return type.
+   using ConstReference = const Type&;  //!< Reference-to-const return type.
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
    inline ValueIndexPair();
    inline ValueIndexPair( const Type& v, size_t i );
    // No explicitly declared copy constructor.
+   // No explicitly declared move constructor.
    //**********************************************************************************************
 
    //**Destructor**********************************************************************************
@@ -91,14 +96,25 @@ class ValueIndexPair : private SparseElement
    /*!\name Operators */
    //@{
    // No explicitly declared copy assignment operator.
+   // No explicitly declared move assignment operator.
 
    template< typename Other >
-   inline typename EnableIf< IsSparseElement<Other>, ValueIndexPair& >::Type
+   inline EnableIf_< IsSparseElement<Other>, ValueIndexPair& >
       operator=( const Other& rhs );
 
    template< typename Other >
-   inline typename DisableIf< IsSparseElement<Other>, ValueIndexPair& >::Type
+   inline EnableIf_< And< IsSparseElement< RemoveReference_<Other> >
+                        , IsRValueReference<Other&&> >, ValueIndexPair& >
+      operator=( Other&& rhs );
+
+   template< typename Other >
+   inline EnableIf_< Not< IsSparseElement<Other> >, ValueIndexPair& >
       operator=( const Other& v );
+
+   template< typename Other >
+   inline EnableIf_< And< Not< IsSparseElement< RemoveReference_<Other> > >
+                        , IsRValueReference<Other&&> >, ValueIndexPair& >
+      operator=( Other&& v );
 
    template< typename Other > inline ValueIndexPair& operator+=( const Other& v );
    template< typename Other > inline ValueIndexPair& operator-=( const Other& v );
@@ -197,10 +213,33 @@ inline ValueIndexPair<Type>::ValueIndexPair( const Type& v, size_t i )
 */
 template< typename Type >   // Type of the value element
 template< typename Other >  // Data type of the right-hand side value-index-pair
-inline typename EnableIf< IsSparseElement<Other>, ValueIndexPair<Type>& >::Type
+inline EnableIf_< IsSparseElement<Other>, ValueIndexPair<Type>& >
    ValueIndexPair<Type>::operator=( const Other& rhs )
 {
    value_ = rhs.value();
+   index_ = rhs.index();
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Assignment operator for different value-index-pair types.
+//
+// \param rhs Value-index-pair to be moved.
+// \return Reference to the assigned value-index-pair.
+//
+// This assignment operator enables the assignment of other value-index-pair types. The given
+// \a Other data type qualifies as value-index-pair type in case it provides a value() and an
+// index() member function.
+*/
+template< typename Type >   // Type of the value element
+template< typename Other >  // Data type of the right-hand side value-index-pair
+inline EnableIf_< And< IsSparseElement< RemoveReference_<Other> >
+                     , IsRValueReference<Other&&> >, ValueIndexPair<Type>& >
+   ValueIndexPair<Type>::operator=( Other&& rhs )
+{
+   value_ = std::move( rhs.value() );
    index_ = rhs.index();
    return *this;
 }
@@ -215,10 +254,28 @@ inline typename EnableIf< IsSparseElement<Other>, ValueIndexPair<Type>& >::Type
 */
 template< typename Type >   // Type of the value element
 template< typename Other >  // Data type of the right-hand side value
-inline typename DisableIf< IsSparseElement<Other>, ValueIndexPair<Type>& >::Type
+inline EnableIf_< Not< IsSparseElement<Other> >, ValueIndexPair<Type>& >
    ValueIndexPair<Type>::operator=( const Other& v )
 {
    value_ = v;
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Assignment to the value of the value-index-pair.
+//
+// \param v The new value-index-pair value.
+// \return Reference to the assigned value-index-pair.
+*/
+template< typename Type >   // Type of the value element
+template< typename Other >  // Data type of the right-hand side value
+inline EnableIf_< And< Not< IsSparseElement< RemoveReference_<Other> > >
+                     , IsRValueReference<Other&&> >, ValueIndexPair<Type>& >
+   ValueIndexPair<Type>::operator=( Other&& v )
+{
+   value_ = std::move( v );
    return *this;
 }
 //*************************************************************************************************

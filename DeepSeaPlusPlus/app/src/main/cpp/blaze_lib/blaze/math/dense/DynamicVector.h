@@ -3,7 +3,7 @@
 //  \file blaze/math/dense/DynamicVector.h
 //  \brief Header file for the implementation of an arbitrarily sized vector
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -41,36 +41,53 @@
 //*************************************************************************************************
 
 #include <algorithm>
+#include <utility>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/AlignmentFlag.h>
+#include <blaze/math/constraints/DenseVector.h>
+#include <blaze/math/constraints/RequiresEvaluation.h>
+#include <blaze/math/constraints/TransposeFlag.h>
 #include <blaze/math/dense/DenseIterator.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/DenseVector.h>
 #include <blaze/math/expressions/SparseVector.h>
 #include <blaze/math/Forward.h>
 #include <blaze/math/Functions.h>
-#include <blaze/math/Intrinsics.h>
+#include <blaze/math/InitializerList.h>
 #include <blaze/math/shims/Clear.h>
 #include <blaze/math/shims/IsDefault.h>
 #include <blaze/math/shims/Serial.h>
+#include <blaze/math/SIMD.h>
 #include <blaze/math/traits/AddTrait.h>
+#include <blaze/math/traits/BinaryMapTrait.h>
 #include <blaze/math/traits/CrossTrait.h>
 #include <blaze/math/traits/DivTrait.h>
-#include <blaze/math/traits/MathTrait.h>
 #include <blaze/math/traits/MultTrait.h>
 #include <blaze/math/traits/SubTrait.h>
 #include <blaze/math/traits/SubvectorTrait.h>
+#include <blaze/math/traits/UnaryMapTrait.h>
 #include <blaze/math/typetraits/HasConstDataAccess.h>
 #include <blaze/math/typetraits/HasMutableDataAccess.h>
+#include <blaze/math/typetraits/HasSIMDAdd.h>
+#include <blaze/math/typetraits/HasSIMDDiv.h>
+#include <blaze/math/typetraits/HasSIMDMult.h>
+#include <blaze/math/typetraits/HasSIMDSub.h>
+#include <blaze/math/typetraits/HighType.h>
 #include <blaze/math/typetraits/IsAligned.h>
 #include <blaze/math/typetraits/IsPadded.h>
 #include <blaze/math/typetraits/IsResizable.h>
+#include <blaze/math/typetraits/IsShrinkable.h>
+#include <blaze/math/typetraits/IsSIMDCombinable.h>
 #include <blaze/math/typetraits/IsSMPAssignable.h>
 #include <blaze/math/typetraits/IsSparseVector.h>
+#include <blaze/math/typetraits/LowType.h>
 #include <blaze/system/CacheSize.h>
 #include <blaze/system/Inline.h>
 #include <blaze/system/Optimizations.h>
 #include <blaze/system/Restrict.h>
 #include <blaze/system/Thresholds.h>
 #include <blaze/system/TransposeFlag.h>
+#include <blaze/util/algorithms/Transfer.h>
 #include <blaze/util/AlignmentCheck.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/constraints/Const.h>
@@ -80,15 +97,13 @@
 #include <blaze/util/constraints/Volatile.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/Memory.h>
-#include <blaze/util/Null.h>
 #include <blaze/util/Template.h>
+#include <blaze/util/TrueType.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/IsNumeric.h>
-#include <blaze/util/typetraits/IsSame.h>
 #include <blaze/util/typetraits/IsVectorizable.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -165,68 +180,78 @@ namespace blaze {
 */
 template< typename Type                     // Data type of the vector
         , bool TF = defaultTransposeFlag >  // Transpose flag
-class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
+class DynamicVector
+   : public DenseVector< DynamicVector<Type,TF>, TF >
 {
- private:
-   //**Type definitions****************************************************************************
-   typedef IntrinsicTrait<Type>  IT;  //!< Intrinsic trait for the vector element type.
-   //**********************************************************************************************
-
  public:
    //**Type definitions****************************************************************************
-   typedef DynamicVector<Type,TF>   This;           //!< Type of this DynamicVector instance.
-   typedef This                     ResultType;     //!< Result type for expression template evaluations.
-   typedef DynamicVector<Type,!TF>  TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef Type                     ElementType;    //!< Type of the vector elements.
-   typedef typename IT::Type        IntrinsicType;  //!< Intrinsic type of the vector elements.
-   typedef const Type&              ReturnType;     //!< Return type for expression template evaluations
-   typedef const DynamicVector&     CompositeType;  //!< Data type for composite expression templates.
+   using This          = DynamicVector<Type,TF>;   //!< Type of this DynamicVector instance.
+   using BaseType      = DenseVector<This,TF>;     //!< Base type of this DynamicVector instance.
+   using ResultType    = This;                     //!< Result type for expression template evaluations.
+   using TransposeType = DynamicVector<Type,!TF>;  //!< Transpose type for expression template evaluations.
+   using ElementType   = Type;                     //!< Type of the vector elements.
+   using SIMDType      = SIMDTrait_<ElementType>;  //!< SIMD type of the vector elements.
+   using ReturnType    = const Type&;              //!< Return type for expression template evaluations
+   using CompositeType = const DynamicVector&;     //!< Data type for composite expression templates.
 
-   typedef Type&        Reference;       //!< Reference to a non-constant vector value.
-   typedef const Type&  ConstReference;  //!< Reference to a constant vector value.
-   typedef Type*        Pointer;         //!< Pointer to a non-constant vector value.
-   typedef const Type*  ConstPointer;    //!< Pointer to a constant vector value.
+   using Reference      = Type&;        //!< Reference to a non-constant vector value.
+   using ConstReference = const Type&;  //!< Reference to a constant vector value.
+   using Pointer        = Type*;        //!< Pointer to a non-constant vector value.
+   using ConstPointer   = const Type*;  //!< Pointer to a constant vector value.
 
-   typedef DenseIterator<Type,aligned>        Iterator;       //!< Iterator over non-constant elements.
-   typedef DenseIterator<const Type,aligned>  ConstIterator;  //!< Iterator over constant elements.
+   using Iterator      = DenseIterator<Type,aligned>;        //!< Iterator over non-constant elements.
+   using ConstIterator = DenseIterator<const Type,aligned>;  //!< Iterator over constant elements.
    //**********************************************************************************************
 
    //**Rebind struct definition********************************************************************
    /*!\brief Rebind mechanism to obtain a DynamicVector with different data/element type.
    */
-   template< typename ET >  // Data type of the other vector
+   template< typename NewType >  // Data type of the other vector
    struct Rebind {
-      typedef DynamicVector<ET,TF>  Other;  //!< The type of the other DynamicVector.
+      using Other = DynamicVector<NewType,TF>;  //!< The type of the other DynamicVector.
+   };
+   //**********************************************************************************************
+
+   //**Resize struct definition********************************************************************
+   /*!\brief Resize mechanism to obtain a DynamicVector with a different fixed number of elements.
+   */
+   template< size_t NewN >  // Number of elements of the other vector
+   struct Resize {
+      using Other = DynamicVector<Type,TF>;  //!< The type of the other DynamicVector.
    };
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
-   //! Compilation flag for intrinsic optimization.
-   /*! The \a vectorizable compilation flag indicates whether expressions the vector is involved
-       in can be optimized via intrinsics. In case the element type of the vector is an intrinsic
-       data type, the \a vectorizable compilation flag is set to \a true, otherwise it is set to
-       \a false. */
-   enum { vectorizable = IsVectorizable<Type>::value };
+   //! Compilation flag for SIMD optimization.
+   /*! The \a simdEnabled compilation flag indicates whether expressions the vector is involved
+       in can be optimized via SIMD operationss. In case the element type of the vector is a
+       vectorizable data type, the \a simdEnabled compilation flag is set to \a true, otherwise
+       it is set to \a false. */
+   enum : bool { simdEnabled = IsVectorizable<Type>::value };
 
    //! Compilation flag for SMP assignments.
    /*! The \a smpAssignable compilation flag indicates whether the vector can be used in SMP
        (shared memory parallel) assignments (both on the left-hand and right-hand side of the
        assignment). */
-   enum { smpAssignable = !IsSMPAssignable<Type>::value };
+   enum : bool { smpAssignable = !IsSMPAssignable<Type>::value };
    //**********************************************************************************************
 
    //**Constructors********************************************************************************
    /*!\name Constructors */
    //@{
-                              explicit inline DynamicVector();
-                              explicit inline DynamicVector( size_t n );
-                              explicit inline DynamicVector( size_t n, const Type& init );
-   template< typename Other > explicit inline DynamicVector( size_t n, const Other* array );
+   explicit inline DynamicVector() noexcept;
+   explicit inline DynamicVector( size_t n );
+   explicit inline DynamicVector( size_t n, const Type& init );
+   explicit inline DynamicVector( initializer_list<Type> list );
 
-   template< typename Other, size_t N >
-   explicit inline DynamicVector( const Other (&array)[N] );
+   template< typename Other >
+   explicit inline DynamicVector( size_t n, const Other* array );
+
+   template< typename Other, size_t Dim >
+   explicit inline DynamicVector( const Other (&array)[Dim] );
 
                            inline DynamicVector( const DynamicVector& v );
+                           inline DynamicVector( DynamicVector&& v ) noexcept;
    template< typename VT > inline DynamicVector( const Vector<VT,TF>& v );
    //@}
    //**********************************************************************************************
@@ -241,57 +266,69 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
    //**Data access functions***********************************************************************
    /*!\name Data access functions */
    //@{
-   inline Reference      operator[]( size_t index );
-   inline ConstReference operator[]( size_t index ) const;
+   inline Reference      operator[]( size_t index ) noexcept;
+   inline ConstReference operator[]( size_t index ) const noexcept;
    inline Reference      at( size_t index );
    inline ConstReference at( size_t index ) const;
-   inline Pointer        data  ();
-   inline ConstPointer   data  () const;
-   inline Iterator       begin ();
-   inline ConstIterator  begin () const;
-   inline ConstIterator  cbegin() const;
-   inline Iterator       end   ();
-   inline ConstIterator  end   () const;
-   inline ConstIterator  cend  () const;
+   inline Pointer        data  () noexcept;
+   inline ConstPointer   data  () const noexcept;
+   inline Iterator       begin () noexcept;
+   inline ConstIterator  begin () const noexcept;
+   inline ConstIterator  cbegin() const noexcept;
+   inline Iterator       end   () noexcept;
+   inline ConstIterator  end   () const noexcept;
+   inline ConstIterator  cend  () const noexcept;
    //@}
    //**********************************************************************************************
 
    //**Assignment operators************************************************************************
    /*!\name Assignment operators */
    //@{
-   template< typename Other, size_t N >
-   inline DynamicVector& operator=( const Other (&array)[N] );
+   inline DynamicVector& operator=( const Type& rhs );
+   inline DynamicVector& operator=( initializer_list<Type> list );
 
-                           inline DynamicVector& operator= ( const Type& rhs );
-                           inline DynamicVector& operator= ( const DynamicVector& rhs );
+   template< typename Other, size_t Dim >
+   inline DynamicVector& operator=( const Other (&array)[Dim] );
+
+   inline DynamicVector& operator=( const DynamicVector& rhs );
+   inline DynamicVector& operator=( DynamicVector&& rhs ) noexcept;
+
    template< typename VT > inline DynamicVector& operator= ( const Vector<VT,TF>& rhs );
    template< typename VT > inline DynamicVector& operator+=( const Vector<VT,TF>& rhs );
    template< typename VT > inline DynamicVector& operator-=( const Vector<VT,TF>& rhs );
    template< typename VT > inline DynamicVector& operator*=( const Vector<VT,TF>& rhs );
+   template< typename VT > inline DynamicVector& operator/=( const DenseVector<VT,TF>& rhs );
+   template< typename VT > inline DynamicVector& operator%=( const Vector<VT,TF>& rhs );
 
    template< typename Other >
-   inline typename EnableIf< IsNumeric<Other>, DynamicVector >::Type&
-      operator*=( Other rhs );
+   inline EnableIf_<IsNumeric<Other>, DynamicVector >& operator*=( Other rhs );
 
    template< typename Other >
-   inline typename EnableIf< IsNumeric<Other>, DynamicVector >::Type&
-      operator/=( Other rhs );
+   inline EnableIf_<IsNumeric<Other>, DynamicVector >& operator/=( Other rhs );
    //@}
    //**********************************************************************************************
 
    //**Utility functions***************************************************************************
    /*!\name Utility functions */
    //@{
-                              inline size_t         size() const;
-                              inline size_t         capacity() const;
-                              inline size_t         nonZeros() const;
-                              inline void           reset();
-                              inline void           clear();
-                              inline void           resize( size_t n, bool preserve=true );
-                              inline void           extend( size_t n, bool preserve=true );
-                              inline void           reserve( size_t n );
+   inline size_t size() const noexcept;
+   inline size_t spacing() const noexcept;
+   inline size_t capacity() const noexcept;
+   inline size_t nonZeros() const;
+   inline void   reset();
+   inline void   clear();
+   inline void   resize( size_t n, bool preserve=true );
+   inline void   extend( size_t n, bool preserve=true );
+   inline void   reserve( size_t n );
+   inline void   shrinkToFit();
+   inline void   swap( DynamicVector& v ) noexcept;
+   //@}
+   //**********************************************************************************************
+
+   //**Numeric functions***************************************************************************
+   /*!\name Numeric functions */
+   //@{
    template< typename Other > inline DynamicVector& scale( const Other& scalar );
-                              inline void           swap( DynamicVector& v ) /* throw() */;
    //@}
    //**********************************************************************************************
 
@@ -301,9 +338,9 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename VT >
    struct VectorizedAssign {
-      enum { value = useOptimizedKernels &&
-                     vectorizable && VT::vectorizable &&
-                     IsSame<Type,typename VT::ElementType>::value };
+      enum : bool { value = useOptimizedKernels &&
+                            simdEnabled && VT::simdEnabled &&
+                            IsSIMDCombinable< Type, ElementType_<VT> >::value };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -313,10 +350,10 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename VT >
    struct VectorizedAddAssign {
-      enum { value = useOptimizedKernels &&
-                     vectorizable && VT::vectorizable &&
-                     IsSame<Type,typename VT::ElementType>::value &&
-                     IntrinsicTrait<Type>::addition };
+      enum : bool { value = useOptimizedKernels &&
+                            simdEnabled && VT::simdEnabled &&
+                            IsSIMDCombinable< Type, ElementType_<VT> >::value &&
+                            HasSIMDAdd< Type, ElementType_<VT> >::value };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -326,10 +363,10 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename VT >
    struct VectorizedSubAssign {
-      enum { value = useOptimizedKernels &&
-                     vectorizable && VT::vectorizable &&
-                     IsSame<Type,typename VT::ElementType>::value &&
-                     IntrinsicTrait<Type>::subtraction };
+      enum : bool { value = useOptimizedKernels &&
+                            simdEnabled && VT::simdEnabled &&
+                            IsSIMDCombinable< Type, ElementType_<VT> >::value &&
+                            HasSIMDSub< Type, ElementType_<VT> >::value };
    };
    /*! \endcond */
    //**********************************************************************************************
@@ -339,72 +376,95 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
    //! Helper structure for the explicit application of the SFINAE principle.
    template< typename VT >
    struct VectorizedMultAssign {
-      enum { value = useOptimizedKernels &&
-                     vectorizable && VT::vectorizable &&
-                     IsSame<Type,typename VT::ElementType>::value &&
-                     IntrinsicTrait<Type>::multiplication };
+      enum : bool { value = useOptimizedKernels &&
+                            simdEnabled && VT::simdEnabled &&
+                            IsSIMDCombinable< Type, ElementType_<VT> >::value &&
+                            HasSIMDMult< Type, ElementType_<VT> >::value };
    };
    /*! \endcond */
    //**********************************************************************************************
 
+   //**********************************************************************************************
+   /*! \cond BLAZE_INTERNAL */
+   //! Helper structure for the explicit application of the SFINAE principle.
+   template< typename VT >
+   struct VectorizedDivAssign {
+      enum : bool { value = useOptimizedKernels &&
+                            simdEnabled && VT::simdEnabled &&
+                            IsSIMDCombinable< Type, ElementType_<VT> >::value &&
+                            HasSIMDDiv< Type, ElementType_<VT> >::value };
+   };
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**********************************************************************************************
+   //! The number of elements packed within a single SIMD element.
+   enum : size_t { SIMDSIZE = SIMDTrait<ElementType>::size };
+   //**********************************************************************************************
+
  public:
+   //**Debugging functions*************************************************************************
+   /*!\name Debugging functions */
+   //@{
+   inline bool isIntact() const noexcept;
+   //@}
+   //**********************************************************************************************
+
    //**Expression template evaluation functions****************************************************
    /*!\name Expression template evaluation functions */
    //@{
-   template< typename Other > inline bool canAlias ( const Other* alias ) const;
-   template< typename Other > inline bool isAliased( const Other* alias ) const;
+   template< typename Other > inline bool canAlias ( const Other* alias ) const noexcept;
+   template< typename Other > inline bool isAliased( const Other* alias ) const noexcept;
 
-   inline bool isAligned   () const;
-   inline bool canSMPAssign() const;
+   inline bool isAligned   () const noexcept;
+   inline bool canSMPAssign() const noexcept;
 
-   BLAZE_ALWAYS_INLINE IntrinsicType load ( size_t index ) const;
-   BLAZE_ALWAYS_INLINE IntrinsicType loada( size_t index ) const;
-   BLAZE_ALWAYS_INLINE IntrinsicType loadu( size_t index ) const;
+   BLAZE_ALWAYS_INLINE SIMDType load ( size_t index ) const noexcept;
+   BLAZE_ALWAYS_INLINE SIMDType loada( size_t index ) const noexcept;
+   BLAZE_ALWAYS_INLINE SIMDType loadu( size_t index ) const noexcept;
 
-   BLAZE_ALWAYS_INLINE void store ( size_t index, const IntrinsicType& value );
-   BLAZE_ALWAYS_INLINE void storea( size_t index, const IntrinsicType& value );
-   BLAZE_ALWAYS_INLINE void storeu( size_t index, const IntrinsicType& value );
-   BLAZE_ALWAYS_INLINE void stream( size_t index, const IntrinsicType& value );
-
-   template< typename VT >
-   inline typename DisableIf< VectorizedAssign<VT> >::Type
-      assign( const DenseVector<VT,TF>& rhs );
+   BLAZE_ALWAYS_INLINE void store ( size_t index, const SIMDType& value ) noexcept;
+   BLAZE_ALWAYS_INLINE void storea( size_t index, const SIMDType& value ) noexcept;
+   BLAZE_ALWAYS_INLINE void storeu( size_t index, const SIMDType& value ) noexcept;
+   BLAZE_ALWAYS_INLINE void stream( size_t index, const SIMDType& value ) noexcept;
 
    template< typename VT >
-   inline typename EnableIf< VectorizedAssign<VT> >::Type
-      assign( const DenseVector<VT,TF>& rhs );
+   inline DisableIf_<VectorizedAssign<VT> > assign( const DenseVector<VT,TF>& rhs );
+
+   template< typename VT >
+   inline EnableIf_<VectorizedAssign<VT> > assign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT > inline void assign( const SparseVector<VT,TF>& rhs );
 
    template< typename VT >
-   inline typename DisableIf< VectorizedAddAssign<VT> >::Type
-      addAssign( const DenseVector<VT,TF>& rhs );
+   inline DisableIf_<VectorizedAddAssign<VT> > addAssign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT >
-   inline typename EnableIf< VectorizedAddAssign<VT> >::Type
-      addAssign( const DenseVector<VT,TF>& rhs );
+   inline EnableIf_<VectorizedAddAssign<VT> > addAssign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT > inline void addAssign( const SparseVector<VT,TF>& rhs );
 
    template< typename VT >
-   inline typename DisableIf< VectorizedSubAssign<VT> >::Type
-      subAssign( const DenseVector<VT,TF>& rhs );
+   inline DisableIf_<VectorizedSubAssign<VT> > subAssign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT >
-   inline typename EnableIf< VectorizedSubAssign<VT> >::Type
-      subAssign( const DenseVector<VT,TF>& rhs );
+   inline EnableIf_<VectorizedSubAssign<VT> > subAssign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT > inline void subAssign( const SparseVector<VT,TF>& rhs );
 
    template< typename VT >
-   inline typename DisableIf< VectorizedMultAssign<VT> >::Type
-      multAssign( const DenseVector<VT,TF>& rhs );
+   inline DisableIf_<VectorizedMultAssign<VT> > multAssign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT >
-   inline typename EnableIf< VectorizedMultAssign<VT> >::Type
-      multAssign( const DenseVector<VT,TF>& rhs );
+   inline EnableIf_<VectorizedMultAssign<VT> > multAssign( const DenseVector<VT,TF>& rhs );
 
    template< typename VT > inline void multAssign( const SparseVector<VT,TF>& rhs );
+
+   template< typename VT >
+   inline DisableIf_<VectorizedDivAssign<VT> > divAssign( const DenseVector<VT,TF>& rhs );
+
+   template< typename VT >
+   inline EnableIf_<VectorizedDivAssign<VT> > divAssign( const DenseVector<VT,TF>& rhs );
    //@}
    //**********************************************************************************************
 
@@ -412,7 +472,7 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
    //**Utility functions***************************************************************************
    /*!\name Utility functions */
    //@{
-   inline size_t adjustCapacity( size_t minCapacity ) const;
+   inline size_t addPadding( size_t value ) const noexcept;
    //@}
    //**********************************************************************************************
 
@@ -455,10 +515,10 @@ class DynamicVector : public DenseVector< DynamicVector<Type,TF>, TF >
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline DynamicVector<Type,TF>::DynamicVector()
-   : size_    ( 0UL )   // The current size/dimension of the vector
-   , capacity_( 0UL )   // The maximum capacity of the vector
-   , v_       ( NULL )  // The vector elements
+inline DynamicVector<Type,TF>::DynamicVector() noexcept
+   : size_    ( 0UL )      // The current size/dimension of the vector
+   , capacity_( 0UL )      // The maximum capacity of the vector
+   , v_       ( nullptr )  // The vector elements
 {}
 //*************************************************************************************************
 
@@ -468,20 +528,22 @@ inline DynamicVector<Type,TF>::DynamicVector()
 //
 // \param n The size of the vector.
 //
-// \note: This constructor is only responsible to allocate the required dynamic memory. No
+// \note This constructor is only responsible to allocate the required dynamic memory. No
 // element initialization is performed!
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 inline DynamicVector<Type,TF>::DynamicVector( size_t n )
    : size_    ( n )                            // The current size/dimension of the vector
-   , capacity_( adjustCapacity( n ) )          // The maximum capacity of the vector
+   , capacity_( addPadding( n ) )              // The maximum capacity of the vector
    , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
 {
    if( IsVectorizable<Type>::value ) {
       for( size_t i=size_; i<capacity_; ++i )
          v_[i] = Type();
    }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 }
 //*************************************************************************************************
 
@@ -498,7 +560,7 @@ template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 inline DynamicVector<Type,TF>::DynamicVector( size_t n, const Type& init )
    : size_    ( n )                            // The current size/dimension of the vector
-   , capacity_( adjustCapacity( n ) )          // The maximum capacity of the vector
+   , capacity_( addPadding( n ) )              // The maximum capacity of the vector
    , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
 {
    for( size_t i=0UL; i<size_; ++i )
@@ -508,6 +570,37 @@ inline DynamicVector<Type,TF>::DynamicVector( size_t n, const Type& init )
       for( size_t i=size_; i<capacity_; ++i )
          v_[i] = Type();
    }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief List initialization of all vector elements.
+//
+// \param list The initializer list.
+//
+// This assignment operator provides the option to explicitly initialize the elements of the
+// vector within a constructor call:
+
+   \code
+   blaze::DynamicVector<double> v1{ 4.2, 6.3, -1.2 };
+   \endcode
+
+// The vector is sized according to the size of the initializer list and all its elements are
+// initialized by the values of the given initializer list.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline DynamicVector<Type,TF>::DynamicVector( initializer_list<Type> list )
+   : size_    ( list.size() )                  // The current size/dimension of the vector
+   , capacity_( addPadding( size_ ) )          // The maximum capacity of the vector
+   , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
+{
+   std::fill( std::copy( list.begin(), list.end(), v_ ), v_+capacity_, Type() );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 }
 //*************************************************************************************************
 
@@ -524,11 +617,11 @@ inline DynamicVector<Type,TF>::DynamicVector( size_t n, const Type& init )
    \code
    double* array = new double[4];
    // ... Initialization of the dynamic array
-   blaze::DynamicVector<real_t> v( array, 4UL );
+   blaze::DynamicVector<double> v( array, 4UL );
    delete[] array;
    \endcode
 
-// The vector is sized accoring to the specified size of the array and initialized with the
+// The vector is sized according to the specified size of the array and initialized with the
 // values from the given array. Note that it is expected that the given \a array has at least
 // \a n elements. Providing an array with less elements results in undefined behavior!
 */
@@ -537,7 +630,7 @@ template< typename Type     // Data type of the vector
 template< typename Other >  // Data type of the initialization array
 inline DynamicVector<Type,TF>::DynamicVector( size_t n, const Other* array )
    : size_    ( n )                            // The current size/dimension of the vector
-   , capacity_( adjustCapacity( n ) )          // The maximum capacity of the vector
+   , capacity_( addPadding( n ) )              // The maximum capacity of the vector
    , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
 {
    for( size_t i=0UL; i<n; ++i )
@@ -547,6 +640,8 @@ inline DynamicVector<Type,TF>::DynamicVector( size_t n, const Other* array )
       for( size_t i=n; i<capacity_; ++i )
          v_[i] = Type();
    }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 }
 //*************************************************************************************************
 
@@ -556,34 +651,36 @@ inline DynamicVector<Type,TF>::DynamicVector( size_t n, const Other* array )
 //
 // \param array N-dimensional array for the initialization.
 //
-// This assignment operator offers the option to directly initialize the elements of the vector
-// with a static array:
+// This constructor offers the option to directly initialize the elements of the vector with a
+// static array:
 
    \code
-   const real_t init[4] = { 1, 2, 3 };
-   blaze::DynamicVector<real_t> v( init );
+   const int init[4] = { 1, 2, 3 };
+   blaze::DynamicVector<int> v( init );
    \endcode
 
-// The vector is sized accoring to the size of the array and initialized with the values from the
+// The vector is sized according to the size of the array and initialized with the values from the
 // given array. Missing values are initialized with default values (as e.g. the fourth element in
 // the example).
 */
 template< typename Type   // Data type of the vector
         , bool TF >       // Transpose flag
 template< typename Other  // Data type of the initialization array
-        , size_t N >      // Dimension of the initialization array
-inline DynamicVector<Type,TF>::DynamicVector( const Other (&array)[N] )
-   : size_    ( N )                            // The current size/dimension of the vector
-   , capacity_( adjustCapacity( N ) )          // The maximum capacity of the vector
+        , size_t Dim >    // Dimension of the initialization array
+inline DynamicVector<Type,TF>::DynamicVector( const Other (&array)[Dim] )
+   : size_    ( Dim )                          // The current size/dimension of the vector
+   , capacity_( addPadding( Dim ) )            // The maximum capacity of the vector
    , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
 {
-   for( size_t i=0UL; i<N; ++i )
+   for( size_t i=0UL; i<Dim; ++i )
       v_[i] = array[i];
 
    if( IsVectorizable<Type>::value ) {
-      for( size_t i=N; i<capacity_; ++i )
+      for( size_t i=Dim; i<capacity_; ++i )
          v_[i] = Type();
    }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 }
 //*************************************************************************************************
 
@@ -600,13 +697,34 @@ template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 inline DynamicVector<Type,TF>::DynamicVector( const DynamicVector& v )
    : size_    ( v.size_ )                      // The current size/dimension of the vector
-   , capacity_( adjustCapacity( v.size_ ) )    // The maximum capacity of the vector
+   , capacity_( addPadding( v.size_ ) )        // The maximum capacity of the vector
    , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
 {
    BLAZE_INTERNAL_ASSERT( capacity_ <= v.capacity_, "Invalid capacity estimation" );
 
    for( size_t i=0UL; i<capacity_; ++i )
       v_[i] = v.v_[i];
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief The move constructor for DynamicVector.
+//
+// \param v The vector to be moved into this instance.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline DynamicVector<Type,TF>::DynamicVector( DynamicVector&& v ) noexcept
+   : size_    ( v.size_     )  // The current size/dimension of the vector
+   , capacity_( v.capacity_ )  // The maximum capacity of the vector
+   , v_       ( v.v_        )  // The vector elements
+{
+   v.size_     = 0UL;
+   v.capacity_ = 0UL;
+   v.v_        = nullptr;
 }
 //*************************************************************************************************
 
@@ -621,7 +739,7 @@ template< typename Type  // Data type of the vector
 template< typename VT >  // Type of the foreign vector
 inline DynamicVector<Type,TF>::DynamicVector( const Vector<VT,TF>& v )
    : size_    ( (~v).size() )                  // The current size/dimension of the vector
-   , capacity_( adjustCapacity( size_ ) )      // The maximum capacity of the vector
+   , capacity_( addPadding( size_ ) )          // The maximum capacity of the vector
    , v_       ( allocate<Type>( capacity_ ) )  // The vector elements
 {
    for( size_t i=( IsSparseVector<VT>::value   ? 0UL       : size_ );
@@ -630,6 +748,8 @@ inline DynamicVector<Type,TF>::DynamicVector( const Vector<VT,TF>& v )
    }
 
    smpAssign( *this, ~v );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 }
 //*************************************************************************************************
 
@@ -674,7 +794,7 @@ inline DynamicVector<Type,TF>::~DynamicVector()
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 inline typename DynamicVector<Type,TF>::Reference
-   DynamicVector<Type,TF>::operator[]( size_t index )
+   DynamicVector<Type,TF>::operator[]( size_t index ) noexcept
 {
    BLAZE_USER_ASSERT( index < size_, "Invalid vector access index" );
    return v_[index];
@@ -694,7 +814,7 @@ inline typename DynamicVector<Type,TF>::Reference
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 inline typename DynamicVector<Type,TF>::ConstReference
-   DynamicVector<Type,TF>::operator[]( size_t index ) const
+   DynamicVector<Type,TF>::operator[]( size_t index ) const noexcept
 {
    BLAZE_USER_ASSERT( index < size_, "Invalid vector access index" );
    return v_[index];
@@ -757,7 +877,7 @@ inline typename DynamicVector<Type,TF>::ConstReference
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::Pointer DynamicVector<Type,TF>::data()
+inline typename DynamicVector<Type,TF>::Pointer DynamicVector<Type,TF>::data() noexcept
 {
    return v_;
 }
@@ -773,7 +893,7 @@ inline typename DynamicVector<Type,TF>::Pointer DynamicVector<Type,TF>::data()
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::ConstPointer DynamicVector<Type,TF>::data() const
+inline typename DynamicVector<Type,TF>::ConstPointer DynamicVector<Type,TF>::data() const noexcept
 {
    return v_;
 }
@@ -787,7 +907,7 @@ inline typename DynamicVector<Type,TF>::ConstPointer DynamicVector<Type,TF>::dat
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::Iterator DynamicVector<Type,TF>::begin()
+inline typename DynamicVector<Type,TF>::Iterator DynamicVector<Type,TF>::begin() noexcept
 {
    return Iterator( v_ );
 }
@@ -801,7 +921,7 @@ inline typename DynamicVector<Type,TF>::Iterator DynamicVector<Type,TF>::begin()
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::begin() const
+inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::begin() const noexcept
 {
    return ConstIterator( v_ );
 }
@@ -815,7 +935,7 @@ inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::be
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::cbegin() const
+inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::cbegin() const noexcept
 {
    return ConstIterator( v_ );
 }
@@ -829,7 +949,7 @@ inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::cb
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::Iterator DynamicVector<Type,TF>::end()
+inline typename DynamicVector<Type,TF>::Iterator DynamicVector<Type,TF>::end() noexcept
 {
    return Iterator( v_ + size_ );
 }
@@ -843,7 +963,7 @@ inline typename DynamicVector<Type,TF>::Iterator DynamicVector<Type,TF>::end()
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::end() const
+inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::end() const noexcept
 {
    return ConstIterator( v_ + size_ );
 }
@@ -857,7 +977,7 @@ inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::en
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::cend() const
+inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::cend() const noexcept
 {
    return ConstIterator( v_ + size_ );
 }
@@ -873,40 +993,6 @@ inline typename DynamicVector<Type,TF>::ConstIterator DynamicVector<Type,TF>::ce
 //=================================================================================================
 
 //*************************************************************************************************
-/*!\brief Array assignment to all vector elements.
-//
-// \param array N-dimensional array for the assignment.
-// \return Reference to the assigned vector.
-//
-// This assignment operator offers the option to directly set all elements of the vector:
-
-   \code
-   const real_t init[4] = { 1, 2, 3 };
-   blaze::DynamicVector<real_t> v;
-   v = init;
-   \endcode
-
-// The vector is resized accoring to the size of the array and assigned the values from the given
-// array. Missing values are initialized with default values (as e.g. the fourth element in the
-// example).
-*/
-template< typename Type   // Data type of the vector
-        , bool TF >       // Transpose flag
-template< typename Other  // Data type of the initialization array
-        , size_t N >      // Dimension of the initialization array
-inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( const Other (&array)[N] )
-{
-   resize( N, false );
-
-   for( size_t i=0UL; i<N; ++i )
-      v_[i] = array[i];
-
-   return *this;
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
 /*!\brief Homogenous assignment to all vector elements.
 //
 // \param rhs Scalar value to be assigned to all vector elements.
@@ -918,6 +1004,68 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( const Type& rh
 {
    for( size_t i=0UL; i<size_; ++i )
       v_[i] = rhs;
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief List assignment to all vector elements.
+//
+// \param list The initializer list.
+//
+// This assignment operator offers the option to directly assign to all elements of the vector
+// by means of an initializer list:
+
+   \code
+   blaze::DynamicVector<double> v;
+   v = { 4.2, 6.3, -1.2 };
+   \endcode
+
+// The vector is resized according to the size of the initializer list and all its elements are
+// assigned the values from the given initializer list.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( initializer_list<Type> list )
+{
+   resize( list.size(), false );
+   std::copy( list.begin(), list.end(), v_ );
+
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Array assignment to all vector elements.
+//
+// \param array N-dimensional array for the assignment.
+// \return Reference to the assigned vector.
+//
+// This assignment operator offers the option to directly set all elements of the vector:
+
+   \code
+   const int init[4] = { 1, 2, 3 };
+   blaze::DynamicVector<int> v;
+   v = init;
+   \endcode
+
+// The vector is resized according to the size of the array and assigned the values from the given
+// array. Missing values are initialized with default values (as e.g. the fourth element in the
+// example).
+*/
+template< typename Type   // Data type of the vector
+        , bool TF >       // Transpose flag
+template< typename Other  // Data type of the initialization array
+        , size_t Dim >    // Dimension of the initialization array
+inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( const Other (&array)[Dim] )
+{
+   resize( Dim, false );
+
+   for( size_t i=0UL; i<Dim; ++i )
+      v_[i] = array[i];
+
    return *this;
 }
 //*************************************************************************************************
@@ -940,6 +1088,33 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( const DynamicV
 
    resize( rhs.size_, false );
    smpAssign( *this, ~rhs );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Move assignment operator for DynamicVector.
+//
+// \param rhs The vector to be moved into this instance.
+// \return Reference to the assigned vector.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( DynamicVector&& rhs ) noexcept
+{
+   deallocate( v_ );
+
+   size_     = rhs.size_;
+   capacity_ = rhs.capacity_;
+   v_        = rhs.v_;
+
+   rhs.size_     = 0UL;
+   rhs.capacity_ = 0UL;
+   rhs.v_        = nullptr;
 
    return *this;
 }
@@ -970,6 +1145,8 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator=( const Vector<V
       smpAssign( *this, ~rhs );
    }
 
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
    return *this;
 }
 //*************************************************************************************************
@@ -995,12 +1172,14 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator+=( const Vector<
    }
 
    if( (~rhs).canAlias( this ) ) {
-      typename VT::ResultType tmp( ~rhs );
+      const ResultType_<VT> tmp( ~rhs );
       smpAddAssign( *this, tmp );
    }
    else {
       smpAddAssign( *this, ~rhs );
    }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 
    return *this;
 }
@@ -1028,12 +1207,14 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator-=( const Vector<
    }
 
    if( (~rhs).canAlias( this ) ) {
-      typename VT::ResultType tmp( ~rhs );
+      const ResultType_<VT> tmp( ~rhs );
       smpSubAssign( *this, tmp );
    }
    else {
       smpSubAssign( *this, ~rhs );
    }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
 
    return *this;
 }
@@ -1068,6 +1249,83 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator*=( const Vector<
       smpMultAssign( *this, ~rhs );
    }
 
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Division assignment operator for the division of a dense vector (\f$ \vec{a}/=\vec{b} \f$).
+//
+// \param rhs The right-hand side dense vector divisor.
+// \return Reference to the vector.
+// \exception std::invalid_argument Vector sizes do not match.
+//
+// In case the current sizes of the two vectors don't match, a \a std::invalid_argument exception
+// is thrown.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+template< typename VT >  // Type of the right-hand side vector
+inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator/=( const DenseVector<VT,TF>& rhs )
+{
+   if( (~rhs).size() != size_ ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Vector sizes do not match" );
+   }
+
+   if( (~rhs).canAlias( this ) ) {
+      DynamicVector<Type,TF> tmp( *this / (~rhs) );
+      swap( tmp );
+   }
+   else {
+      smpDivAssign( *this, ~rhs );
+   }
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
+   return *this;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Cross product assignment operator for the multiplication of a vector
+//        (\f$ \vec{a}\times=\vec{b} \f$).
+//
+// \param rhs The right-hand side vector for the cross product.
+// \return Reference to the vector.
+// \exception std::invalid_argument Invalid vector size for cross product.
+//
+// In case the current size of any of the two vectors is not equal to 3, a \a std::invalid_argument
+// exception is thrown.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+template< typename VT >  // Type of the right-hand side vector
+inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator%=( const Vector<VT,TF>& rhs )
+{
+   using blaze::assign;
+
+   BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( VT, TF );
+   BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( ResultType_<VT> );
+
+   using CrossType = CrossTrait_< This, ResultType_<VT> >;
+
+   BLAZE_CONSTRAINT_MUST_BE_DENSE_VECTOR_TYPE( CrossType );
+   BLAZE_CONSTRAINT_MUST_BE_VECTOR_WITH_TRANSPOSE_FLAG( CrossType, TF );
+   BLAZE_CONSTRAINT_MUST_NOT_REQUIRE_EVALUATION( CrossType );
+
+   if( size_ != 3UL || (~rhs).size() != 3UL ) {
+      BLAZE_THROW_INVALID_ARGUMENT( "Invalid vector size for cross product" );
+   }
+
+   const CrossType tmp( *this % (~rhs) );
+   assign( *this, tmp );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
    return *this;
 }
 //*************************************************************************************************
@@ -1083,10 +1341,13 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::operator*=( const Vector<
 template< typename Type     // Data type of the vector
         , bool TF >         // Transpose flag
 template< typename Other >  // Data type of the right-hand side scalar
-inline typename EnableIf< IsNumeric<Other>, DynamicVector<Type,TF> >::Type&
+inline EnableIf_<IsNumeric<Other>, DynamicVector<Type,TF> >&
    DynamicVector<Type,TF>::operator*=( Other rhs )
 {
    smpAssign( *this, (*this) * rhs );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
    return *this;
 }
 //*************************************************************************************************
@@ -1099,17 +1360,20 @@ inline typename EnableIf< IsNumeric<Other>, DynamicVector<Type,TF> >::Type&
 // \param rhs The right-hand side scalar value for the division.
 // \return Reference to the vector.
 //
-// \note: A division by zero is only checked by an user assert.
+// \note A division by zero is only checked by an user assert.
 */
 template< typename Type     // Data type of the vector
         , bool TF >         // Transpose flag
 template< typename Other >  // Data type of the right-hand side scalar
-inline typename EnableIf< IsNumeric<Other>, DynamicVector<Type,TF> >::Type&
+inline EnableIf_<IsNumeric<Other>, DynamicVector<Type,TF> >&
    DynamicVector<Type,TF>::operator/=( Other rhs )
 {
    BLAZE_USER_ASSERT( rhs != Other(0), "Division by zero detected" );
 
    smpAssign( *this, (*this) / rhs );
+
+   BLAZE_INTERNAL_ASSERT( isIntact(), "Invariant violation detected" );
+
    return *this;
 }
 //*************************************************************************************************
@@ -1130,7 +1394,7 @@ inline typename EnableIf< IsNumeric<Other>, DynamicVector<Type,TF> >::Type&
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline size_t DynamicVector<Type,TF>::size() const
+inline size_t DynamicVector<Type,TF>::size() const noexcept
 {
    return size_;
 }
@@ -1138,13 +1402,30 @@ inline size_t DynamicVector<Type,TF>::size() const
 
 
 //*************************************************************************************************
-/*!\brief Returns the maximum capacity of the vector.
+/*!\brief Returns the minimum capacity of the vector.
 //
-// \return The capacity of the vector.
+// \return The minimum capacity of the vector.
+//
+// This function returns the minimum capacity of the vector, which corresponds to the current
+// size plus padding.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline size_t DynamicVector<Type,TF>::capacity() const
+inline size_t DynamicVector<Type,TF>::spacing() const noexcept
+{
+   return addPadding( size_ );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Returns the maximum capacity of the vector.
+//
+// \return The maximum capacity of the vector.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline size_t DynamicVector<Type,TF>::capacity() const noexcept
 {
    return capacity_;
 }
@@ -1243,12 +1524,12 @@ inline void DynamicVector<Type,TF>::resize( size_t n, bool preserve )
    if( n > capacity_ )
    {
       // Allocating a new array
-      const size_t newCapacity( adjustCapacity( n ) );
+      const size_t newCapacity( addPadding( n ) );
       Type* BLAZE_RESTRICT tmp = allocate<Type>( newCapacity );
 
       // Initializing the new array
       if( preserve ) {
-         std::copy( v_, v_+size_, tmp );
+         transfer( v_, v_+size_, tmp );
       }
 
       if( IsVectorizable<Type>::value ) {
@@ -1309,11 +1590,11 @@ inline void DynamicVector<Type,TF>::reserve( size_t n )
    if( n > capacity_ )
    {
       // Allocating a new array
-      const size_t newCapacity( adjustCapacity( n ) );
+      const size_t newCapacity( addPadding( n ) );
       Type* BLAZE_RESTRICT tmp = allocate<Type>( newCapacity );
 
       // Initializing the new array
-      std::copy( v_, v_+size_, tmp );
+      transfer( v_, v_+size_, tmp );
 
       if( IsVectorizable<Type>::value ) {
          for( size_t i=size_; i<newCapacity; ++i )
@@ -1330,10 +1611,87 @@ inline void DynamicVector<Type,TF>::reserve( size_t n )
 
 
 //*************************************************************************************************
+/*!\brief Requesting the removal of unused capacity.
+//
+// \return void
+//
+// This function minimizes the capacity of the vector by removing unused capacity. Please note
+// that due to padding the capacity might not be reduced exactly to size(). Please also note
+// that in case a reallocation occurs, all iterators (including end() iterators), all pointers
+// and references to elements of this vector are invalidated.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline void DynamicVector<Type,TF>::shrinkToFit()
+{
+   if( spacing() < capacity_ ) {
+      DynamicVector( *this ).swap( *this );
+   }
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Swapping the contents of two vectors.
+//
+// \param v The vector to be swapped.
+// \return void
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline void DynamicVector<Type,TF>::swap( DynamicVector& v ) noexcept
+{
+   std::swap( size_, v.size_ );
+   std::swap( capacity_, v.capacity_ );
+   std::swap( v_, v.v_ );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Add the necessary amount of padding to the given value.
+//
+// \param value The value to be padded.
+// \return The padded value.
+//
+// This function increments the given \a value by the necessary amount of padding based on the
+// vector's data type \a Type.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+inline size_t DynamicVector<Type,TF>::addPadding( size_t value ) const noexcept
+{
+   if( usePadding && IsVectorizable<Type>::value )
+      return nextMultiple<size_t>( value, SIMDSIZE );
+   else return value;
+}
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  NUMERIC FUNCTIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
 /*!\brief Scaling of the vector by the scalar value \a scalar (\f$ \vec{a}=\vec{b}*s \f$).
 //
 // \param scalar The scalar value for the vector scaling.
 // \return Reference to the vector.
+//
+// This function scales the vector by applying the given scalar value \a scalar to each element
+// of the vector. For built-in and \c complex data types it has the same effect as using the
+// multiplication assignment operator:
+
+   \code
+   blaze::DynamicVector<int> a;
+   // ... Initialization
+   a *= 4;        // Scaling of the vector
+   a.scale( 4 );  // Same effect as above
+   \endcode
 */
 template< typename Type     // Data type of the vector
         , bool TF >         // Transpose flag
@@ -1347,37 +1705,38 @@ inline DynamicVector<Type,TF>& DynamicVector<Type,TF>::scale( const Other& scala
 //*************************************************************************************************
 
 
-//*************************************************************************************************
-/*!\brief Swapping the contents of two vectors.
+
+
+//=================================================================================================
 //
-// \param v The vector to be swapped.
-// \return void
-// \exception no-throw guarantee.
+//  DEBUGGING FUNCTIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*!\brief Returns whether the invariants of the dynamic vector are intact.
+//
+// \return \a true in case the dynamic vector's invariants are intact, \a false otherwise.
+//
+// This function checks whether the invariants of the dynamic vector are intact, i.e. if its
+// state is valid. In case the invariants are intact, the function returns \a true, else it
+// will return \a false.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline void DynamicVector<Type,TF>::swap( DynamicVector& v ) /* throw() */
+inline bool DynamicVector<Type,TF>::isIntact() const noexcept
 {
-   std::swap( size_, v.size_ );
-   std::swap( capacity_, v.capacity_ );
-   std::swap( v_, v.v_ );
-}
-//*************************************************************************************************
+   if( size_ > capacity_ )
+      return false;
 
+   if( IsNumeric<Type>::value ) {
+      for( size_t i=size_; i<capacity_; ++i ) {
+         if( v_[i] != Type() )
+            return false;
+      }
+   }
 
-//*************************************************************************************************
-/*!\brief Adjusting the new capacity of the vector according to its data type \a Type.
-//
-// \param minCapacity The minimum necessary capacity.
-// \return The new capacity.
-*/
-template< typename Type  // Data type of the vector
-        , bool TF >      // Transpose flag
-inline size_t DynamicVector<Type,TF>::adjustCapacity( size_t minCapacity ) const
-{
-   if( usePadding && IsVectorizable<Type>::value )
-      return nextMultiple<size_t>( minCapacity, IT::size );
-   else return minCapacity;
+   return true;
 }
 //*************************************************************************************************
 
@@ -1403,7 +1762,7 @@ inline size_t DynamicVector<Type,TF>::adjustCapacity( size_t minCapacity ) const
 template< typename Type     // Data type of the vector
         , bool TF >         // Transpose flag
 template< typename Other >  // Data type of the foreign expression
-inline bool DynamicVector<Type,TF>::canAlias( const Other* alias ) const
+inline bool DynamicVector<Type,TF>::canAlias( const Other* alias ) const noexcept
 {
    return static_cast<const void*>( this ) == static_cast<const void*>( alias );
 }
@@ -1423,7 +1782,7 @@ inline bool DynamicVector<Type,TF>::canAlias( const Other* alias ) const
 template< typename Type     // Data type of the vector
         , bool TF >         // Transpose flag
 template< typename Other >  // Data type of the foreign expression
-inline bool DynamicVector<Type,TF>::isAliased( const Other* alias ) const
+inline bool DynamicVector<Type,TF>::isAliased( const Other* alias ) const noexcept
 {
    return static_cast<const void*>( this ) == static_cast<const void*>( alias );
 }
@@ -1441,7 +1800,7 @@ inline bool DynamicVector<Type,TF>::isAliased( const Other* alias ) const
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline bool DynamicVector<Type,TF>::isAligned() const
+inline bool DynamicVector<Type,TF>::isAligned() const noexcept
 {
    return true;
 }
@@ -1460,7 +1819,7 @@ inline bool DynamicVector<Type,TF>::isAligned() const
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline bool DynamicVector<Type,TF>::canSMPAssign() const
+inline bool DynamicVector<Type,TF>::canSMPAssign() const noexcept
 {
    return ( size() > SMP_DVECASSIGN_THRESHOLD );
 }
@@ -1468,22 +1827,21 @@ inline bool DynamicVector<Type,TF>::canSMPAssign() const
 
 
 //*************************************************************************************************
-/*!\brief Load of an intrinsic element of the vector.
+/*!\brief Load of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \return The loaded intrinsic element.
+// \return The loaded SIMD element.
 //
-// This function performs a load of a specific intrinsic element of the dense vector. The
-// index must be smaller than the number of vector elements and it must be a multiple of
-// the number of values inside the intrinsic element. This function must \b NOT be called
-// explicitly! It is used internally for the performance optimized evaluation of expression
-// templates. Calling this function explicitly might result in erroneous results and/or in
-// compilation errors.
+// This function performs a load of a specific SIMD element of the dense vector. The index
+// must be smaller than the number of vector elements and it must be a multiple of the number
+// of values inside the SIMD element. This function must \b NOT be called explicitly! It is
+// used internally for the performance optimized evaluation of expression templates. Calling
+// this function explicitly might result in erroneous results and/or in compilation errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::IntrinsicType
-   DynamicVector<Type,TF>::load( size_t index ) const
+BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::SIMDType
+   DynamicVector<Type,TF>::load( size_t index ) const noexcept
 {
    return loada( index );
 }
@@ -1491,30 +1849,30 @@ BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::IntrinsicType
 
 
 //*************************************************************************************************
-/*!\brief Aligned load of an intrinsic element of the vector.
+/*!\brief Aligned load of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \return The loaded intrinsic element.
+// \return The loaded SIMD element.
 //
-// This function performs an aligned load of a specific intrinsic element of the dense vector.
-// The index must be smaller than the number of vector elements and it must be a multiple of
-// the number of values inside the intrinsic element. This function must \b NOT be called
-// explicitly! It is used internally for the performance optimized evaluation of expression
-// templates. Calling this function explicitly might result in erroneous results and/or in
-// compilation errors.
+// This function performs an aligned load of a specific SIMD element of the dense vector. The
+// index must be smaller than the number of vector elements and it must be a multiple of the
+// number of values inside the SIMD element. This function must \b NOT be called explicitly!
+// It is used internally for the performance optimized evaluation of expression templates.
+// Calling this function explicitly might result in erroneous results and/or in compilation
+// errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::IntrinsicType
-   DynamicVector<Type,TF>::loada( size_t index ) const
+BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::SIMDType
+   DynamicVector<Type,TF>::loada( size_t index ) const noexcept
 {
    using blaze::loada;
 
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( index < size_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index + IT::size <= capacity_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index % IT::size == 0UL, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index + SIMDSIZE <= capacity_, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index % SIMDSIZE == 0UL, "Invalid vector access index" );
    BLAZE_INTERNAL_ASSERT( checkAlignment( v_+index ), "Invalid alignment detected" );
 
    return loada( v_+index );
@@ -1523,29 +1881,29 @@ BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::IntrinsicType
 
 
 //*************************************************************************************************
-/*!\brief Unaligned load of an intrinsic element of the vector.
+/*!\brief Unaligned load of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \return The loaded intrinsic element.
+// \return The loaded SIMD element.
 //
-// This function performs an unaligned load of a specific intrinsic element of the dense vector.
-// The index must be smaller than the number of vector elements and it must be a multiple of
-// the number of values inside the intrinsic element. This function must \b NOT be called
-// explicitly! It is used internally for the performance optimized evaluation of expression
-// templates. Calling this function explicitly might result in erroneous results and/or in
-// compilation errors.
+// This function performs an unaligned load of a specific SIMD element of the dense vector. The
+// index must be smaller than the number of vector elements and it must be a multiple of the
+// number of values inside the SIMD element. This function must \b NOT be called explicitly!
+// It is used internally for the performance optimized evaluation of expression templates.
+// Calling this function explicitly might result in erroneous results and/or in compilation
+// errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::IntrinsicType
-   DynamicVector<Type,TF>::loadu( size_t index ) const
+BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::SIMDType
+   DynamicVector<Type,TF>::loadu( size_t index ) const noexcept
 {
    using blaze::loadu;
 
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( index < size_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index + IT::size <= capacity_, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index + SIMDSIZE <= capacity_, "Invalid vector access index" );
 
    return loadu( v_+index );
 }
@@ -1553,22 +1911,22 @@ BLAZE_ALWAYS_INLINE typename DynamicVector<Type,TF>::IntrinsicType
 
 
 //*************************************************************************************************
-/*!\brief Store of an intrinsic element of the vector.
+/*!\brief Store of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \param value The intrinsic element to be stored.
+// \param value The SIMD element to be stored.
 // \return void
 //
-// This function performs a store of a specific intrinsic element of the dense vector. The
-// index must be smaller than the number of vector elements and it must be a multiple of
-// the number of values inside the intrinsic element. This function must \b NOT be called
-// explicitly! It is used internally for the performance optimized evaluation of expression
-// templates. Calling this function explicitly might result in erroneous results and/or in
-// compilation errors.
+// This function performs a store of a specific SIMD element of the dense vector. The index
+// must be smaller than the number of vector elements and it must be a multiple of the number
+// of values inside the SIMD element. This function must \b NOT be called explicitly! It is
+// used internally for the performance optimized evaluation of expression templates. Calling
+// this function explicitly might result in erroneous results and/or in compilation errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::store( size_t index, const IntrinsicType& value )
+BLAZE_ALWAYS_INLINE void
+   DynamicVector<Type,TF>::store( size_t index, const SIMDType& value ) noexcept
 {
    storea( index, value );
 }
@@ -1576,30 +1934,30 @@ BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::store( size_t index, const Intr
 
 
 //*************************************************************************************************
-/*!\brief Aligned store of an intrinsic element of the vector.
+/*!\brief Aligned store of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \param value The intrinsic element to be stored.
+// \param value The SIMD element to be stored.
 // \return void
 //
-// This function performs an aligned store of a specific intrinsic element of the dense vector.
-// The index must be smaller than the number of vector elements and it must be a multiple of
-// the number of values inside the intrinsic element. This function must \b NOT be called
-// explicitly! It is used internally for the performance optimized evaluation of expression
-// templates. Calling this function explicitly might result in erroneous results and/or in
-// compilation errors.
+// This function performs an aligned store of a specific SIMD element of the dense vector. The
+// index must be smaller than the number of vector elements and it must be a multiple of the
+// number of values inside the SIMD element. This function must \b NOT be called explicitly! It
+// is used internally for the performance optimized evaluation of expression templates. Calling
+// this function explicitly might result in erroneous results and/or in compilation errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::storea( size_t index, const IntrinsicType& value )
+BLAZE_ALWAYS_INLINE void
+   DynamicVector<Type,TF>::storea( size_t index, const SIMDType& value ) noexcept
 {
    using blaze::storea;
 
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( index < size_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index + IT::size <= capacity_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index % IT::size == 0UL, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index + SIMDSIZE <= capacity_, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index % SIMDSIZE == 0UL, "Invalid vector access index" );
    BLAZE_INTERNAL_ASSERT( checkAlignment( v_+index ), "Invalid alignment detected" );
 
    storea( v_+index, value );
@@ -1608,29 +1966,29 @@ BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::storea( size_t index, const Int
 
 
 //*************************************************************************************************
-/*!\brief Unaligned store of an intrinsic element of the dense vector.
+/*!\brief Unaligned store of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \param value The intrinsic element to be stored.
+// \param value The SIMD element to be stored.
 // \return void
 //
-// This function performs an unaligned store of a specific intrinsic element of the dense vector.
+// This function performs an unaligned store of a specific SIMD element of the dense vector.
 // The index must be smaller than the number of vector elements and it must be a multiple of the
-// number of values inside the intrinsic element. This function must \b NOT be called explicitly!
-// It is used internally for the performance optimized evaluation of expression templates.
-// Calling this function explicitly might result in erroneous results and/or in compilation
-// errors.
+// number of values inside the SIMD element. This function must \b NOT be called explicitly! It
+// is used internally for the performance optimized evaluation of expression templates. Calling
+// this function explicitly might result in erroneous results and/or in compilation errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::storeu( size_t index, const IntrinsicType& value )
+BLAZE_ALWAYS_INLINE void
+   DynamicVector<Type,TF>::storeu( size_t index, const SIMDType& value ) noexcept
 {
    using blaze::storeu;
 
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( index < size_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index + IT::size <= capacity_, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index + SIMDSIZE <= capacity_, "Invalid vector access index" );
 
    storeu( v_+index, value );
 }
@@ -1638,30 +1996,31 @@ BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::storeu( size_t index, const Int
 
 
 //*************************************************************************************************
-/*!\brief Aligned, non-temporal store of an intrinsic element of the dense vector.
+/*!\brief Aligned, non-temporal store of a SIMD element of the vector.
 //
 // \param index Access index. The index must be smaller than the number of vector elements.
-// \param value The intrinsic element to be stored.
+// \param value The SIMD element to be stored.
 // \return void
 //
-// This function performs an aligned, non-temporal store of a specific intrinsic element of
-// the dense vector. The index must be smaller than the number of vector elements and it must
-// be a multiple of the number of values inside the intrinsic element. This function must
-// \b NOT be called explicitly! It is used internally for the performance optimized evaluation
-// of expression templates. Calling this function explicitly might result in erroneous results
+// This function performs an aligned, non-temporal store of a specific SIMD element of the
+// dense vector. The index must be smaller than the number of vector elements and it must be
+// a multiple of the number of values inside the SIMD element. This function must \b NOT be
+// called explicitly! It is used internally for the performance optimized evaluation of
+// expression templates. Calling this function explicitly might result in erroneous results
 // and/or in compilation errors.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::stream( size_t index, const IntrinsicType& value )
+BLAZE_ALWAYS_INLINE void
+   DynamicVector<Type,TF>::stream( size_t index, const SIMDType& value ) noexcept
 {
    using blaze::stream;
 
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( index < size_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index + IT::size <= capacity_, "Invalid vector access index" );
-   BLAZE_INTERNAL_ASSERT( index % IT::size == 0UL, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index + SIMDSIZE <= capacity_, "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( index % SIMDSIZE == 0UL, "Invalid vector access index" );
    BLAZE_INTERNAL_ASSERT( checkAlignment( v_+index ), "Invalid alignment detected" );
 
    stream( v_+index, value );
@@ -1683,7 +2042,7 @@ BLAZE_ALWAYS_INLINE void DynamicVector<Type,TF>::stream( size_t index, const Int
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAssign<VT> >::Type
+inline DisableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAssign<VT> >
    DynamicVector<Type,TF>::assign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
@@ -1702,7 +2061,7 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 
 
 //*************************************************************************************************
-/*!\brief Intrinsic optimized implementation of the assignment of a dense vector.
+/*!\brief SIMD optimized implementation of the assignment of a dense vector.
 //
 // \param rhs The right-hand side dense vector to be assigned.
 // \return void
@@ -1715,45 +2074,44 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename EnableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAssign<VT> >::Type
+inline EnableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAssign<VT> >
    DynamicVector<Type,TF>::assign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   const bool remainder( !usePadding || !IsPadded<VT>::value );
+   constexpr bool remainder( !usePadding || !IsPadded<VT>::value );
 
-   const size_t ipos( ( remainder )?( size_ & size_t(-IT::size) ):( size_ ) );
-   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (IT::size) ) ) == ipos, "Invalid end calculation" );
+   const size_t ipos( ( remainder )?( size_ & size_t(-SIMDSIZE) ):( size_ ) );
+   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (SIMDSIZE) ) ) == ipos, "Invalid end calculation" );
+
+   size_t i=0UL;
+   Iterator left( begin() );
+   ConstIterator_<VT> right( (~rhs).begin() );
 
    if( useStreaming && size_ > ( cacheSize/( sizeof(Type) * 3UL ) ) && !(~rhs).isAliased( this ) )
    {
-      size_t i=0UL;
-
-      for( ; i<ipos; i+=IT::size ) {
-         stream( i, (~rhs).load(i) );
+      for( ; i<ipos; i+=SIMDSIZE ) {
+         left.stream( right.load() ); left += SIMDSIZE; right += SIMDSIZE;
       }
       for( ; remainder && i<size_; ++i ) {
-         v_[i] = (~rhs)[i];
+         *left = *right; ++left; ++right;
       }
    }
    else
    {
-      size_t i( 0UL );
-      typename VT::ConstIterator it( (~rhs).begin() );
-
-      for( ; (i+IT::size*3UL) < ipos; i+=IT::size*4UL ) {
-         store( i             , it.load() ); it += IT::size;
-         store( i+IT::size    , it.load() ); it += IT::size;
-         store( i+IT::size*2UL, it.load() ); it += IT::size;
-         store( i+IT::size*3UL, it.load() ); it += IT::size;
+      for( ; (i+SIMDSIZE*3UL) < ipos; i+=SIMDSIZE*4UL ) {
+         left.store( right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+         left.store( right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+         left.store( right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+         left.store( right.load() ); left += SIMDSIZE; right += SIMDSIZE;
       }
-      for( ; i<ipos; i+=IT::size, it+=IT::size ) {
-         store( i, it.load() );
+      for( ; i<ipos; i+=SIMDSIZE ) {
+         left.store( right.load() ); left += SIMDSIZE; right += SIMDSIZE;
       }
-      for( ; remainder && i<size_; ++i, ++it ) {
-         v_[i] = *it;
+      for( ; remainder && i<size_; ++i ) {
+         *left = *right; ++left; ++right;
       }
    }
 }
@@ -1778,7 +2136,7 @@ inline void DynamicVector<Type,TF>::assign( const SparseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   for( typename VT::ConstIterator element=(~rhs).begin(); element!=(~rhs).end(); ++element )
+   for( ConstIterator_<VT> element=(~rhs).begin(); element!=(~rhs).end(); ++element )
       v_[element->index()] = element->value();
 }
 //*************************************************************************************************
@@ -1798,7 +2156,7 @@ inline void DynamicVector<Type,TF>::assign( const SparseVector<VT,TF>& rhs )
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAddAssign<VT> >::Type
+inline DisableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAddAssign<VT> >
    DynamicVector<Type,TF>::addAssign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
@@ -1817,7 +2175,7 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 
 
 //*************************************************************************************************
-/*!\brief Intrinsic optimized implementation of the addition assignment of a dense vector.
+/*!\brief SIMD optimized implementation of the addition assignment of a dense vector.
 //
 // \param rhs The right-hand side dense vector to be added.
 // \return void
@@ -1830,32 +2188,33 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename EnableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAddAssign<VT> >::Type
+inline EnableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedAddAssign<VT> >
    DynamicVector<Type,TF>::addAssign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   const bool remainder( !usePadding || !IsPadded<VT>::value );
+   constexpr bool remainder( !usePadding || !IsPadded<VT>::value );
 
-   const size_t ipos( ( remainder )?( size_ & size_t(-IT::size) ):( size_ ) );
-   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (IT::size) ) ) == ipos, "Invalid end calculation" );
+   const size_t ipos( ( remainder )?( size_ & size_t(-SIMDSIZE) ):( size_ ) );
+   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (SIMDSIZE) ) ) == ipos, "Invalid end calculation" );
 
    size_t i( 0UL );
-   typename VT::ConstIterator it( (~rhs).begin() );
+   Iterator left( begin() );
+   ConstIterator_<VT> right( (~rhs).begin() );
 
-   for( ; (i+IT::size*3UL) < ipos; i+=IT::size*4UL ) {
-      store( i             , load(i             ) + it.load() ); it += IT::size;
-      store( i+IT::size    , load(i+IT::size    ) + it.load() ); it += IT::size;
-      store( i+IT::size*2UL, load(i+IT::size*2UL) + it.load() ); it += IT::size;
-      store( i+IT::size*3UL, load(i+IT::size*3UL) + it.load() ); it += IT::size;
+   for( ; (i+SIMDSIZE*3UL) < ipos; i+=SIMDSIZE*4UL ) {
+      left.store( left.load() + right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() + right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() + right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() + right.load() ); left += SIMDSIZE; right += SIMDSIZE;
    }
-   for( ; i<ipos; i+=IT::size, it+=IT::size ) {
-      store( i, load(i) + it.load() );
+   for( ; i<ipos; i+=SIMDSIZE ) {
+      left.store( left.load() + right.load() ); left += SIMDSIZE; right += SIMDSIZE;
    }
-   for( ; remainder && i<size_; ++i, ++it ) {
-      v_[i] += *it;
+   for( ; remainder && i<size_; ++i ) {
+      *left += *right; ++left; ++right;
    }
 }
 //*************************************************************************************************
@@ -1879,7 +2238,7 @@ inline void DynamicVector<Type,TF>::addAssign( const SparseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   for( typename VT::ConstIterator element=(~rhs).begin(); element!=(~rhs).end(); ++element )
+   for( ConstIterator_<VT> element=(~rhs).begin(); element!=(~rhs).end(); ++element )
       v_[element->index()] += element->value();
 }
 //*************************************************************************************************
@@ -1899,7 +2258,7 @@ inline void DynamicVector<Type,TF>::addAssign( const SparseVector<VT,TF>& rhs )
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedSubAssign<VT> >::Type
+inline DisableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedSubAssign<VT> >
    DynamicVector<Type,TF>::subAssign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
@@ -1918,7 +2277,7 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 
 
 //*************************************************************************************************
-/*!\brief Intrinsic optimized implementation of the subtraction assignment of a dense vector.
+/*!\brief SIMD optimized implementation of the subtraction assignment of a dense vector.
 //
 // \param rhs The right-hand side dense vector to be subtracted.
 // \return void
@@ -1931,32 +2290,33 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename EnableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedSubAssign<VT> >::Type
+inline EnableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedSubAssign<VT> >
    DynamicVector<Type,TF>::subAssign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   const bool remainder( !usePadding || !IsPadded<VT>::value );
+   constexpr bool remainder( !usePadding || !IsPadded<VT>::value );
 
-   const size_t ipos( ( remainder )?( size_ & size_t(-IT::size) ):( size_ ) );
-   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (IT::size) ) ) == ipos, "Invalid end calculation" );
+   const size_t ipos( ( remainder )?( size_ & size_t(-SIMDSIZE) ):( size_ ) );
+   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (SIMDSIZE) ) ) == ipos, "Invalid end calculation" );
 
    size_t i( 0UL );
-   typename VT::ConstIterator it( (~rhs).begin() );
+   Iterator left( begin() );
+   ConstIterator_<VT> right( (~rhs).begin() );
 
-   for( ; (i+IT::size*3UL) < ipos; i+=IT::size*4UL ) {
-      store( i             , load(i             ) - it.load() ); it += IT::size;
-      store( i+IT::size    , load(i+IT::size    ) - it.load() ); it += IT::size;
-      store( i+IT::size*2UL, load(i+IT::size*2UL) - it.load() ); it += IT::size;
-      store( i+IT::size*3UL, load(i+IT::size*3UL) - it.load() ); it += IT::size;
+   for( ; (i+SIMDSIZE*3UL) < ipos; i+=SIMDSIZE*4UL ) {
+      left.store( left.load() - right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() - right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() - right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() - right.load() ); left += SIMDSIZE; right += SIMDSIZE;
    }
-   for( ; i<ipos; i+=IT::size, it+=IT::size ) {
-      store( i, load(i) - it.load() );
+   for( ; i<ipos; i+=SIMDSIZE ) {
+      left.store( left.load() - right.load() ); left += SIMDSIZE; right += SIMDSIZE;
    }
-   for( ; remainder && i<size_; ++i, ++it ) {
-      v_[i] -= *it;
+   for( ; remainder && i<size_; ++i ) {
+      *left -= *right; ++left; ++right;
    }
 }
 //*************************************************************************************************
@@ -1980,7 +2340,7 @@ inline void DynamicVector<Type,TF>::subAssign( const SparseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   for( typename VT::ConstIterator element=(~rhs).begin(); element!=(~rhs).end(); ++element )
+   for( ConstIterator_<VT> element=(~rhs).begin(); element!=(~rhs).end(); ++element )
       v_[element->index()] -= element->value();
 }
 //*************************************************************************************************
@@ -2000,7 +2360,7 @@ inline void DynamicVector<Type,TF>::subAssign( const SparseVector<VT,TF>& rhs )
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedMultAssign<VT> >::Type
+inline DisableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedMultAssign<VT> >
    DynamicVector<Type,TF>::multAssign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
@@ -2019,7 +2379,7 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 
 
 //*************************************************************************************************
-/*!\brief Intrinsic optimized implementation of the multiplication assignment of a dense vector.
+/*!\brief SIMD optimized implementation of the multiplication assignment of a dense vector.
 //
 // \param rhs The right-hand side dense vector to be multiplied.
 // \return void
@@ -2032,32 +2392,33 @@ inline typename DisableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE Vecto
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 template< typename VT >  // Type of the right-hand side dense vector
-inline typename EnableIf< typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedMultAssign<VT> >::Type
+inline EnableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedMultAssign<VT> >
    DynamicVector<Type,TF>::multAssign( const DenseVector<VT,TF>& rhs )
 {
    BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
 
    BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
 
-   const bool remainder( !usePadding || !IsPadded<VT>::value );
+   constexpr bool remainder( !usePadding || !IsPadded<VT>::value );
 
-   const size_t ipos( ( remainder )?( size_ & size_t(-IT::size) ):( size_ ) );
-   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (IT::size) ) ) == ipos, "Invalid end calculation" );
+   const size_t ipos( ( remainder )?( size_ & size_t(-SIMDSIZE) ):( size_ ) );
+   BLAZE_INTERNAL_ASSERT( !remainder || ( size_ - ( size_ % (SIMDSIZE) ) ) == ipos, "Invalid end calculation" );
 
    size_t i( 0UL );
-   typename VT::ConstIterator it( (~rhs).begin() );
+   Iterator left( begin() );
+   ConstIterator_<VT> right( (~rhs).begin() );
 
-   for( ; (i+IT::size*3UL) < ipos; i+=IT::size*4UL ) {
-      store( i             , load(i             ) * it.load() ); it += IT::size;
-      store( i+IT::size    , load(i+IT::size    ) * it.load() ); it += IT::size;
-      store( i+IT::size*2UL, load(i+IT::size*2UL) * it.load() ); it += IT::size;
-      store( i+IT::size*3UL, load(i+IT::size*3UL) * it.load() ); it += IT::size;
+   for( ; (i+SIMDSIZE*3UL) < ipos; i+=SIMDSIZE*4UL ) {
+      left.store( left.load() * right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() * right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() * right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() * right.load() ); left += SIMDSIZE; right += SIMDSIZE;
    }
-   for( ; i<ipos; i+=IT::size, it+=IT::size ) {
-      store( i, load(i) * it.load() );
+   for( ; i<ipos; i+=SIMDSIZE ) {
+      left.store( left.load() * right.load() ); left += SIMDSIZE; right += SIMDSIZE;
    }
-   for( ; remainder && i<size_; ++i, ++it ) {
-      v_[i] *= *it;
+   for( ; remainder && i<size_; ++i ) {
+      *left *= *right; ++left; ++right;
    }
 }
 //*************************************************************************************************
@@ -2085,8 +2446,84 @@ inline void DynamicVector<Type,TF>::multAssign( const SparseVector<VT,TF>& rhs )
 
    reset();
 
-   for( typename VT::ConstIterator element=(~rhs).begin(); element!=(~rhs).end(); ++element )
+   for( ConstIterator_<VT> element=(~rhs).begin(); element!=(~rhs).end(); ++element )
       v_[element->index()] = tmp[element->index()] * element->value();
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Default implementation of the division assignment of a dense vector.
+//
+// \param rhs The right-hand side dense vector divisior.
+// \return void
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+template< typename VT >  // Type of the right-hand side dense vector
+inline DisableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedDivAssign<VT> >
+   DynamicVector<Type,TF>::divAssign( const DenseVector<VT,TF>& rhs )
+{
+   BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
+
+   const size_t ipos( size_ & size_t(-2) );
+   BLAZE_INTERNAL_ASSERT( ( size_ - ( size_ % 2UL ) ) == ipos, "Invalid end calculation" );
+
+   for( size_t i=0UL; i<ipos; i+=2UL ) {
+      v_[i    ] /= (~rhs)[i    ];
+      v_[i+1UL] /= (~rhs)[i+1UL];
+   }
+   if( ipos < (~rhs).size() )
+      v_[ipos] /= (~rhs)[ipos];
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief SIMD optimized implementation of the division assignment of a dense vector.
+//
+// \param rhs The right-hand side dense vector divisor.
+// \return void
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename Type  // Data type of the vector
+        , bool TF >      // Transpose flag
+template< typename VT >  // Type of the right-hand side dense vector
+inline EnableIf_<typename DynamicVector<Type,TF>::BLAZE_TEMPLATE VectorizedDivAssign<VT> >
+   DynamicVector<Type,TF>::divAssign( const DenseVector<VT,TF>& rhs )
+{
+   BLAZE_CONSTRAINT_MUST_BE_VECTORIZABLE_TYPE( Type );
+
+   BLAZE_INTERNAL_ASSERT( size_ == (~rhs).size(), "Invalid vector sizes" );
+
+   const size_t ipos( size_ & size_t(-SIMDSIZE) );
+   BLAZE_INTERNAL_ASSERT( ( size_ - ( size_ % (SIMDSIZE) ) ) == ipos, "Invalid end calculation" );
+
+   size_t i( 0UL );
+   Iterator left( begin() );
+   ConstIterator_<VT> right( (~rhs).begin() );
+
+   for( ; (i+SIMDSIZE*3UL) < ipos; i+=SIMDSIZE*4UL ) {
+      left.store( left.load() / right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() / right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() / right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+      left.store( left.load() / right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+   }
+   for( ; i<ipos; i+=SIMDSIZE ) {
+      left.store( left.load() / right.load() ); left += SIMDSIZE; right += SIMDSIZE;
+   }
+   for( ; i<size_; ++i ) {
+      *left /= *right; ++left; ++right;
+   }
 }
 //*************************************************************************************************
 
@@ -2108,17 +2545,14 @@ inline void reset( DynamicVector<Type,TF>& v );
 template< typename Type, bool TF >
 inline void clear( DynamicVector<Type,TF>& v );
 
-template< typename Type, bool TF >
+template< bool RF, typename Type, bool TF >
 inline bool isDefault( const DynamicVector<Type,TF>& v );
 
 template< typename Type, bool TF >
-inline bool isIntact( const DynamicVector<Type,TF>& v );
+inline bool isIntact( const DynamicVector<Type,TF>& v ) noexcept;
 
 template< typename Type, bool TF >
-inline void swap( DynamicVector<Type,TF>& a, DynamicVector<Type,TF>& b ) /* throw() */;
-
-template< typename Type, bool TF >
-inline void move( DynamicVector<Type,TF>& dst, DynamicVector<Type,TF>& src ) /* throw() */;
+inline void swap( DynamicVector<Type,TF>& a, DynamicVector<Type,TF>& b ) noexcept;
 //@}
 //*************************************************************************************************
 
@@ -2171,8 +2605,16 @@ inline void clear( DynamicVector<Type,TF>& v )
    // ... Resizing and initialization
    if( isDefault( a ) ) { ... }
    \endcode
+
+// Optionally, it is possible to switch between strict semantics (blaze::strict) and relaxed
+// semantics (blaze::relaxed):
+
+   \code
+   if( isDefault<relaxed>( a ) ) { ... }
+   \endcode
 */
-template< typename Type  // Data type of the vector
+template< bool RF        // Relaxation flag
+        , typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
 inline bool isDefault( const DynamicVector<Type,TF>& v )
 {
@@ -2201,9 +2643,9 @@ inline bool isDefault( const DynamicVector<Type,TF>& v )
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline bool isIntact( const DynamicVector<Type,TF>& v )
+inline bool isIntact( const DynamicVector<Type,TF>& v ) noexcept
 {
-   return ( v.size() <= v.capacity() );
+   return v.isIntact();
 }
 //*************************************************************************************************
 
@@ -2215,31 +2657,12 @@ inline bool isIntact( const DynamicVector<Type,TF>& v )
 // \param a The first vector to be swapped.
 // \param b The second vector to be swapped.
 // \return void
-// \exception no-throw guarantee.
 */
 template< typename Type  // Data type of the vector
         , bool TF >      // Transpose flag
-inline void swap( DynamicVector<Type,TF>& a, DynamicVector<Type,TF>& b ) /* throw() */
+inline void swap( DynamicVector<Type,TF>& a, DynamicVector<Type,TF>& b ) noexcept
 {
    a.swap( b );
-}
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*!\brief Moving the contents of one dynamic vector to another.
-// \ingroup dynamic_vector
-//
-// \param dst The destination vector.
-// \param src The source vector.
-// \return void
-// \exception no-throw guarantee.
-*/
-template< typename Type  // Data type of the vector
-        , bool TF >      // Transpose flag
-inline void move( DynamicVector<Type,TF>& dst, DynamicVector<Type,TF>& src ) /* throw() */
-{
-   dst.swap( src );
 }
 //*************************************************************************************************
 
@@ -2255,7 +2678,8 @@ inline void move( DynamicVector<Type,TF>& dst, DynamicVector<Type,TF>& src ) /* 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T, bool TF >
-struct HasConstDataAccess< DynamicVector<T,TF> > : public IsTrue<true>
+struct HasConstDataAccess< DynamicVector<T,TF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -2272,7 +2696,8 @@ struct HasConstDataAccess< DynamicVector<T,TF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T, bool TF >
-struct HasMutableDataAccess< DynamicVector<T,TF> > : public IsTrue<true>
+struct HasMutableDataAccess< DynamicVector<T,TF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -2289,7 +2714,8 @@ struct HasMutableDataAccess< DynamicVector<T,TF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T, bool TF >
-struct IsAligned< DynamicVector<T,TF> > : public IsTrue<true>
+struct IsAligned< DynamicVector<T,TF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -2306,7 +2732,8 @@ struct IsAligned< DynamicVector<T,TF> > : public IsTrue<true>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T, bool TF >
-struct IsPadded< DynamicVector<T,TF> > : public IsTrue<usePadding>
+struct IsPadded< DynamicVector<T,TF> >
+   : public BoolConstant<usePadding>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -2323,7 +2750,26 @@ struct IsPadded< DynamicVector<T,TF> > : public IsTrue<usePadding>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T, bool TF >
-struct IsResizable< DynamicVector<T,TF> > : public IsTrue<true>
+struct IsResizable< DynamicVector<T,TF> >
+   : public TrueType
+{};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  ISSHRINKABLE SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename T, bool TF >
+struct IsShrinkable< DynamicVector<T,TF> >
+   : public TrueType
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -2342,31 +2788,31 @@ struct IsResizable< DynamicVector<T,TF> > : public IsTrue<true>
 template< typename T1, bool TF, typename T2, size_t N >
 struct AddTrait< DynamicVector<T1,TF>, StaticVector<T2,N,TF> >
 {
-   typedef StaticVector< typename AddTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = StaticVector< AddTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, size_t N, bool TF, typename T2 >
 struct AddTrait< StaticVector<T1,N,TF>, DynamicVector<T2,TF> >
 {
-   typedef StaticVector< typename AddTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = StaticVector< AddTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, bool TF, typename T2, size_t N >
 struct AddTrait< DynamicVector<T1,TF>, HybridVector<T2,N,TF> >
 {
-   typedef HybridVector< typename AddTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = HybridVector< AddTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, size_t N, bool TF, typename T2 >
 struct AddTrait< HybridVector<T1,N,TF>, DynamicVector<T2,TF> >
 {
-   typedef HybridVector< typename AddTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = HybridVector< AddTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, bool TF, typename T2 >
 struct AddTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
 {
-   typedef DynamicVector< typename AddTrait<T1,T2>::Type, TF >  Type;
+   using Type = DynamicVector< AddTrait_<T1,T2>, TF >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2385,31 +2831,31 @@ struct AddTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
 template< typename T1, bool TF, typename T2, size_t N >
 struct SubTrait< DynamicVector<T1,TF>, StaticVector<T2,N,TF> >
 {
-   typedef StaticVector< typename SubTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = StaticVector< SubTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, size_t N, bool TF, typename T2 >
 struct SubTrait< StaticVector<T1,N,TF>, DynamicVector<T2,TF> >
 {
-   typedef StaticVector< typename SubTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = StaticVector< SubTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, bool TF, typename T2, size_t N >
 struct SubTrait< DynamicVector<T1,TF>, HybridVector<T2,N,TF> >
 {
-   typedef HybridVector< typename SubTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = HybridVector< SubTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, size_t N, bool TF, typename T2 >
 struct SubTrait< HybridVector<T1,N,TF>, DynamicVector<T2,TF> >
 {
-   typedef HybridVector< typename SubTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = HybridVector< SubTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, bool TF, typename T2 >
 struct SubTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
 {
-   typedef DynamicVector< typename SubTrait<T1,T2>::Type, TF >  Type;
+   using Type = DynamicVector< SubTrait_<T1,T2>, TF >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2426,168 +2872,105 @@ struct SubTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T1, bool TF, typename T2 >
-struct MultTrait< DynamicVector<T1,TF>, T2, typename EnableIf< IsNumeric<T2> >::Type >
+struct MultTrait< DynamicVector<T1,TF>, T2, EnableIf_<IsNumeric<T2> > >
 {
-   typedef DynamicVector< typename MultTrait<T1,T2>::Type, TF >  Type;
+   using Type = DynamicVector< MultTrait_<T1,T2>, TF >;
 };
 
 template< typename T1, typename T2, bool TF >
-struct MultTrait< T1, DynamicVector<T2,TF>, typename EnableIf< IsNumeric<T1> >::Type >
+struct MultTrait< T1, DynamicVector<T2,TF>, EnableIf_<IsNumeric<T1> > >
 {
-   typedef DynamicVector< typename MultTrait<T1,T2>::Type, TF >  Type;
+   using Type = DynamicVector< MultTrait_<T1,T2>, TF >;
 };
 
 template< typename T1, bool TF, typename T2, size_t N >
 struct MultTrait< DynamicVector<T1,TF>, StaticVector<T2,N,TF> >
 {
-   typedef StaticVector< typename MultTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = StaticVector< MultTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, typename T2, size_t N >
 struct MultTrait< DynamicVector<T1,false>, StaticVector<T2,N,true> >
 {
-   typedef DynamicMatrix< typename MultTrait<T1,T2>::Type, false >  Type;
+   using Type = DynamicMatrix< MultTrait_<T1,T2>, false >;
 };
 
 template< typename T1, typename T2, size_t N >
 struct MultTrait< DynamicVector<T1,true>, StaticVector<T2,N,false> >
 {
-   typedef typename MultTrait<T1,T2>::Type  Type;
+   using Type = MultTrait_<T1,T2>;
 };
 
 template< typename T1, size_t N, bool TF, typename T2 >
 struct MultTrait< StaticVector<T1,N,TF>, DynamicVector<T2,TF> >
 {
-   typedef StaticVector< typename MultTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = StaticVector< MultTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, size_t N, typename T2 >
 struct MultTrait< StaticVector<T1,N,false>, DynamicVector<T2,true> >
 {
-   typedef DynamicMatrix< typename MultTrait<T1,T2>::Type, false >  Type;
+   using Type = DynamicMatrix< MultTrait_<T1,T2>, false >;
 };
 
 template< typename T1, size_t N, typename T2 >
 struct MultTrait< StaticVector<T1,N,true>, DynamicVector<T2,false> >
 {
-   typedef typename MultTrait<T1,T2>::Type  Type;
+   using Type = MultTrait_<T1,T2>;
 };
 
 template< typename T1, bool TF, typename T2, size_t N >
 struct MultTrait< DynamicVector<T1,TF>, HybridVector<T2,N,TF> >
 {
-   typedef HybridVector< typename MultTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = HybridVector< MultTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, typename T2, size_t N >
 struct MultTrait< DynamicVector<T1,false>, HybridVector<T2,N,true> >
 {
-   typedef DynamicMatrix< typename MultTrait<T1,T2>::Type, false >  Type;
+   using Type = DynamicMatrix< MultTrait_<T1,T2>, false >;
 };
 
 template< typename T1, typename T2, size_t N >
 struct MultTrait< DynamicVector<T1,true>, HybridVector<T2,N,false> >
 {
-   typedef typename MultTrait<T1,T2>::Type  Type;
+   using Type = MultTrait_<T1,T2>;
 };
 
 template< typename T1, size_t N, bool TF, typename T2 >
 struct MultTrait< HybridVector<T1,N,TF>, DynamicVector<T2,TF> >
 {
-   typedef HybridVector< typename MultTrait<T1,T2>::Type, N, TF >  Type;
+   using Type = HybridVector< MultTrait_<T1,T2>, N, TF >;
 };
 
 template< typename T1, size_t N, typename T2 >
 struct MultTrait< HybridVector<T1,N,false>, DynamicVector<T2,true> >
 {
-   typedef DynamicMatrix< typename MultTrait<T1,T2>::Type, false >  Type;
+   using Type = DynamicMatrix< MultTrait_<T1,T2>, false >;
 };
 
 template< typename T1, size_t N, typename T2 >
 struct MultTrait< HybridVector<T1,N,true>, DynamicVector<T2,false> >
 {
-   typedef typename MultTrait<T1,T2>::Type  Type;
+   using Type = MultTrait_<T1,T2>;
 };
 
 template< typename T1, bool TF, typename T2 >
 struct MultTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
 {
-   typedef DynamicVector< typename MultTrait<T1,T2>::Type, TF >  Type;
+   using Type = DynamicVector< MultTrait_<T1,T2>, TF >;
 };
 
 template< typename T1, typename T2 >
 struct MultTrait< DynamicVector<T1,false>, DynamicVector<T2,true> >
 {
-   typedef DynamicMatrix< typename MultTrait<T1,T2>::Type, false >  Type;
+   using Type = DynamicMatrix< MultTrait_<T1,T2>, false >;
 };
 
 template< typename T1, typename T2 >
 struct MultTrait< DynamicVector<T1,true>, DynamicVector<T2,false> >
 {
-   typedef typename MultTrait<T1,T2>::Type  Type;
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  CROSSTRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename T1, typename T2 >
-struct CrossTrait< DynamicVector<T1,false>, StaticVector<T2,3UL,false> >
-{
- private:
-   typedef typename MultTrait<T1,T2>::Type  T;
-
- public:
-   typedef StaticVector< typename SubTrait<T,T>::Type, 3UL, false >  Type;
-};
-
-template< typename T1, typename T2 >
-struct CrossTrait< StaticVector<T1,3UL,false>, DynamicVector<T2,false> >
-{
- private:
-   typedef typename MultTrait<T1,T2>::Type  T;
-
- public:
-   typedef StaticVector< typename SubTrait<T,T>::Type, 3UL, false >  Type;
-};
-
-template< typename T1, typename T2, size_t N >
-struct CrossTrait< DynamicVector<T1,false>, HybridVector<T2,N,false> >
-{
- private:
-   typedef typename MultTrait<T1,T2>::Type  T;
-
- public:
-   typedef StaticVector< typename SubTrait<T,T>::Type, 3UL, false >  Type;
-};
-
-template< typename T1, size_t N, typename T2 >
-struct CrossTrait< HybridVector<T1,N,false>, DynamicVector<T2,false> >
-{
- private:
-   typedef typename MultTrait<T1,T2>::Type  T;
-
- public:
-   typedef StaticVector< typename SubTrait<T,T>::Type, 3UL, false >  Type;
-};
-
-template< typename T1, typename T2 >
-struct CrossTrait< DynamicVector<T1,false>, DynamicVector<T2,false> >
-{
- private:
-   typedef typename MultTrait<T1,T2>::Type  T;
-
- public:
-   typedef StaticVector< typename SubTrait<T,T>::Type, 3UL, false >  Type;
+   using Type = MultTrait_<T1,T2>;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2604,9 +2987,39 @@ struct CrossTrait< DynamicVector<T1,false>, DynamicVector<T2,false> >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T1, bool TF, typename T2 >
-struct DivTrait< DynamicVector<T1,TF>, T2, typename EnableIf< IsNumeric<T2> >::Type >
+struct DivTrait< DynamicVector<T1,TF>, T2, EnableIf_<IsNumeric<T2> > >
 {
-   typedef DynamicVector< typename DivTrait<T1,T2>::Type, TF >  Type;
+   using Type = DynamicVector< DivTrait_<T1,T2>, TF >;
+};
+
+template< typename T1, bool TF, typename T2, size_t N >
+struct DivTrait< DynamicVector<T1,TF>, StaticVector<T2,N,TF> >
+{
+   using Type = StaticVector< DivTrait_<T1,T2>, N, TF >;
+};
+
+template< typename T1, size_t N, bool TF, typename T2 >
+struct DivTrait< StaticVector<T1,N,TF>, DynamicVector<T2,TF> >
+{
+   using Type = StaticVector< DivTrait_<T1,T2>, N, TF >;
+};
+
+template< typename T1, bool TF, typename T2, size_t N >
+struct DivTrait< DynamicVector<T1,TF>, HybridVector<T2,N,TF> >
+{
+   using Type = HybridVector< DivTrait_<T1,T2>, N, TF >;
+};
+
+template< typename T1, size_t N, bool TF, typename T2 >
+struct DivTrait< HybridVector<T1,N,TF>, DynamicVector<T2,TF> >
+{
+   using Type = HybridVector< DivTrait_<T1,T2>, N, TF >;
+};
+
+template< typename T1, bool TF, typename T2 >
+struct DivTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
+{
+   using Type = DynamicVector< DivTrait_<T1,T2>, TF >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2616,17 +3029,160 @@ struct DivTrait< DynamicVector<T1,TF>, T2, typename EnableIf< IsNumeric<T2> >::T
 
 //=================================================================================================
 //
-//  MATHTRAIT SPECIALIZATIONS
+//  CROSSTRAIT SPECIALIZATIONS
 //
 //=================================================================================================
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename T1, bool TF, typename T2 >
-struct MathTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
+struct CrossTrait< DynamicVector<T1,TF>, StaticVector<T2,3UL,TF> >
 {
-   typedef DynamicVector< typename MathTrait<T1,T2>::HighType, TF >  HighType;
-   typedef DynamicVector< typename MathTrait<T1,T2>::LowType , TF >  LowType;
+ private:
+   using T = MultTrait_<T1,T2>;
+
+ public:
+   using Type = StaticVector< SubTrait_<T,T>, 3UL, TF >;
+};
+
+template< typename T1, bool TF, typename T2 >
+struct CrossTrait< StaticVector<T1,3UL,TF>, DynamicVector<T2,TF> >
+{
+ private:
+   using T = MultTrait_<T1,T2>;
+
+ public:
+   using Type = StaticVector< SubTrait_<T,T>, 3UL, TF >;
+};
+
+template< typename T1, bool TF, typename T2, size_t N >
+struct CrossTrait< DynamicVector<T1,TF>, HybridVector<T2,N,TF> >
+{
+ private:
+   using T = MultTrait_<T1,T2>;
+
+ public:
+   using Type = StaticVector< SubTrait_<T,T>, 3UL, TF >;
+};
+
+template< typename T1, size_t N, bool TF, typename T2 >
+struct CrossTrait< HybridVector<T1,N,TF>, DynamicVector<T2,TF> >
+{
+ private:
+   using T = MultTrait_<T1,T2>;
+
+ public:
+   using Type = StaticVector< SubTrait_<T,T>, 3UL, TF >;
+};
+
+template< typename T1, bool TF, typename T2 >
+struct CrossTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
+{
+ private:
+   using T = MultTrait_<T1,T2>;
+
+ public:
+   using Type = StaticVector< SubTrait_<T,T>, 3UL, TF >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  UNARYMAPTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename T, bool TF, typename OP >
+struct UnaryMapTrait< DynamicVector<T,TF>, OP >
+{
+   using Type = DynamicVector< UnaryMapTrait_<T,OP>, TF >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  BINARYMAPTRAIT SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename T1, bool TF, typename T2, size_t N, typename OP >
+struct BinaryMapTrait< DynamicVector<T1,TF>, StaticVector<T2,N,TF>, OP >
+{
+   using Type = StaticVector< BinaryMapTrait_<T1,T2,OP>, N, TF >;
+};
+
+template< typename T1, size_t N, bool TF, typename T2, typename OP >
+struct BinaryMapTrait< StaticVector<T1,N,TF>, DynamicVector<T2,TF>, OP >
+{
+   using Type = StaticVector< BinaryMapTrait_<T1,T2,OP>, N, TF >;
+};
+
+template< typename T1, bool TF, typename T2, size_t N, typename OP >
+struct BinaryMapTrait< DynamicVector<T1,TF>, HybridVector<T2,N,TF>, OP >
+{
+   using Type = HybridVector< BinaryMapTrait_<T1,T2,OP>, N, TF >;
+};
+
+template< typename T1, size_t N, bool TF, typename T2, typename OP >
+struct BinaryMapTrait< HybridVector<T1,N,TF>, DynamicVector<T2,TF>, OP >
+{
+   using Type = HybridVector< BinaryMapTrait_<T1,T2,OP>, N, TF >;
+};
+
+template< typename T1, bool TF, typename T2, typename OP >
+struct BinaryMapTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF>, OP >
+{
+   using Type = DynamicVector< BinaryMapTrait_<T1,T2,OP>, TF >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  HIGHTYPE SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename T1, bool TF, typename T2 >
+struct HighType< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
+{
+   using Type = DynamicVector< typename HighType<T1,T2>::Type, TF >;
+};
+/*! \endcond */
+//*************************************************************************************************
+
+
+
+
+//=================================================================================================
+//
+//  LOWTYPE SPECIALIZATIONS
+//
+//=================================================================================================
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+template< typename T1, bool TF, typename T2 >
+struct LowType< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
+{
+   using Type = DynamicVector< typename LowType<T1,T2>::Type, TF >;
 };
 /*! \endcond */
 //*************************************************************************************************
@@ -2642,10 +3198,10 @@ struct MathTrait< DynamicVector<T1,TF>, DynamicVector<T2,TF> >
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
-template< typename T1, bool TF >
-struct SubvectorTrait< DynamicVector<T1,TF> >
+template< typename T, bool TF >
+struct SubvectorTrait< DynamicVector<T,TF> >
 {
-   typedef DynamicVector<T1,TF>  Type;
+   using Type = DynamicVector<T,TF>;
 };
 /*! \endcond */
 //*************************************************************************************************

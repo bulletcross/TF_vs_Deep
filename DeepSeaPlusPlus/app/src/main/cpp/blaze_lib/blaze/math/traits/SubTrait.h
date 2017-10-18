@@ -3,7 +3,7 @@
 //  \file blaze/math/traits/SubTrait.h
 //  \brief Header file for the subtraction trait
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,18 +40,19 @@
 // Includes
 //*************************************************************************************************
 
-#include <boost/typeof/typeof.hpp>
+#include <utility>
 #include <blaze/util/Complex.h>
 #include <blaze/util/EnableIf.h>
 #include <blaze/util/mpl/If.h>
 #include <blaze/util/mpl/Or.h>
+#include <blaze/util/typetraits/All.h>
+#include <blaze/util/typetraits/Any.h>
 #include <blaze/util/typetraits/CommonType.h>
+#include <blaze/util/typetraits/Decay.h>
 #include <blaze/util/typetraits/IsBuiltin.h>
 #include <blaze/util/typetraits/IsConst.h>
 #include <blaze/util/typetraits/IsReference.h>
 #include <blaze/util/typetraits/IsVolatile.h>
-#include <blaze/util/typetraits/RemoveCV.h>
-#include <blaze/util/typetraits/RemoveReference.h>
 
 
 namespace blaze {
@@ -103,7 +104,7 @@ namespace blaze {
 //
 // \n \section subtrait_specializations Creating custom specializations
 //
-// AddTrait is guaranteed to work for all data types that provide a subtraction operator (i.e.
+// SubTrait is guaranteed to work for all data types that provide a subtraction operator (i.e.
 // \c operator-). In order to add support for user-defined data types that either don't provide
 // a subtraction operator or whose subtraction operator returns a proxy object instead of a
 // concrete type (as it is for instance common in expression template libraries) it is possible
@@ -114,7 +115,7 @@ namespace blaze {
    template< typename T1, typename T2 >
    struct SubTrait< DynamicVector<T1,columnVector>, DynamicVector<T2,columnVector> >
    {
-      typedef DynamicVector< typename SubTrait<T1,T2>::Type, columnVector >  Type;
+      using Type = DynamicVector< typename SubTrait<T1,T2>::Type, columnVector >;
    };
    \endcode
 
@@ -140,26 +141,44 @@ struct SubTrait
  private:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename RemoveReference< typename RemoveCV<T1>::Type >::Type  Type1;
-   typedef typename RemoveReference< typename RemoveCV<T2>::Type >::Type  Type2;
+   using Type1 = Decay_<T1>;
+   using Type2 = Decay_<T2>;
    /*! \endcond */
    //**********************************************************************************************
 
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   struct SubType { typedef BOOST_TYPEOF_TPL( Type1() - Type2() )  Type; };
+   struct SubType { using Type = decltype( std::declval<Type1>() - std::declval<Type2>() ); };
    /*! \endcond */
    //**********************************************************************************************
 
  public:
    //**********************************************************************************************
    /*! \cond BLAZE_INTERNAL */
-   typedef typename If< Or< IsConst<T1>, IsVolatile<T1>, IsReference<T1>
-                          , IsConst<T2>, IsVolatile<T2>, IsReference<T2> >
-                      , SubTrait<Type1,Type2>, SubType >::Type::Type  Type;
+   using Type = typename If_< Or< IsConst<T1>, IsVolatile<T1>, IsReference<T1>
+                                , IsConst<T2>, IsVolatile<T2>, IsReference<T2> >
+                            , SubTrait<Type1,Type2>
+                            , SubType >::Type;
    /*! \endcond */
    //**********************************************************************************************
 };
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Specialization of the SubTrait class template for two identical data types.
+// \ingroup math_traits
+*/
+template< typename T >
+struct SubTrait< T, T, EnableIf_< IsBuiltin<T> > >
+{
+ public:
+   //**********************************************************************************************
+   using Type = Decay_<T>;
+   //**********************************************************************************************
+};
+/*! \endcond */
 //*************************************************************************************************
 
 
@@ -169,11 +188,11 @@ struct SubTrait
 // \ingroup math_traits
 */
 template< typename T1, typename T2 >
-struct SubTrait< complex<T1>, T2, typename EnableIf< IsBuiltin<T2> >::Type >
+struct SubTrait< complex<T1>, T2, EnableIf_< IsBuiltin<T2> > >
 {
  public:
    //**********************************************************************************************
-   typedef typename CommonType< complex<T1> , T2 >::Type  Type;
+   using Type = CommonType_< complex<T1> , T2 >;
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -186,11 +205,11 @@ struct SubTrait< complex<T1>, T2, typename EnableIf< IsBuiltin<T2> >::Type >
 // \ingroup math_traits
 */
 template< typename T1, typename T2 >
-struct SubTrait< T1, complex<T2>, typename EnableIf< IsBuiltin<T1> >::Type >
+struct SubTrait< T1, complex<T2>, EnableIf_< IsBuiltin<T1> > >
 {
  public:
    //**********************************************************************************************
-   typedef typename CommonType< T1, complex<T2> >::Type  Type;
+   using Type = CommonType_< T1, complex<T2> >;
    //**********************************************************************************************
 };
 /*! \endcond */
@@ -207,10 +226,28 @@ struct SubTrait< complex<T1>, complex<T2> >
 {
  public:
    //**********************************************************************************************
-   typedef typename CommonType< complex<T1>, complex<T2> >::Type  Type;
+   using Type = CommonType_< complex<T1>, complex<T2> >;
    //**********************************************************************************************
 };
 /*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Auxiliary alias declaration for the SubTrait class template.
+// \ingroup math_traits
+//
+// The SubTrait_ alias declaration provides a convenient shortcut to access the nested \a Type
+// of the SubTrait class template. For instance, given the types \a T1 and \a T2 the following
+// two type definitions are identical:
+
+   \code
+   using Type1 = typename SubTrait<T1,T2>::Type;
+   using Type2 = SubTrait_<T1,T2>;
+   \endcode
+*/
+template< typename T1, typename T2 >
+using SubTrait_ = typename SubTrait<T1,T2>::Type;
 //*************************************************************************************************
 
 } // namespace blaze

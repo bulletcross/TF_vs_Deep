@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/DMatSerialExpr.h
 //  \brief Header file for the dense matrix serial evaluation expression
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,27 +40,19 @@
 // Includes
 //*************************************************************************************************
 
-#include <cmath>
+#include <blaze/math/Aliases.h>
 #include <blaze/math/constraints/DenseMatrix.h>
 #include <blaze/math/constraints/StorageOrder.h>
+#include <blaze/math/Exception.h>
 #include <blaze/math/expressions/Computation.h>
 #include <blaze/math/expressions/DenseMatrix.h>
 #include <blaze/math/expressions/Forward.h>
 #include <blaze/math/expressions/MatSerialExpr.h>
-#include <blaze/math/traits/ColumnExprTrait.h>
-#include <blaze/math/traits/DMatSerialExprTrait.h>
-#include <blaze/math/traits/SerialExprTrait.h>
-#include <blaze/math/traits/RowExprTrait.h>
-#include <blaze/math/traits/SubmatrixExprTrait.h>
-#include <blaze/math/traits/TDMatSerialExprTrait.h>
 #include <blaze/math/typetraits/Columns.h>
 #include <blaze/math/typetraits/IsAligned.h>
-#include <blaze/math/typetraits/IsColumnMajorMatrix.h>
-#include <blaze/math/typetraits/IsDenseMatrix.h>
 #include <blaze/math/typetraits/IsExpression.h>
 #include <blaze/math/typetraits/IsHermitian.h>
 #include <blaze/math/typetraits/IsLower.h>
-#include <blaze/math/typetraits/IsRowMajorMatrix.h>
 #include <blaze/math/typetraits/IsStrictlyLower.h>
 #include <blaze/math/typetraits/IsStrictlyUpper.h>
 #include <blaze/math/typetraits/IsSymmetric.h>
@@ -69,13 +61,11 @@
 #include <blaze/math/typetraits/IsUpper.h>
 #include <blaze/math/typetraits/Rows.h>
 #include <blaze/util/Assert.h>
-#include <blaze/util/constraints/Reference.h>
-#include <blaze/util/Exception.h>
+#include <blaze/util/FunctionTrace.h>
+#include <blaze/util/IntegralConstant.h>
 #include <blaze/util/InvalidType.h>
-#include <blaze/util/logging/FunctionTrace.h>
-#include <blaze/util/SelectType.h>
+#include <blaze/util/mpl/If.h>
 #include <blaze/util/Types.h>
-#include <blaze/util/valuetraits/IsTrue.h>
 
 
 namespace blaze {
@@ -95,32 +85,32 @@ namespace blaze {
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
-                     , private MatSerialExpr
-                     , private Computation
+class DMatSerialExpr
+   : public MatSerialExpr< DenseMatrix< DMatSerialExpr<MT,SO>, SO > >
+   , private Computation
 {
  public:
    //**Type definitions****************************************************************************
-   typedef DMatSerialExpr<MT,SO>       This;           //!< Type of this DMatSerialExpr instance.
-   typedef typename MT::ResultType     ResultType;     //!< Result type for expression template evaluations.
-   typedef typename MT::OppositeType   OppositeType;   //!< Result type with opposite storage order for expression template evaluations.
-   typedef typename MT::TransposeType  TransposeType;  //!< Transpose type for expression template evaluations.
-   typedef typename MT::ElementType    ElementType;    //!< Resulting element type.
-   typedef typename MT::ReturnType     ReturnType;     //!< Return type for expression template evaluations.
+   using This = DMatSerialExpr<MT,SO>;        //!< Type of this DMatSerialExpr instance.
+   using ResultType = ResultType_<MT>;        //!< Result type for expression template evaluations.
+   using OppositeType = OppositeType_<MT>;    //!< Result type with opposite storage order for expression template evaluations.
+   using TransposeType = TransposeType_<MT>;  //!< Transpose type for expression template evaluations.
+   using ElementType = ElementType_<MT>;      //!< Resulting element type.
+   using ReturnType = ReturnType_<MT>;        //!< Return type for expression template evaluations.
 
    //! Data type for composite expression templates.
-   typedef const ResultType  CompositeType;
+   using CompositeType = const ResultType;
 
    //! Composite data type of the dense matrix expression.
-   typedef typename SelectType< IsExpression<MT>::value, const MT, const MT& >::Type  Operand;
+   using Operand = If_< IsExpression<MT>, const MT, const MT& >;
    //**********************************************************************************************
 
    //**Compilation flags***************************************************************************
    //! Compilation switch for the expression template evaluation strategy.
-   enum { vectorizable = 0 };
+   enum : bool { simdEnabled = false };
 
    //! Compilation switch for the expression template assignment strategy.
-   enum { smpAssignable = MT::smpAssignable };
+   enum : bool { smpAssignable = MT::smpAssignable };
    //**********************************************************************************************
 
    //**Constructor*********************************************************************************
@@ -128,7 +118,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \param dm The dense matrix operand of the serial evaluation expression.
    */
-   explicit inline DMatSerialExpr( const MT& dm )
+   explicit inline DMatSerialExpr( const MT& dm ) noexcept
       : dm_( dm )  // Dense matrix of the serial evaluation expression
    {}
    //**********************************************************************************************
@@ -171,7 +161,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \return The number of rows of the matrix.
    */
-   inline size_t rows() const {
+   inline size_t rows() const noexcept {
       return dm_.rows();
    }
    //**********************************************************************************************
@@ -181,7 +171,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \return The number of columns of the matrix.
    */
-   inline size_t columns() const {
+   inline size_t columns() const noexcept {
       return dm_.columns();
    }
    //**********************************************************************************************
@@ -191,7 +181,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \return The dense matrix operand.
    */
-   inline Operand operand() const {
+   inline Operand operand() const noexcept {
       return dm_;
    }
    //**********************************************************************************************
@@ -201,7 +191,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \return The dense matrix operand.
    */
-   inline operator Operand() const {
+   inline operator Operand() const noexcept {
       return dm_;
    }
    //**********************************************************************************************
@@ -213,7 +203,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    // \return \a true in case the expression can alias, \a false otherwise.
    */
    template< typename T >
-   inline bool canAlias( const T* alias ) const {
+   inline bool canAlias( const T* alias ) const noexcept {
       return dm_.canAlias( alias );
    }
    //**********************************************************************************************
@@ -225,7 +215,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    // \return \a true in case an alias effect is detected, \a false otherwise.
    */
    template< typename T >
-   inline bool isAliased( const T* alias ) const {
+   inline bool isAliased( const T* alias ) const noexcept {
       return dm_.isAliased( alias );
    }
    //**********************************************************************************************
@@ -235,7 +225,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \return \a true in case the operands are aligned, \a false if not.
    */
-   inline bool isAligned() const {
+   inline bool isAligned() const noexcept {
       return dm_.isAligned();
    }
    //**********************************************************************************************
@@ -245,7 +235,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    //
    // \return \a true in case the expression can be used in SMP assignments, \a false if not.
    */
-   inline bool canSMPAssign() const {
+   inline bool canSMPAssign() const noexcept {
       return dm_.canSMPAssign();
    }
    //**********************************************************************************************
@@ -287,7 +277,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    // \ingroup dense_matrix
    //
    // \param lhs The target left-hand side sparse matrix.
-   // \param rhs The right-hand side serial evaluatin expression to be assigned.
+   // \param rhs The right-hand side serial evaluation expression to be assigned.
    // \return void
    //
    // This function implements the performance optimized assignment of a dense matrix serial
@@ -413,6 +403,60 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    /*! \endcond */
    //**********************************************************************************************
 
+   //**Schur product assignment to dense matrices**************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief Schur product assignment of a dense matrix serial evaluation expression to a dense
+   //        matrix.
+   // \ingroup dense_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side serial evaluation expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized Schur product assignment of a dense
+   // matrix serial evaluation expression to a dense matrix.
+   */
+   template< typename MT2  // Type of the target dense matrix
+           , bool SO2 >    // Storage order of the target dense matrix
+   friend inline void schurAssign( DenseMatrix<MT2,SO2>& lhs, const DMatSerialExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      schurAssign( ~lhs, rhs.dm_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**Schur product assignment to sparse matrices*************************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief Schur product assignment of a dense matrix serial evaluation expression to a sparse
+   //        matrix.
+   // \ingroup dense_matrix
+   //
+   // \param lhs The target left-hand side sparse matrix.
+   // \param rhs The right-hand side serial evaluation expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized Schur product assignment of a dense
+   // matrix serial evaluation expression to a sparse matrix.
+   */
+   template< typename MT2  // Type of the target sparse matrix
+           , bool SO2 >    // Storage order of the target dense matrix
+   friend inline void schurAssign( SparseMatrix<MT2,SO2>& lhs, const DMatSerialExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      schurAssign( ~lhs, rhs.dm_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
    //**Multiplication assignment to dense matrices*************************************************
    /*! \cond BLAZE_INTERNAL */
    /*!\brief Multiplication assignment of a dense matrix serial evaluation expression to a dense
@@ -499,7 +543,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    // \ingroup dense_matrix
    //
    // \param lhs The target left-hand side sparse matrix.
-   // \param rhs The right-hand side serial evaluatin expression to be assigned.
+   // \param rhs The right-hand side serial evaluation expression to be assigned.
    // \return void
    //
    // This function implements the performance optimized SMP assignment of a dense matrix
@@ -627,6 +671,60 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
    /*! \endcond */
    //**********************************************************************************************
 
+   //**SMP Schur product assignment to dense matrices**********************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief SMP Schur product assignment of a dense matrix serial evaluation expression to a dense
+   //        matrix.
+   // \ingroup dense_matrix
+   //
+   // \param lhs The target left-hand side dense matrix.
+   // \param rhs The right-hand side serial evaluation expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized SMP Schur product assignment of a dense
+   // matrix serial evaluation expression to a dense matrix.
+   */
+   template< typename MT2  // Type of the target dense matrix
+           , bool SO2 >    // Storage order of the target dense matrix
+   friend inline void smpSchurAssign( DenseMatrix<MT2,SO2>& lhs, const DMatSerialExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      schurAssign( ~lhs, rhs.dm_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
+   //**SMP Schur product assignment to sparse matrices*********************************************
+   /*! \cond BLAZE_INTERNAL */
+   /*!\brief SMP Schur product assignment of a dense matrix serial evaluation expression to a
+   //        sparse matrix.
+   // \ingroup dense_matrix
+   //
+   // \param lhs The target left-hand side sparse matrix.
+   // \param rhs The right-hand side serial evaluation expression for the Schur product.
+   // \return void
+   //
+   // This function implements the performance optimized SMP Schur product assignment of a dense
+   // matrix serial evaluation expression to a sparse matrix.
+   */
+   template< typename MT2  // Type of the target sparse matrix
+           , bool SO2 >    // Storage order of the target dense matrix
+   friend inline void smpSchurAssign( SparseMatrix<MT2,SO2>& lhs, const DMatSerialExpr& rhs )
+   {
+      BLAZE_FUNCTION_TRACE;
+
+      BLAZE_INTERNAL_ASSERT( (~lhs).rows()    == rhs.rows()   , "Invalid number of rows"    );
+      BLAZE_INTERNAL_ASSERT( (~lhs).columns() == rhs.columns(), "Invalid number of columns" );
+
+      schurAssign( ~lhs, rhs.dm_ );
+   }
+   /*! \endcond */
+   //**********************************************************************************************
+
    //**SMP multiplication assignment to dense matrices*********************************************
    /*! \cond BLAZE_INTERNAL */
    /*!\brief SMP multiplication assignment of a dense matrix serial evaluation expression to a
@@ -708,7 +806,7 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
 //
 // The \a serial function forces the serial evaluation of the given dense matrix expression
 // \a dm. The function returns an expression representing the operation.\n
-// The following example demonstrates the use of the \a serial function
+// The following example demonstrates the use of the \a serial function:
 
    \code
    blaze::DynamicMatrix<double> A, B;
@@ -718,11 +816,12 @@ class DMatSerialExpr : public DenseMatrix< DMatSerialExpr<MT,SO>, SO >
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline const DMatSerialExpr<MT,SO> serial( const DenseMatrix<MT,SO>& dm )
+inline decltype(auto) serial( const DenseMatrix<MT,SO>& dm )
 {
    BLAZE_FUNCTION_TRACE;
 
-   return DMatSerialExpr<MT,SO>( ~dm );
+   using ReturnType = const DMatSerialExpr<MT,SO>;
+   return ReturnType( ~dm );
 }
 //*************************************************************************************************
 
@@ -748,7 +847,7 @@ inline const DMatSerialExpr<MT,SO> serial( const DenseMatrix<MT,SO>& dm )
 */
 template< typename MT  // Type of the dense matrix
         , bool SO >    // Storage order
-inline const DMatSerialExpr<MT,SO> serial( const DMatSerialExpr<MT,SO>& dm )
+inline decltype(auto) serial( const DMatSerialExpr<MT,SO>& dm )
 {
    return dm;
 }
@@ -767,7 +866,8 @@ inline const DMatSerialExpr<MT,SO> serial( const DMatSerialExpr<MT,SO>& dm )
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct Rows< DMatSerialExpr<MT,SO> > : public Rows<MT>
+struct Rows< DMatSerialExpr<MT,SO> >
+   : public Rows<MT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -784,7 +884,8 @@ struct Rows< DMatSerialExpr<MT,SO> > : public Rows<MT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct Columns< DMatSerialExpr<MT,SO> > : public Columns<MT>
+struct Columns< DMatSerialExpr<MT,SO> >
+   : public Columns<MT>
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -801,7 +902,8 @@ struct Columns< DMatSerialExpr<MT,SO> > : public Columns<MT>
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsAligned< DMatSerialExpr<MT,SO> > : public IsTrue< IsAligned<MT>::value >
+struct IsAligned< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsAligned<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -818,7 +920,8 @@ struct IsAligned< DMatSerialExpr<MT,SO> > : public IsTrue< IsAligned<MT>::value 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsSymmetric< DMatSerialExpr<MT,SO> > : public IsTrue< IsSymmetric<MT>::value >
+struct IsSymmetric< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsSymmetric<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -835,7 +938,8 @@ struct IsSymmetric< DMatSerialExpr<MT,SO> > : public IsTrue< IsSymmetric<MT>::va
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsHermitian< DMatSerialExpr<MT,SO> > : public IsTrue< IsHermitian<MT>::value >
+struct IsHermitian< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsHermitian<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -852,7 +956,8 @@ struct IsHermitian< DMatSerialExpr<MT,SO> > : public IsTrue< IsHermitian<MT>::va
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsLower< DMatSerialExpr<MT,SO> > : public IsTrue< IsLower<MT>::value >
+struct IsLower< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsLower<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -869,7 +974,8 @@ struct IsLower< DMatSerialExpr<MT,SO> > : public IsTrue< IsLower<MT>::value >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsUniLower< DMatSerialExpr<MT,SO> > : public IsTrue< IsUniLower<MT>::value >
+struct IsUniLower< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsUniLower<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -886,7 +992,8 @@ struct IsUniLower< DMatSerialExpr<MT,SO> > : public IsTrue< IsUniLower<MT>::valu
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsStrictlyLower< DMatSerialExpr<MT,SO> > : public IsTrue< IsStrictlyLower<MT>::value >
+struct IsStrictlyLower< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsStrictlyLower<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -903,7 +1010,8 @@ struct IsStrictlyLower< DMatSerialExpr<MT,SO> > : public IsTrue< IsStrictlyLower
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsUpper< DMatSerialExpr<MT,SO> > : public IsTrue< IsUpper<MT>::value >
+struct IsUpper< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsUpper<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -920,7 +1028,8 @@ struct IsUpper< DMatSerialExpr<MT,SO> > : public IsTrue< IsUpper<MT>::value >
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsUniUpper< DMatSerialExpr<MT,SO> > : public IsTrue< IsUniUpper<MT>::value >
+struct IsUniUpper< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsUniUpper<MT>::value >
 {};
 /*! \endcond */
 //*************************************************************************************************
@@ -937,90 +1046,9 @@ struct IsUniUpper< DMatSerialExpr<MT,SO> > : public IsTrue< IsUniUpper<MT>::valu
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
 template< typename MT, bool SO >
-struct IsStrictlyUpper< DMatSerialExpr<MT,SO> > : public IsTrue< IsStrictlyUpper<MT>::value >
+struct IsStrictlyUpper< DMatSerialExpr<MT,SO> >
+   : public BoolConstant< IsStrictlyUpper<MT>::value >
 {};
-/*! \endcond */
-//*************************************************************************************************
-
-
-
-
-//=================================================================================================
-//
-//  EXPRESSION TRAIT SPECIALIZATIONS
-//
-//=================================================================================================
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT >
-struct DMatSerialExprTrait< DMatSerialExpr<MT,false> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsDenseMatrix<MT>::value && IsRowMajorMatrix<MT>::value
-                              , DMatSerialExpr<MT,false>
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT >
-struct TDMatSerialExprTrait< DMatSerialExpr<MT,true> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SelectType< IsDenseMatrix<MT>::value && IsColumnMajorMatrix<MT>::value
-                              , DMatSerialExpr<MT,true>
-                              , INVALID_TYPE >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO, bool AF >
-struct SubmatrixExprTrait< DMatSerialExpr<MT,SO>, AF >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SerialExprTrait< typename SubmatrixExprTrait<const MT,AF>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO >
-struct RowExprTrait< DMatSerialExpr<MT,SO> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SerialExprTrait< typename RowExprTrait<const MT>::Type >::Type  Type;
-   //**********************************************************************************************
-};
-/*! \endcond */
-//*************************************************************************************************
-
-
-//*************************************************************************************************
-/*! \cond BLAZE_INTERNAL */
-template< typename MT, bool SO >
-struct ColumnExprTrait< DMatSerialExpr<MT,SO> >
-{
- public:
-   //**********************************************************************************************
-   typedef typename SerialExprTrait< typename ColumnExprTrait<const MT>::Type >::Type  Type;
-   //**********************************************************************************************
-};
 /*! \endcond */
 //*************************************************************************************************
 

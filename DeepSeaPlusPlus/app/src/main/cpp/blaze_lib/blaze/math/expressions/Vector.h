@@ -3,7 +3,7 @@
 //  \file blaze/math/expressions/Vector.h
 //  \brief Header file for the Vector CRTP base class
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,13 +40,14 @@
 // Includes
 //*************************************************************************************************
 
+#include <blaze/math/Exception.h>
 #include <blaze/math/typetraits/IsResizable.h>
+#include <blaze/math/typetraits/IsShrinkable.h>
 #include <blaze/system/Inline.h>
 #include <blaze/util/Assert.h>
 #include <blaze/util/DisableIf.h>
 #include <blaze/util/EnableIf.h>
-#include <blaze/util/Exception.h>
-#include <blaze/util/logging/FunctionTrace.h>
+#include <blaze/util/FunctionTrace.h>
 #include <blaze/util/Types.h>
 #include <blaze/util/typetraits/IsSame.h>
 #include <blaze/util/Unused.h>
@@ -77,7 +78,7 @@ template< typename VT  // Type of the vector
 struct Vector
 {
    //**Type definitions****************************************************************************
-   typedef VT  VectorType;  //!< Type of the vector.
+   using VectorType = VT;  //!< Type of the vector.
    //**********************************************************************************************
 
    //**Non-const conversion operator***************************************************************
@@ -85,7 +86,7 @@ struct Vector
    //
    // \return Reference of the actual type of the vector.
    */
-   BLAZE_ALWAYS_INLINE VectorType& operator~() {
+   BLAZE_ALWAYS_INLINE VectorType& operator~() noexcept {
       return *static_cast<VectorType*>( this );
    }
    //**********************************************************************************************
@@ -95,7 +96,7 @@ struct Vector
    //
    // \return Const reference of the actual type of the vector.
    */
-   BLAZE_ALWAYS_INLINE const VectorType& operator~() const {
+   BLAZE_ALWAYS_INLINE const VectorType& operator~() const noexcept {
       return *static_cast<const VectorType*>( this );
    }
    //**********************************************************************************************
@@ -133,10 +134,10 @@ template< typename VT, bool TF >
 BLAZE_ALWAYS_INLINE typename VT::ConstIterator cend( const Vector<VT,TF>& vector );
 
 template< typename VT, bool TF >
-BLAZE_ALWAYS_INLINE size_t size( const Vector<VT,TF>& vector );
+BLAZE_ALWAYS_INLINE size_t size( const Vector<VT,TF>& vector ) noexcept;
 
 template< typename VT, bool TF >
-BLAZE_ALWAYS_INLINE size_t capacity( const Vector<VT,TF>& vector );
+BLAZE_ALWAYS_INLINE size_t capacity( const Vector<VT,TF>& vector ) noexcept;
 
 template< typename VT, bool TF >
 BLAZE_ALWAYS_INLINE size_t nonZeros( const Vector<VT,TF>& vector );
@@ -144,14 +145,21 @@ BLAZE_ALWAYS_INLINE size_t nonZeros( const Vector<VT,TF>& vector );
 template< typename VT, bool TF >
 BLAZE_ALWAYS_INLINE void resize( Vector<VT,TF>& vector, size_t n, bool preserve=true );
 
+template< typename VT, bool TF >
+BLAZE_ALWAYS_INLINE void shrinkToFit( Vector<VT,TF>& vector );
+
+template< typename VT, bool TF >
+inline const typename VT::ResultType evaluate( const Vector<VT,TF>& vector );
+
 template< typename VT1, bool TF1, typename VT2, bool TF2 >
-BLAZE_ALWAYS_INLINE bool isSame( const Vector<VT1,TF1>& a, const Vector<VT2,TF2>& b );
+BLAZE_ALWAYS_INLINE bool isSame( const Vector<VT1,TF1>& a, const Vector<VT2,TF2>& b ) noexcept;
 //@}
 //*************************************************************************************************
 
 
 //*************************************************************************************************
 /*!\brief Returns an iterator to the first element of the given vector.
+// \ingroup vector
 //
 // \param vector The given dense or sparse vector.
 // \return Iterator to the first element of the given vector.
@@ -167,6 +175,7 @@ BLAZE_ALWAYS_INLINE typename VT::Iterator begin( Vector<VT,TF>& vector )
 
 //*************************************************************************************************
 /*!\brief Returns an iterator to the first element of the given vector.
+// \ingroup vector
 //
 // \param vector The given dense or sparse vector.
 // \return Iterator to the first element of the given vector.
@@ -182,6 +191,7 @@ BLAZE_ALWAYS_INLINE typename VT::ConstIterator begin( const Vector<VT,TF>& vecto
 
 //*************************************************************************************************
 /*!\brief Returns an iterator to the first element of the given vector.
+// \ingroup vector
 //
 // \param vector The given dense or sparse vector.
 // \return Iterator to the first element of the given vector.
@@ -197,6 +207,7 @@ BLAZE_ALWAYS_INLINE typename VT::ConstIterator cbegin( const Vector<VT,TF>& vect
 
 //*************************************************************************************************
 /*!\brief Returns an iterator just past the last element of the given vector.
+// \ingroup vector
 //
 // \param vector The given dense or sparse vector.
 // \return Iterator just past the last element of the given vector.
@@ -212,6 +223,7 @@ BLAZE_ALWAYS_INLINE typename VT::Iterator end( Vector<VT,TF>& vector )
 
 //*************************************************************************************************
 /*!\brief Returns an iterator just past the last element of the given vector.
+// \ingroup vector
 //
 // \param vector The given dense or sparse vector.
 // \return Iterator just past the last element of the given vector.
@@ -227,6 +239,7 @@ BLAZE_ALWAYS_INLINE typename VT::ConstIterator end( const Vector<VT,TF>& vector 
 
 //*************************************************************************************************
 /*!\brief Returns an iterator just past the last element of the given vector.
+// \ingroup vector
 //
 // \param vector The given dense or sparse vector.
 // \return Iterator just past the last element of the given vector.
@@ -249,7 +262,7 @@ BLAZE_ALWAYS_INLINE typename VT::ConstIterator cend( const Vector<VT,TF>& vector
 */
 template< typename VT  // Type of the vector
         , bool TF >    // Transpose flag of the vector
-BLAZE_ALWAYS_INLINE size_t size( const Vector<VT,TF>& vector )
+BLAZE_ALWAYS_INLINE size_t size( const Vector<VT,TF>& vector ) noexcept
 {
    return (~vector).size();
 }
@@ -265,7 +278,7 @@ BLAZE_ALWAYS_INLINE size_t size( const Vector<VT,TF>& vector )
 */
 template< typename VT  // Type of the vector
         , bool TF >    // Transpose flag of the vector
-BLAZE_ALWAYS_INLINE size_t capacity( const Vector<VT,TF>& vector )
+BLAZE_ALWAYS_INLINE size_t capacity( const Vector<VT,TF>& vector ) noexcept
 {
    return (~vector).capacity();
 }
@@ -307,7 +320,7 @@ BLAZE_ALWAYS_INLINE size_t nonZeros( const Vector<VT,TF>& vector )
 */
 template< typename VT  // Type of the vector
         , bool TF >    // Transpose flag of the vector
-BLAZE_ALWAYS_INLINE typename DisableIf< IsResizable<VT> >::Type
+BLAZE_ALWAYS_INLINE DisableIf_< IsResizable<VT> >
    resize_backend( Vector<VT,TF>& vector, size_t n, bool preserve )
 {
    UNUSED_PARAMETER( preserve );
@@ -334,7 +347,7 @@ BLAZE_ALWAYS_INLINE typename DisableIf< IsResizable<VT> >::Type
 */
 template< typename VT  // Type of the vector
         , bool TF >    // Transpose flag of the vector
-BLAZE_ALWAYS_INLINE typename EnableIf< IsResizable<VT> >::Type
+BLAZE_ALWAYS_INLINE EnableIf_< IsResizable<VT> >
    resize_backend( Vector<VT,TF>& vector, size_t n, bool preserve )
 {
    (~vector).resize( n, preserve );
@@ -381,6 +394,126 @@ BLAZE_ALWAYS_INLINE void resize( Vector<VT,TF>& vector, size_t n, bool preserve 
 
 
 //*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Backend implementation of the \c shrinkToFit() function for non-shrinkable vectors.
+// \ingroup vector
+//
+// \param vector The given vector to be shrunk.
+// \return void
+*/
+template< typename VT  // Type of the vector
+        , bool TF >    // Transpose flag of the vector
+BLAZE_ALWAYS_INLINE DisableIf_< IsShrinkable<VT> >
+   shrinkToFit_backend( Vector<VT,TF>& vector )
+{
+   UNUSED_PARAMETER( vector );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Backend implementation of the \c shrinkToFit() function for shrinkable vectors.
+// \ingroup vector
+//
+// \param vector The given vector to be shrunk.
+// \return void
+*/
+template< typename VT  // Type of the vector
+        , bool TF >    // Transpose flag of the vector
+BLAZE_ALWAYS_INLINE EnableIf_< IsShrinkable<VT> >
+   shrinkToFit_backend( Vector<VT,TF>& vector )
+{
+   (~vector).shrinkToFit();
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Requesting the removal of unused capacity.
+// \ingroup vector
+//
+// \param vector The given vector to be shrunk.
+// \return void
+//
+// This function tries to minimize the capacity of the vector by removing unused capacity.
+// Please note that in case of a shrinkable vector, due to padding the capacity might not be
+// reduced exactly to the size of the vector. Please also note that in case a reallocation
+// occurs, all iterators (including end() iterators), all pointers and references to elements
+// of this vector are invalidated. In case of an unshrinkable vector the function has no effect.
+*/
+template< typename VT  // Type of the vector
+        , bool TF >    // Transpose flag of the vector
+BLAZE_ALWAYS_INLINE void shrinkToFit( Vector<VT,TF>& vector )
+{
+   shrinkToFit_backend( vector );
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*!\brief Evaluates the given vector expression.
+// \ingroup vector
+//
+// \param vector The vector to be evaluated.
+// \return The result of the evaluated vector expression.
+//
+// This function forces an evaluation of the given vector expression and enables an automatic
+// deduction of the correct result type of an operation. The following code example demonstrates
+// its intended use for the multiplication of a dense and a sparse vector:
+
+   \code
+   using blaze::DynamicVector;
+   using blaze::CompressedVector;
+
+   blaze::DynamicVector<double> a;
+   blaze::CompressedVector<double> b;
+   // ... Resizing and initialization
+
+   auto c = evaluate( a * b );
+   \endcode
+
+// In this scenario, the \a evaluate() function assists in deducing the exact result type of
+// the operation via the 'auto' keyword. Please note that if \a evaluate() is used in this
+// way, no temporary vector is created and no copy operation is performed. Instead, the result
+// is directly written to the target vector due to the return value optimization (RVO). However,
+// if \a evaluate() is used in combination with an explicit target type, a temporary will be
+// created and a copy operation will be performed if the used type differs from the type
+// returned from the function:
+
+   \code
+   CompressedVector<double> d( a * b );  // No temporary & no copy operation
+   DynamicVector<double> e( a * b );     // Temporary & copy operation
+   d = evaluate( a * b );                // Temporary & copy operation
+   \endcode
+
+// Sometimes it might be desirable to explicitly evaluate a sub-expression within a larger
+// expression. However, please note that \a evaluate() is not intended to be used for this
+// purpose. This task is more elegantly and efficiently handled by the \a eval() function:
+
+   \code
+   blaze::DynamicVector<double> a, b, c, d;
+
+   d = a + evaluate( b * c );  // Unnecessary creation of a temporary vector
+   d = a + eval( b * c );      // No creation of a temporary vector
+   \endcode
+
+// In contrast to the \a evaluate() function, \a eval() can take the complete expression into
+// account and therefore can guarantee the most efficient way to evaluate it.
+*/
+template< typename VT  // Type of the vector
+        , bool TF >    // Transpose flag of the vector
+inline const typename VT::ResultType evaluate( const Vector<VT,TF>& vector )
+{
+   const typename VT::ResultType tmp( ~vector );
+   return tmp;
+}
+//*************************************************************************************************
+
+
+//*************************************************************************************************
 /*!\brief Returns whether the two given vectors represent the same observable state.
 // \ingroup vector
 //
@@ -395,8 +528,8 @@ BLAZE_ALWAYS_INLINE void resize( Vector<VT,TF>& vector, size_t n, bool preserve 
 // \a false.
 
    \code
-   typedef blaze::DynamicVector<int>          VectorType;
-   typedef blaze::DenseSubvector<VectorType>  SubvectorType;
+   using VectorType    = blaze::DynamicVector<int>;
+   using SubvectorType = blaze::Subvector<VectorType>;
 
    VectorType vec1( 4UL );  // Setup of a 4-dimensional dynamic vector
    VectorType vec2( 4UL );  // Setup of a second 4-dimensional dynamic vector
@@ -417,7 +550,7 @@ template< typename VT1  // Type of the left-hand side vector
         , bool TF1      // Transpose flag of the left-hand side vector
         , typename VT2  // Type of the right-hand side vector
         , bool TF2 >    // Transpose flag of the right-hand side vector
-BLAZE_ALWAYS_INLINE bool isSame( const Vector<VT1,TF1>& a, const Vector<VT2,TF2>& b )
+BLAZE_ALWAYS_INLINE bool isSame( const Vector<VT1,TF1>& a, const Vector<VT2,TF2>& b ) noexcept
 {
    return ( IsSame<VT1,VT2>::value &&
             reinterpret_cast<const void*>( &a ) == reinterpret_cast<const void*>( &b ) );
@@ -547,6 +680,36 @@ BLAZE_ALWAYS_INLINE void multAssign( Vector<VT1,TF1>& lhs, const Vector<VT2,TF2>
 
 //*************************************************************************************************
 /*! \cond BLAZE_INTERNAL */
+/*!\brief Default implementation of the division assignment of a vector to a vector.
+// \ingroup vector
+//
+// \param lhs The target left-hand side vector.
+// \param rhs The right-hand side vector divisor.
+// \return void
+//
+// This function implements the default division assignment of a vector to a vector.\n
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename VT1  // Type of the left-hand side vector
+        , bool TF1      // Transpose flag of the left-hand side vector
+        , typename VT2  // Type of the right-hand side vector
+        , bool TF2 >    // Transpose flag of the right-hand side vector
+BLAZE_ALWAYS_INLINE void divAssign( Vector<VT1,TF1>& lhs, const Vector<VT2,TF2>& rhs )
+{
+   BLAZE_FUNCTION_TRACE;
+
+   BLAZE_INTERNAL_ASSERT( (~lhs).size() == (~rhs).size(), "Invalid vector sizes" );
+   (~lhs).divAssign( ~rhs );
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
 /*!\brief Predict invariant violations by the assignment of a vector to a vector.
 // \ingroup vector
 //
@@ -661,6 +824,38 @@ template< typename VT1  // Type of the left-hand side vector
         , typename VT2  // Type of the right-hand side vector
         , bool TF2 >    // Transpose flag of the right-hand side vector
 BLAZE_ALWAYS_INLINE bool tryMultAssign( const Vector<VT1,TF1>& lhs, const Vector<VT2,TF2>& rhs, size_t index )
+{
+   BLAZE_INTERNAL_ASSERT( index <= (~lhs).size(), "Invalid vector access index" );
+   BLAZE_INTERNAL_ASSERT( (~rhs).size() <= (~lhs).size() - index, "Invalid vector size" );
+
+   UNUSED_PARAMETER( lhs, rhs, index );
+
+   return true;
+}
+/*! \endcond */
+//*************************************************************************************************
+
+
+//*************************************************************************************************
+/*! \cond BLAZE_INTERNAL */
+/*!\brief Predict invariant violations by the division assignment of a vector to a vector.
+// \ingroup vector
+//
+// \param lhs The target left-hand side vector.
+// \param rhs The right-hand side vector divisor.
+// \param index The index of the first element to be modified.
+// \return \a true in case the assignment would be successful, \a false if not.
+//
+// This function must \b NOT be called explicitly! It is used internally for the performance
+// optimized evaluation of expression templates. Calling this function explicitly might result
+// in erroneous results and/or in compilation errors. Instead of using this function use the
+// assignment operator.
+*/
+template< typename VT1  // Type of the left-hand side vector
+        , bool TF1      // Transpose flag of the left-hand side vector
+        , typename VT2  // Type of the right-hand side vector
+        , bool TF2 >    // Transpose flag of the right-hand side vector
+BLAZE_ALWAYS_INLINE bool tryDivAssign( const Vector<VT1,TF1>& lhs, const Vector<VT2,TF2>& rhs, size_t index )
 {
    BLAZE_INTERNAL_ASSERT( index <= (~lhs).size(), "Invalid vector access index" );
    BLAZE_INTERNAL_ASSERT( (~rhs).size() <= (~lhs).size() - index, "Invalid vector size" );

@@ -3,7 +3,7 @@
 //  \file blaze/math/adaptors/symmetricmatrix/BaseTemplate.h
 //  \brief Header file for the implementation of the base template of the SymmetricMatrix
 //
-//  Copyright (C) 2013 Klaus Iglberger - All Rights Reserved
+//  Copyright (C) 2012-2017 Klaus Iglberger - All Rights Reserved
 //
 //  This file is part of the Blaze library. You can redistribute it and/or modify it under
 //  the terms of the New (Revised) BSD License. Redistribution and use in source and binary
@@ -40,9 +40,9 @@
 // Includes
 //*************************************************************************************************
 
-#include <blaze/math/typetraits/IsColumnMajorMatrix.h>
 #include <blaze/math/typetraits/IsDenseMatrix.h>
-#include <blaze/util/typetraits/IsNumeric.h>
+#include <blaze/math/typetraits/IsNumericMatrix.h>
+#include <blaze/math/typetraits/StorageOrder.h>
 
 
 namespace blaze {
@@ -293,7 +293,7 @@ namespace blaze {
    using blaze::unpadded;
    using blaze::rowMajor;
 
-   typedef SymmetricMatrix< CustomMatrix<double,unaligned,unpadded,rowMajor> >  CustomSymmetric;
+   using CustomSymmetric = SymmetricMatrix< CustomMatrix<double,unaligned,unpadded,rowMajor> >;
 
    // Creating a 3x3 symmetric custom matrix from a properly initialized array
    double array[9] = { 1.0, 2.0, 4.0,
@@ -427,19 +427,23 @@ namespace blaze {
    SymmetricMatrix< HybridMatrix<double,3UL,3UL,rowMajor> > E;
    SymmetricMatrix< StaticMatrix<double,3UL,3UL,columnMajor> > F;
 
-   E = A + B;     // Matrix addition and assignment to a row-major symmetric matrix
-   F = C - D;     // Matrix subtraction and assignment to a column-major symmetric matrix
-   F = A * D;     // Matrix multiplication between a dense and a sparse matrix
+   E = A + B;     // Matrix addition and assignment to a row-major symmetric matrix (includes runtime check)
+   F = C - D;     // Matrix subtraction and assignment to a column-major symmetric matrix (only compile time check)
+   F = A * D;     // Matrix multiplication between a dense and a sparse matrix (includes runtime check)
 
    C *= 2.0;      // In-place scaling of matrix C
-   E  = 2.0 * B;  // Scaling of matrix B
-   F  = C * 2.0;  // Scaling of matrix C
+   E  = 2.0 * B;  // Scaling of matrix B (includes runtime check)
+   F  = C * 2.0;  // Scaling of matrix C (only compile time check)
 
-   E += A - B;    // Addition assignment
-   F -= C + D;    // Subtraction assignment
-   F *= A * D;    // Multiplication assignment
+   E += A - B;    // Addition assignment (includes runtime check)
+   F -= C + D;    // Subtraction assignment (only compile time check)
+   F *= A * D;    // Multiplication assignment (includes runtime check)
    \endcode
 
+// Note that it is possible to assign any kind of matrix to a symmetric matrix. In case the matrix
+// to be assigned is not symmetric at compile time, a runtime check is performed.
+//
+//
 // \n \section symmetricmatrix_block_structured Block-Structured Symmetric Matrices
 //
 // It is also possible to use block-structured symmetric matrices:
@@ -459,9 +463,9 @@ namespace blaze {
 
    \code
    // Inserting the elements (2,4) and (4,2)
-   A.insert( 2, 4, StaticMatrix<int,3UL,3UL>( 1, -4,  5,
-                                              6,  8, -3,
-                                              2, -1,  2 ) );
+   A.insert( 2, 4, StaticMatrix<int,3UL,3UL>( { { 1, -4,  5 },
+                                                { 6,  8, -3 },
+                                                { 2, -1,  2 } } ) );
 
    // Manipulating the elements (2,4) and (4,2)
    A(2,4)(1,1) = -5;
@@ -552,10 +556,10 @@ namespace blaze {
    using blaze::rowMajor;
    using blaze::columnMajor;
 
-   typedef SymmetricMatrix< DynamicMatrix<double,columnMajor> >  DynamicSymmetric;
+   using DynamicSymmetric = SymmetricMatrix< DynamicMatrix<double,columnMajor> >;
 
    DynamicSymmetric A( 10UL );
-   DenseRow<DynamicSymmetric> row5 = row( A, 5UL );
+   Row<DynamicSymmetric> row5 = row( A, 5UL );
    \endcode
 
 // Usually, a row view on a column-major matrix results in a considerable performance decrease in
@@ -600,10 +604,10 @@ namespace blaze {
    C = A * B;  // Is not guaranteed to result in a symmetric matrix; some runtime overhead
    \endcode
 */
-template< typename MT                                             // Type of the adapted matrix
-        , bool SO = IsColumnMajorMatrix<MT>::value                // Storage order of the adapted matrix
-        , bool DF = IsDenseMatrix<MT>::value                      // Density flag
-        , bool NF = IsNumeric<typename MT::ElementType>::value >  // Numeric flag
+template< typename MT                             // Type of the adapted matrix
+        , bool SO = StorageOrder<MT>::value       // Storage order of the adapted matrix
+        , bool DF = IsDenseMatrix<MT>::value      // Density flag
+        , bool NF = IsNumericMatrix<MT>::value >  // Numeric flag
 class SymmetricMatrix
 {};
 //*************************************************************************************************
