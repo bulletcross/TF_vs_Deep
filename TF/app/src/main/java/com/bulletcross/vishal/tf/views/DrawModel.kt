@@ -1,67 +1,64 @@
 package com.bulletcross.vishal.tf.views
 
-import java.util.ArrayList
-
-class DrawModel//given a set 28 by 28 sized window
-(val width: Int  // pixel width = 28
- , val height: Int // pixel height = 28
-) {
-
-
-    private var mCurrentLine: Line? = null
-
-    //so a model consits of lines which consists of elements
-    //a line begins when a user starts drawing and ends when
-    //they lift their finger up
-    private val mLines = ArrayList<Line>()
-
-    val lineSize: Int
-        get() = mLines.size
-
-    //initialize beginning of the line coordinate
-    class LineElem//internal repreesntation for manipulation
-    private constructor(var x: Float, var y: Float)
-
-    //for a single line
-    class Line private constructor() {
-        //a line consits of a set of elements (small parts of a line)
-        private val elems = ArrayList<LineElem>()
-
-        val elemSize: Int
-            get() = elems.size
-
-        //add, get, and get index of an element
-        private fun addElem(elem: LineElem) {
-            elems.add(elem)
-        }
-
-        fun getElem(index: Int): LineElem {
-            return elems[index]
-        }
+//point class, the most basic data type from which line can be made
+class point{
+    var x: Float = 0F;
+    var y: Float = 0F;
+    constructor(x: Float, y: Float){
+        this.x = x
+        this.y = y
     }
+}
 
-    //start drawing line and add it to memory
-    fun startLine(x: Float, y: Float) {
-        mCurrentLine = Line()
-        mCurrentLine!!.addElem(LineElem(x, y))
-        mLines.add(mCurrentLine)
+class line{
+    var line_array = mutableListOf<point>()
+    fun line(){}
+    fun add_point(p:point):Unit{
+        line_array.add(p)
     }
+    fun nr_points():Int{
+        return line_array.size
+    }
+    fun get_point(index:Int):point{
+        return line_array.get(index)
+    }
+}
 
-    fun endLine() {
-        mCurrentLine = null
-    }
+//Variables to record data required for prediction
+var temp_line:line = line()
+var width:Int = 0
+var height:Int = 0
+var all_lines = mutableListOf<line>()
 
-    fun addLineElem(x: Float, y: Float) {
-        if (mCurrentLine != null) {
-            mCurrentLine!!.addElem(LineElem(x, y))
-        }
-    }
+fun record_touch(x:Float, y:Float):Unit{
+    temp_line = line()
+    var p = point(x,y)
+    temp_line.add_point(p)
+    all_lines.add(temp_line)
+}
 
-    fun getLine(index: Int): Line {
-        return mLines[index]
+fun record_motion(x:Float, y:Float):Unit{
+    if(temp_line!=null && temp_line.){
+        var p = point(x,y)
+        temp_line.add_point(p)
     }
+}
 
-    fun clear() {
-        mLines.clear()
-    }
+//Bug fixed
+fun finalize_motion():Unit{
+    all_lines.add(temp_line)
+    temp_line = line()
+}
+
+//Other helper functions
+fun get_nr_lines():Int{
+    return all_lines.size
+}
+
+fun get_line(index:Int):line{
+    return all_lines[index]
+}
+
+fun clear_lines():Unit{
+    all_lines.clear()
 }
