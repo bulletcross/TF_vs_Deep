@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             temp_y = event.getY()
             data_draw?.map_data_points(temp_x, temp_y, temp_point)
             data_rec?.record_touch(temp_point.x, temp_point.y)
+            text_accuracy?.setText("D")
             return true
         }
         else if(action == MotionEvent.ACTION_MOVE){
@@ -91,10 +92,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             data_rec?.record_motion(temp_point.x, temp_point.y)
             temp_x = x
             temp_y = y
+            text_accuracy?.setText("M")
+            data_draw?.invalidate()
             return true
         }
         else if(action == MotionEvent.ACTION_UP){
             data_rec?.finalize_motion()
+            text_accuracy?.setText("U")
             return true
         }
         return false

@@ -48,7 +48,7 @@ class data_drawer: View {
     fun reset(){
         nr_drawn_lines = 0
         if(bitmap!=null){
-            paint.color = Color.WHITE
+            paint.color = Color.YELLOW
             val bitmap_height:Int = bitmap!!.height
             val bitmap_width:Int = bitmap!!.width
             canvas?.drawRect(Rect(0,0,bitmap_width,bitmap_height), paint)
