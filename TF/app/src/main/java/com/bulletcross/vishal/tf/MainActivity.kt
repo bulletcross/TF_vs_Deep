@@ -10,6 +10,8 @@ import android.widget.TextView
 import com.bulletcross.vishal.tf.views.data_drawer
 import com.bulletcross.vishal.tf.views.data_recorder
 
+import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
+
 class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchListener{
     //Layout elements
     var button_benchmark:Button? = null
