@@ -18,6 +18,10 @@ import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
+import android.R.attr.data
+import java.util.Collections.replaceAll
+
+
 
 class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchListener{
     //Layout elements
@@ -80,16 +84,14 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             var sb:StringBuilder = StringBuilder()
             var width:Int = data_draw?.bitmap!!.width
             var height:Int = data_draw?.bitmap!!.height
-            var root_path:String = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString()
-            var mydir: File = File(root_path + "/gesture_data/")
-            println(mydir)
+            var mydir: File = File("/sdcard/gesture_data")
             if(!mydir.exists()){
                 mydir.mkdirs()
-                println("Directory created")
             }
             try{
-                var my_file:File = File(mydir.path + "/data_file.csv")
-                outputStream = openFileOutput(my_file.getPath(), Context.MODE_APPEND)
+                var my_file:File = File(mydir.path, "lsdata_file.csv")
+                outputStream = FileOutputStream(my_file, true)
+
                 var pixel_int:IntArray = IntArray(width*height)
                 data_draw?.bitmap!!.getPixels(pixel_int, 0, width, 0, 0, width, height)
                 var pixel_float:Float
@@ -101,12 +103,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
                     sb.append(",")
                 }
                 sb.append(text_input?.text.toString())
+                val separator = System.getProperty("line.separator")
                 outputStream.write(sb.toString().toByteArray())
-                println(mydir.path + this.getFilesDir().getAbsolutePath())
+                outputStream.write(System.getProperty("line.separator").toByteArray());
                 outputStream.close()
 
             } catch (e:Exception){
-                println("Exception!!")
+                println("Exception!!" + e.toString())
             }
 
             data_rec?.clear_lines()
