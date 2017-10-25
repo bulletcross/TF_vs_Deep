@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
                     sb.append(pixel_float.toString())
                     sb.append(",")
                 }
+
                 //Run the prediction
                 probability = predictor_interface!!.prediction_probability(pixel_float_array)
                 //Save the gesture
