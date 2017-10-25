@@ -2159,7 +2159,7 @@ node {
   }
 }
 node {
-  name: "layer_5/OUTPUT"
+  name: "layer_5/softmax_output"
   op: "Softmax"
   input: "layer_5/add"
   attr {
@@ -5147,7 +5147,7 @@ node {
 node {
   name: "accuracy/ArgMax_1"
   op: "ArgMax"
-  input: "layer_5/OUTPUT"
+  input: "layer_5/softmax_output"
   input: "accuracy/ArgMax_1/dimension"
   attr {
     key: "T"
