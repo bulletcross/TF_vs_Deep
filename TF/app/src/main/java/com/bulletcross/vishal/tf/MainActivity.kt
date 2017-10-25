@@ -14,11 +14,11 @@ import android.widget.TextView
 import com.bulletcross.vishal.tf.views.data_drawer
 import com.bulletcross.vishal.tf.views.data_recorder
 
-import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
 import android.R.attr.data
+import com.bulletcross.vishal.tf.inference.predictor
 import java.util.Collections.replaceAll
 
 
@@ -40,6 +40,8 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
     var temp_y:Float = 0.0F
     var temp_point = PointF()
 
+    var predictor_interface:predictor? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -60,6 +62,8 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
         button_benchmark?.setOnClickListener(this)
         button_clear?.setOnClickListener(this)
         button_predict?.setOnClickListener(this)
+
+        predictor_interface = predictor(applicationContext)
 
     }
 
@@ -88,20 +92,25 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             if(!mydir.exists()){
                 mydir.mkdirs()
             }
+            var pixel_int:IntArray = IntArray(width*height)
+            var pixel_float_array:FloatArray = FloatArray(width*height)
+            var probability:FloatArray = FloatArray(4)
             try{
                 var my_file:File = File(mydir.path, "lsdata_file.csv")
                 outputStream = FileOutputStream(my_file, true)
-
-                var pixel_int:IntArray = IntArray(width*height)
                 data_draw?.bitmap!!.getPixels(pixel_int, 0, width, 0, 0, width, height)
                 var pixel_float:Float
                 for (i in 0..pixel_int.size-1){
                     var p_int:Int = pixel_int[i]
                     var p_standard:Int = p_int and 0xff
                     pixel_float = (0xff - p_standard).toFloat()/255.0F
+                    pixel_float_array[i] = pixel_float
                     sb.append(pixel_float.toString())
                     sb.append(",")
                 }
+                //Run the prediction
+                probability = predictor_interface!!.prediction_probability(pixel_float_array)
+                //Save the gesture
                 sb.append(text_input?.text.toString())
                 val separator = System.getProperty("line.separator")
                 outputStream.write(sb.toString().toByteArray())
@@ -115,7 +124,30 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             data_rec?.clear_lines()
             data_draw?.reset()
             data_draw?.invalidate() //Force redraw on screen
-            text_accuracy?.setText("C")
+            //Update the prediction text
+            var max_prob:Float = -1.0F
+            var max_prob_index:Int = -1
+            for(i in 0..3){
+                if(probability[i]>max_prob){
+                    max_prob = probability[i]
+                    max_prob_index = i
+                }
+            }
+            if(max_prob_index==-1){
+                text_accuracy?.setText("?")
+            }
+            else if(max_prob_index==0){
+                text_accuracy?.setText("Tr")
+            }
+            else if(max_prob_index==1){
+                text_accuracy?.setText("Ci")
+            }
+            else if(max_prob_index==2){
+                text_accuracy?.setText("Cr")
+            }
+            else{
+                text_accuracy?.setText("Sq")
+            }
         }
         else if(v.getId() == R.id.button2){
             //Run prediction model on view data
