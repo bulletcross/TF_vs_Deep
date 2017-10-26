@@ -16,10 +16,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include <iostream>
 #include <fstream>
 #include <sstream>
-#include <blaze/Math.h>
 #include <string>
 
 using namespace std;
@@ -64,24 +62,23 @@ DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_co
 	string::size_type temp;
 	string line, word;
 	ifstream file_reader;
-
 	file_reader.open(file_name.c_str());
-
+	if(file_reader.fail()){
+		return ret;
+	}
 	while(file_reader){
 		string line;
 		if(!getline(file_reader, line)){
 			break;
 		}
 		istringstream ss(line);
-		getline(ss, word, ',');
-		ret_label[r] = (word[0] - 'A');
-		while(ss){
-			if(!getline(ss, word, ',')){
-				break;
-			}
+		for(int i=0;i<nr_cols;i++){
+			getline(ss, word, ',');
 			ret(c,r) = (double)stod(word,&temp);
 			c++;
 		}
+		getline(ss, word, ',');
+		ret_label[r] = (int)stoi(word,&temp);
 		r++;
 		c=0;
 	}

@@ -2,25 +2,27 @@
 #include <vector>
 #include <algorithm>
 
+#include <blaze/Math.h>
+
 #include <deepsea/math_util.h>
 #include <deepsea/network_builder.h>
 #include <deepsea/read_write_util.h>
 #include <deepsea/prediction.h>
 
-#include <blaze/Math.h>
-
-
 using namespace std;
+
+#define INPUT_SIZE 784
+#define NUM_CLASSES 4
+
 int main()
 {
-
-	static const int arr[] = {};
+	static const int arr[] = {INPUT_SIZE, 1024, 100, 150, 20, NUM_CLASSES};
 	vector<int> layer (arr, arr + sizeof(arr)/sizeof(arr[0]));
 
 	//Declare training params
-	int batch_size;
-	int nr_epoch;
-	double learning_rate;
+	int batch_size = 20;
+	int nr_epoch = 50;
+	double learning_rate = 0.01;
 	int nr_batch;
 
 	//Initialize model and train graph parameters
@@ -31,25 +33,27 @@ int main()
 	backward_param b_p(layer, batch_size);
 
 	//read datafile, seperate test data X_test, Y_test
-
+  int *temp_label;
+  DynamicMatrix<double> X_all = read_csv_modified("combined_data.csv", 409, INPUT_SIZE, &temp_label);
+  DynamicMatrix<double> Y_all = get_label_modified(temp_label, NUM_CLASSES, 409);
 	nr_batch = X_all.columns()/batch_size;
 
-    //Allocate matrix variables to be used at training
-    DynamicMatrix<double> X;
-    DynamicMatrix<double> Y;
 
-    DynamicMatrix<double> X_test;
-    DynamicMatrix<double> Y_test;
-    DynamicMatrix<double> O;
+  //Allocate matrix variables to be used at training
+  DynamicMatrix<double> X;
+  DynamicMatrix<double> Y;
+
+  DynamicMatrix<double> X_test;
+  DynamicMatrix<double> Y_test;
+  DynamicMatrix<double> O;
 
 	//Start training
 	for(int i=0;i<nr_epoch;i++){
 
-
 		for(int j=0;j<nr_batch;j++){
 			//Prepare input batch X and output label Y
-			X = submatrix(X_all);
-			Y = submatrix(Y_all);
+			X = submatrix(X_all, 0, j*batch_size, INPUT_SIZE, batch_size);
+			Y = submatrix(Y_all, 0, j*batch_size, NUM_CLASSES, batch_size);
 
 			feed_forward(&m_p, &f_p, X);
 			back_prop(&m_p, &f_p, &b_p, Y);
@@ -57,8 +61,8 @@ int main()
 		}
 
 		//Print accuracy and cost on test data set, test set should be separated, but I am lazy :/
-        X_test = submatrix(X_all);
-        Y_test = submatrix(Y_all);
+    X_test = submatrix(X_all, 0, 0, INPUT_SIZE, batch_size);
+    Y_test = submatrix(Y_all, 0, 0, NUM_CLASSES, batch_size);
 		O = predict(&m_p, &f_p, X_test);
 
 		cout << "Cost for epoch " << i << " is " << mean_cross_entropy_loss(Y_test, O) << endl;
@@ -66,6 +70,5 @@ int main()
 	}
 
 	write_model(&m_p, "model_1.txt");
-
-    return 0;
+  return 0;
 }

@@ -16,8 +16,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#include <iostream>
-#include <blaze/Math.h>
 
 //This is "un-optimized" version of predictor, will be extended after performance test
 DynamicMatrix<double> predict(model_param *m_p, forward_param *f_p, DynamicMatrix<double> input){
