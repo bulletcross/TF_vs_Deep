@@ -55,7 +55,7 @@ DynamicMatrix<double> read_csv(string file_name, int nr_rows, int nr_cols){
 }
 
 //This will be depreciated
-DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_cols, int **label){
+/*DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_cols, int **label){/************************
 	DynamicMatrix<double> ret(nr_cols, nr_rows);
 	int *ret_label = new int[nr_rows];
 	int r=0,c=0;
@@ -79,6 +79,37 @@ DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_co
 		}
 		getline(ss, word, ',');
 		ret_label[r] = (int)stoi(word,&temp);
+		r++;
+		c=0;
+	}
+	*label = ret_label;
+	return ret;
+}*/
+DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_cols, int **label){
+	DynamicMatrix<double> ret(nr_cols, nr_rows);
+	int *ret_label = new int[nr_rows];
+	int r=0,c=0;
+	string::size_type temp;
+	string line, word;
+	ifstream file_reader;
+
+	file_reader.open(file_name.c_str());
+
+	while(file_reader){
+		string line;
+		if(!getline(file_reader, line)){
+			break;
+		}
+		istringstream ss(line);
+		getline(ss, word, ',');
+		ret_label[r] = (word[0] - 'A');
+		while(ss){
+			if(!getline(ss, word, ',')){
+				break;
+			}
+			ret(c,r) = (double)stod(word,&temp);
+			c++;
+		}
 		r++;
 		c=0;
 	}
