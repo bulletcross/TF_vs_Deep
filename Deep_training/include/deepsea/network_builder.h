@@ -79,7 +79,7 @@ class forward_param{
 		}
 		void print_linear(void){
 			for(int i=0;i<nr_layer;i++){
-				std::cout << Z[i];
+				std::cout << Z[i] << std::endl;
 			}
 		}
 		void print_activated(void){

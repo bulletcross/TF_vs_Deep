@@ -1,11 +1,4 @@
 
-
-
-/*NOTICE: to run the gesture model training, marked -> /************8
-uncomment the commented code and comment correspondin
-code in the next lines. Further, read_write_util.h has a
-function which needs uncommneting*/
-
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -19,24 +12,36 @@ function which needs uncommneting*/
 
 using namespace std;
 
-/*#define INPUT_SIZE 784/******************
+//If uncommenting below FLAG, uncomment from read_write_util.h also
+//#define BENCH 0
+
+#ifndef BENCH
+#define INPUT_SIZE 784
 #define NUM_CLASSES 4
-#define NR_DATA 409*/
+#define NR_DATA 409
+#else
 #define INPUT_SIZE 16
 #define NUM_CLASSES 26
 #define NR_DATA 20000
+#endif
 
 int main()
 {
-	//static const int arr[] = {INPUT_SIZE, 1024, 100, 150, 20, NUM_CLASSES};/*********************
+#ifndef BENCH
+	static const int arr[] = {INPUT_SIZE, 1024, 100, 150, 20, NUM_CLASSES};
+#else
   static const int arr[] = {INPUT_SIZE, 20, 40, NUM_CLASSES};
+#endif
 	vector<int> layer (arr, arr + sizeof(arr)/sizeof(arr[0]));
 
 	//Declare training params
-	/*int batch_size = 20;/*****************8
-	int nr_epoch = 50;*/
+#ifndef BENCH
+	int batch_size = 20;
+	int nr_epoch = 50;
+#else
   int batch_size = 50;
   int nr_epoch = 200;
+#endif
 
 	double learning_rate = 0.01;
 	int nr_batch;
@@ -50,8 +55,11 @@ int main()
 
 	//read datafile, seperate test data X_test, Y_test
   int *temp_label;
-  //DynamicMatrix<double> X_all = read_csv_modified("combined_data.csv", NR_DATA, INPUT_SIZE, &temp_label);/*******************8
+#ifndef BENCH
+  DynamicMatrix<double> X_all = read_csv_modified("combined_data.csv", NR_DATA, INPUT_SIZE, &temp_label);
+#else
   DynamicMatrix<double> X_all = read_csv_modified("letter-recognition.data", NR_DATA, INPUT_SIZE, &temp_label);
+#endif
   DynamicMatrix<double> Y_all = get_label_modified(temp_label, NUM_CLASSES, NR_DATA);
 
   nr_batch = X_all.columns()/batch_size;
@@ -87,7 +95,10 @@ int main()
 		cout << "Accuracy for epoch " << i << " is " << accuracy(Y_test, O) << endl << endl;
 	}
 
-	//write_model(&m_p, "model_4.txt");/*****************************
+#ifndef BENCH
+	write_model(&m_p, "model_4.txt");
+#else
 	write_model(&m_p, "model_2.txt");
+#endif
   return 0;
 }

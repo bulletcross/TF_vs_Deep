@@ -22,6 +22,8 @@
 
 using namespace std;
 
+//#define BENCH 0
+
 DynamicMatrix<double> read_csv(string file_name, int nr_rows, int nr_cols){
 	DynamicMatrix<double> ret(nr_rows, nr_cols);
 	int r=0,c=0;
@@ -55,7 +57,8 @@ DynamicMatrix<double> read_csv(string file_name, int nr_rows, int nr_cols){
 }
 
 //This will be depreciated
-/*DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_cols, int **label){/************************
+#ifndef BENCH
+DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_cols, int **label){
 	DynamicMatrix<double> ret(nr_cols, nr_rows);
 	int *ret_label = new int[nr_rows];
 	int r=0,c=0;
@@ -84,7 +87,8 @@ DynamicMatrix<double> read_csv(string file_name, int nr_rows, int nr_cols){
 	}
 	*label = ret_label;
 	return ret;
-}*/
+}
+#else
 DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_cols, int **label){
 	DynamicMatrix<double> ret(nr_cols, nr_rows);
 	int *ret_label = new int[nr_rows];
@@ -116,7 +120,7 @@ DynamicMatrix<double> read_csv_modified(string file_name, int nr_rows, int nr_co
 	*label = ret_label;
 	return ret;
 }
-
+#endif
 //This will be depreciated
 DynamicMatrix<double> get_label_modified(int *label, int rows, int cols){
 	DynamicMatrix<double> ret(rows,cols);
