@@ -34,14 +34,14 @@ int main()
 
 	//Declare params
 #ifndef BENCH
-	int batch_size = 1;
+	int batch_size = 20;
 #else
   int batch_size = 10;
 #endif
 	int nr_batch;
 
 #ifndef BENCH
-  model_param m_p = read_model("model_4.txt");
+  model_param m_p = read_model("model_5.txt");
 #else
 	model_param m_p = read_model("model_2.txt");
 #endif
@@ -56,8 +56,7 @@ int main()
 #endif
   DynamicMatrix<double> Y_all = get_label_modified(temp_label, NUM_CLASSES, NR_DATA);
 
-  //nr_batch = X_all.columns()/batch_size;
-  nr_batch = 2;
+  nr_batch = X_all.columns()/batch_size;
 
 
   //Allocate matrix variables to be used
@@ -69,13 +68,9 @@ int main()
 		//Prepare input batch X and output label Y
 		X = submatrix(X_all, 0, i*batch_size, INPUT_SIZE, batch_size);
 		Y = submatrix(Y_all, 0, i*batch_size, NUM_CLASSES, batch_size);
-    cout << X << endl;
-    cout << Y << endl;
 
 		O = predict(&m_p, &f_p, X);
-    cout << O << endl;
     cout << "Accuracy for batch " << i << " is " << accuracy(Y, O) << endl << endl;
 	}
-  f_p.print_linear();
   return 0;
 }
