@@ -18,9 +18,7 @@ android {
             cmake {
                 arguments "-DANDROID_STL=c++_shared"
 
-                cppFlags "-std=c++14 -fexceptions -frtti"
-
-                abiFilters 'armeabi'
+                cppFlags "-std=c++14 -fexceptions -frtti -D__STDC_FORMAT_MACROS"
             }
         }
     }
