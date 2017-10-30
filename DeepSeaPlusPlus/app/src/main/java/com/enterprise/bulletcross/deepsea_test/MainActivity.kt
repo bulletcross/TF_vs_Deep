@@ -9,9 +9,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        val input_vector = DoubleArray(4)
+        input_vector[0] = 3.4
+        input_vector[1] = 6.7
+        input_vector[2] = 8.9
+        input_vector[3] = 3.0
         // Example of a call to a native method
-        sample_text.text = stringFromJNI()
+        val max_from_jni:Double = dummy(input_vector)
+        //println(dummy(input_vector))
+        sample_text.text = stringFromJNI() + max_from_jni.toString()
     }
 
     /**
@@ -19,6 +25,7 @@ class MainActivity : AppCompatActivity() {
      * which is packaged with this application.
      */
     external fun stringFromJNI(): String
+    external fun dummy(inp: DoubleArray): Double
 
     companion object {
 
