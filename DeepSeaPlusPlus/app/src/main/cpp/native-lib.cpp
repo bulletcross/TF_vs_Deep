@@ -24,7 +24,7 @@ vector<int> layer (arr, arr + sizeof(arr)/sizeof(arr[0]));
 blaze::DynamicMatrix<double> output_cache(4, 1);
 blaze::DynamicMatrix<double> input_cache(784, 1);
 
-model_param m_p = read_model("model_5.txt");
+//model_param m_p = read_model("model_5.txt");
 forward_param f_p(layer, 1);
 
 JNIEXPORT void
@@ -32,21 +32,21 @@ JNIEXPORT void
 JNICALL
 Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_load_weight(
         JNIEnv *env,
-        jobject /* this */) {
+        jobject ) {
     //TO-DO: assignment of m_p and f_p in here
-    return;
 
-}
+};
 
 JNIEXPORT jint
 
 JNICALL
 Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_predict_JNI(
         JNIEnv *env,
-        jobject /* this */,
+        jobject ,
         jdoubleArray inp) {
-    jsize len = env->GetArrayLength(inp);
-    jdouble *point = env->GetDoubleArrayElements(inp, 0);
+    //jsize len = env->GetArrayLength(inp);
+    //jint ret = -1;
+    /*jdouble *point = env->GetDoubleArrayElements(inp, 0);
     for(jint i=0;i<len;i++){
         input_cache(i,0) = point[i];
     }
@@ -59,7 +59,7 @@ Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_predict_JNI(
             ret = i;
         }
     }
-    env->ReleaseDoubleArrayElements(inp, point, 0);
-    return ret;
+    env->ReleaseDoubleArrayElements(inp, point, 0);*/
+    return -1;
 };
 }

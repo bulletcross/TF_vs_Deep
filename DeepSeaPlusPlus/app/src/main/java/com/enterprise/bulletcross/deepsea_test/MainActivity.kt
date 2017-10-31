@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
         button_predict?.setOnClickListener(this)
 
         predictor_interface = predictor()
-        predictor_interface?.initialize_weights()
+        //predictor_interface?.initialize_weights()
     }
 
     override fun onResume(){

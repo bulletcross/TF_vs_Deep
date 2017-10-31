@@ -6,7 +6,7 @@ package com.enterprise.bulletcross.deepsea_test.inference
 class predictor {
     //external fun stringFromJNI(): String
     //external fun dummy(inp: DoubleArray): Double
-    external fun load_weight():Unit
+    external fun load_weight()
     external fun predict_JNI(inp: DoubleArray):Int
 
 
