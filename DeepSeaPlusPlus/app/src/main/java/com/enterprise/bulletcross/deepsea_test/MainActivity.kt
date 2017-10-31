@@ -56,7 +56,8 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
         button_clear?.setOnClickListener(this)
         button_predict?.setOnClickListener(this)
 
-        predictor_interface = predictor(applicationContext)
+        predictor_interface = predictor()
+        predictor_interface?.initialize_weights()
     }
 
     override fun onResume(){
@@ -85,24 +86,24 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
                 mydir.mkdirs()
             }
             var pixel_int:IntArray = IntArray(width*height)
-            var pixel_float_array:FloatArray = FloatArray(width*height)
-            var probability:FloatArray = FloatArray(4)
+            var pixel_double_array:DoubleArray = DoubleArray(width*height)
+            var predicted:Int = -1
             try{
                 var my_file: File = File(mydir.path, "lsdata2_file.csv")
                 outputStream = FileOutputStream(my_file, true)
                 data_draw?.bitmap!!.getPixels(pixel_int, 0, width, 0, 0, width, height)
-                var pixel_float:Float
+                var pixel_double:Double
                 for (i in 0..pixel_int.size-1){
                     var p_int:Int = pixel_int[i]
                     var p_standard:Int = p_int and 0xff
-                    pixel_float = (0xff - p_standard).toFloat()/255.0F
-                    pixel_float_array[i] = pixel_float
-                    sb.append(pixel_float.toString())
+                    pixel_double = (0xff - p_standard).toDouble()/255.0
+                    pixel_double_array[i] = pixel_double
+                    sb.append(pixel_double.toString())
                     sb.append(",")
                 }
 
                 //Run the prediction
-                probability = predictor_interface!!.prediction_probability(pixel_float_array)
+                predicted = predictor_interface!!.predict(pixel_double_array)
                 //Save the gesture
                 sb.append(text_input?.text.toString())
                 val separator = System.getProperty("line.separator")
@@ -120,22 +121,17 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             //Update the prediction text
             var max_prob:Float = -1.0F
             var max_prob_index:Int = -1
-            for(i in 0..3){
-                if(probability[i]>max_prob){
-                    max_prob = probability[i]
-                    max_prob_index = i
-                }
-            }
-            if(max_prob_index==-1){
+
+            if(predicted==-1){
                 text_accuracy?.setText("?")
             }
-            else if(max_prob_index==0){
+            else if(predicted==0){
                 text_accuracy?.setText("Tr")
             }
-            else if(max_prob_index==1){
+            else if(predicted==1){
                 text_accuracy?.setText("Ci")
             }
-            else if(max_prob_index==2){
+            else if(predicted==2){
                 text_accuracy?.setText("Cr")
             }
             else{
@@ -174,20 +170,5 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             return true
         }
         return false
-    }
-
-    /**
-     * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
-     */
-    external fun stringFromJNI(): String
-    external fun dummy(inp: DoubleArray): Double
-
-    companion object {
-
-        // Used to load the 'native-lib' library on application startup.
-        init {
-            System.loadLibrary("native-lib")
-        }
     }
 }
