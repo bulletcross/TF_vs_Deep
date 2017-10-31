@@ -119,8 +119,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             data_draw?.reset()
             data_draw?.invalidate() //Force redraw on screen
             //Update the prediction text
-            var max_prob:Float = -1.0F
-            var max_prob_index:Int = -1
 
             if(predicted==-1){
                 text_accuracy?.setText("?")

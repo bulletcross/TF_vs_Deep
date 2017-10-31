@@ -12,38 +12,54 @@
 #include <deepsea/prediction.h>
 #include <deepsea/read_write_util.h>
 
+#define INPUT_SIZE 784
+#define NUM_CLASSES 4
+
 extern "C"
 {
-JNIEXPORT jstring
 
-JNICALL
-Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_stringFromJNI(
-        JNIEnv *env,
-        jobject /* this */) {
-    std::string hello = "Hello from C++ Native success";
-    blaze::DynamicMatrix<double> A(3, 2);
-    return env->NewStringUTF(hello.c_str());
-}
-
+static const int arr[] = {INPUT_SIZE, 1024, 100, 150, 20, NUM_CLASSES};
+vector<int> layer (arr, arr + sizeof(arr)/sizeof(arr[0]));
 
 blaze::DynamicMatrix<double> output_cache(4, 1);
-blaze::DynamicMatrix<double> input_cache(4, 1);
+blaze::DynamicMatrix<double> input_cache(784, 1);
 
-JNIEXPORT jdouble
+model_param m_p = read_model("model_5.txt");
+forward_param f_p(layer, 1);
+
+JNIEXPORT void
 
 JNICALL
-Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_dummy(
+Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_load_weight(
+        JNIEnv *env,
+        jobject /* this */) {
+    //TO-DO: assignment of m_p and f_p in here
+    return;
+
+}
+
+JNIEXPORT jint
+
+JNICALL
+Java_com_enterprise_bulletcross_deepsea_1test_MainActivity_predict_JNI(
         JNIEnv *env,
         jobject /* this */,
         jdoubleArray inp) {
-
     jsize len = env->GetArrayLength(inp);
     jdouble *point = env->GetDoubleArrayElements(inp, 0);
-
-    for(int i=0;i<4;i++){
+    for(jint i=0;i<len;i++){
         input_cache(i,0) = point[i];
     }
+    output_cache = predict(&m_p,&f_p, input_cache);
+    jint ret = -1;
+    double max_value = -1;
+    for(int i=0;i<4;i++){
+        if(max_value < output_cache(i,0)){
+            max_value = output_cache(i,0);
+            ret = i;
+        }
+    }
     env->ReleaseDoubleArrayElements(inp, point, 0);
-    return blaze::max(input_cache);
+    return ret;
 };
 }
