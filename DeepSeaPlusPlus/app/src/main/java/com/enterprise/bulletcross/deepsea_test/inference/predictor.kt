@@ -6,8 +6,8 @@ package com.enterprise.bulletcross.deepsea_test.inference
 class predictor {
     //external fun stringFromJNI(): String
     //external fun dummy(inp: DoubleArray): Double
-    external fun load_weight()
-    external fun predict_JNI(inp: DoubleArray):Int
+    external fun loadweight()
+    external fun predictJNI(inp: DoubleArray):Int
 
 
     companion object {
@@ -16,11 +16,11 @@ class predictor {
         }
     }
     fun initialize_weights(){
-        load_weight()
+        loadweight()
     }
     fun predict(input: DoubleArray):Int{
         var ret_symbol = -1;
-        ret_symbol = predict_JNI(input)
+        ret_symbol = predictJNI(input)
         return ret_symbol;
     }
 }

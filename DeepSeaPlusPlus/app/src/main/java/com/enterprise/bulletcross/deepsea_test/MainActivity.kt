@@ -120,6 +120,8 @@ class MainActivity : AppCompatActivity(), View.OnClickListener,  View.OnTouchLis
             data_draw?.invalidate() //Force redraw on screen
             //Update the prediction text
 
+            println(predicted)
+
             if(predicted==-1){
                 text_accuracy?.setText("?")
             }
